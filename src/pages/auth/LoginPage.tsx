@@ -50,7 +50,8 @@ export function LoginPage() {
     });
 
     // TODO: API/토큰 연동 단계에서 토큰 생성, 세션 저장, 로그인 유지 처리를 구현합니다.
-    navigate('/home');
+    window.sessionStorage.setItem('mockAuthStatus', 'authenticated');
+    navigate('/home', { replace: true });
   };
 
   return (
