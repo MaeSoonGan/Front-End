@@ -10,6 +10,8 @@ import { AdminSystemManagePage } from '../pages/admin/AdminSystemManagePage';
 import { AdminUserManagePage } from '../pages/admin/AdminUserManagePage';
 import { FindAccountPage } from '../pages/auth/FindAccountPage';
 import { LoginPage } from '../pages/auth/LoginPage';
+import { ResetPasswordCompletePage } from '../pages/auth/ResetPasswordCompletePage';
+import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
 import { SignupPage } from '../pages/auth/SignupPage';
 import { InfraDashboardPage } from '../pages/infra/InfraDashboardPage';
 import { ContestDetailPage } from '../pages/user/ContestDetailPage';
@@ -31,6 +33,8 @@ export const router = createBrowserRouter([
       { path: '/login', element: <LoginPage /> },
       { path: '/signup', element: <SignupPage /> },
       { path: '/find-account', element: <FindAccountPage /> },
+      { path: '/reset-password', element: <ResetPasswordPage /> },
+      { path: '/reset-password/complete', element: <ResetPasswordCompletePage /> },
     ],
   },
   {

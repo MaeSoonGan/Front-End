@@ -1,5 +1,6 @@
 import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AuthPageHeader } from '../../components/auth/AuthPageHeader';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { Modal } from '../../components/common/Modal';
@@ -237,19 +238,7 @@ export function SignupPage() {
   return (
     <>
       <Card className="min-h-screen w-full rounded-none border-0 shadow-none sm:min-h-0 sm:max-w-md sm:rounded-lg sm:border sm:shadow-sm">
-        <div className="mb-5 flex items-center gap-3">
-          <button
-            aria-label="뒤로가기"
-            className="relative flex h-8 w-8 items-center justify-center rounded-full text-[#1565C0] hover:bg-[#F0F6FF]"
-            onClick={goBack}
-            type="button"
-          >
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-[61%] text-4xl leading-none">
-              ‹
-            </span>
-          </button>
-          <h1 className="text-base font-bold text-slate-950">회원가입</h1>
-        </div>
+        <AuthPageHeader onBack={goBack} title="회원가입" />
 
         <form className="space-y-3" noValidate onSubmit={handleSubmit}>
           {errors.server ? <p className={ERROR_CLASS}>{errors.server}</p> : null}
