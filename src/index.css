@@ -1,1 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@700&display=swap');
 @import "tailwindcss";
+
+html,
+body,
+button,
+input,
+textarea,
+select {
+  font-family: "Noto Sans KR", sans-serif;
+  font-weight: 700;
+}
