@@ -382,7 +382,7 @@ export function AdminUserManagePage() {
 
         {/* 테이블 */}
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="min-w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-slate-500">
                 <th className="w-10 px-4 py-3">
@@ -397,15 +397,15 @@ export function AdminUserManagePage() {
                   />
                 </th>
                 <th className="px-4 py-3 font-medium">닉네임</th>
-                <th className="px-4 py-3 font-medium">계정</th>
-                <th className="px-4 py-3 font-medium">이메일</th>
-                <th className="px-4 py-3 font-medium">가입일</th>
+                <th className="px-4 py-3 text-center font-medium">계정</th>
+                <th className="px-4 py-3 text-center font-medium">이메일</th>
+                <th className="px-4 py-3 text-center font-medium">가입일</th>
                 <th className="px-4 py-3 text-center font-medium">참여 대회</th>
                 <th className="px-4 py-3 text-right font-medium">총 자산</th>
                 <th className="px-4 py-3 text-right font-medium">수익률</th>
                 <th className="px-4 py-3 text-center font-medium">로그인 실패</th>
-                <th className="px-4 py-3 font-medium">상태</th>
-                <th className="px-4 py-3 font-medium">관리</th>
+                <th className="px-4 py-3 text-center font-medium">상태</th>
+                <th className="px-4 py-3 text-center font-medium">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -429,10 +429,10 @@ export function AdminUserManagePage() {
                         className="h-4 w-4 rounded border-slate-300 accent-[#1565C0]"
                       />
                     </td>
-                    <td className="px-4 py-3 font-medium text-slate-900">{member.nickname}</td>
-                    <td className="px-4 py-3 text-slate-500">{member.accountId}</td>
-                    <td className="px-4 py-3 text-slate-600">{member.email}</td>
-                    <td className="px-4 py-3 text-slate-600">{member.joinedAt}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{member.nickname}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-center text-slate-500">{member.accountId}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-center text-slate-600">{member.email}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-center text-slate-600">{member.joinedAt}</td>
                     <td className="px-4 py-3 text-center text-slate-600">
                       {member.contestCount}개
                     </td>
@@ -457,12 +457,14 @@ export function AdminUserManagePage() {
                       {member.loginFailCount}회
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge tone={MEMBER_STATUS_TONE[member.memberStatus]}>
-                        {MEMBER_STATUS_LABEL[member.memberStatus]}
-                      </StatusBadge>
+                      <div className="flex justify-center">
+                        <StatusBadge tone={MEMBER_STATUS_TONE[member.memberStatus]}>
+                          {MEMBER_STATUS_LABEL[member.memberStatus]}
+                        </StatusBadge>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
+                      <div className="flex justify-center items-center gap-1">
                         <button className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
                           상세
                         </button>

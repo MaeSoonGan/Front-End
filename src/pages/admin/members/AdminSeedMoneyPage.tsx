@@ -330,34 +330,32 @@ export function AdminSeedMoneyPage() {
             <div className="overflow-x-auto">
               <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                    <th className="whitespace-nowrap pb-2 pr-4 font-medium">수령 회원</th>
-                    <th className="whitespace-nowrap pb-2 pr-4 font-medium">금액</th>
-                    <th className="whitespace-nowrap pb-2 pr-4 font-medium">유형</th>
-                    <th className="whitespace-nowrap pb-2 pr-4 font-medium">사유</th>
-                    <th className="whitespace-nowrap pb-2 pr-4 font-medium">지급 관리자</th>
-                    <th className="whitespace-nowrap pb-2 font-medium">일시</th>
+                  <tr className="border-b border-slate-200 text-xs text-slate-500">
+                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">수령 회원</th>
+                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">금액</th>
+                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">유형</th>
+                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">사유</th>
+                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">지급 관리자</th>
+                    <th className="whitespace-nowrap pb-2 text-center font-medium">일시</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginated.map(record => (
                     <tr key={record.id} className="hover:bg-slate-50">
-                      <td className="whitespace-nowrap py-3 pr-4 font-medium text-slate-900">
+                      <td className="whitespace-nowrap py-3 pr-4 text-center font-medium text-slate-900">
                         {record.recipientNickname}
                       </td>
-                      <td className="whitespace-nowrap py-3 pr-4 font-medium text-[#1565C0]">
+                      <td className="whitespace-nowrap py-3 pr-4 text-center font-medium text-[#1565C0]">
                         +{formatAmount(record.amount)}
                       </td>
-                      <td className="whitespace-nowrap py-3 pr-4">
+                      <td className="py-3 pr-4 text-center">
                         <TypeBadge type={record.type} />
                       </td>
-                      <td className="py-3 pr-4">
-                        <p className="w-20 truncate text-slate-600" title={record.reason}>
-                          {record.reason}
-                        </p>
+                      <td className="py-3 pr-4 text-center">
+                        {record.reason}
                       </td>
-                      <td className="whitespace-nowrap py-3 pr-4 text-slate-500">{record.adminName}</td>
-                      <td className="whitespace-nowrap py-3 text-xs text-slate-400">{record.paidAt}</td>
+                      <td className="whitespace-nowrap py-3 pr-4 text-center text-slate-500">{record.adminName}</td>
+                      <td className="whitespace-nowrap py-3 text-center text-xs text-slate-400">{record.paidAt}</td>
                     </tr>
                   ))}
                 </tbody>

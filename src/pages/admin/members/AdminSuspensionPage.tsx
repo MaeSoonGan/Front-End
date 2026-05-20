@@ -310,12 +310,12 @@ export function AdminSuspensionPage() {
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
                     <th className="pb-2 pr-3 font-medium">대상 회원</th>
-                    <th className="pb-2 pr-3 font-medium">유형</th>
-                    <th className="pb-2 pr-3 font-medium">사유</th>
+                    <th className="pb-2 pr-3 text-center font-medium">유형</th>
+                    <th className="pb-2 pr-3 text-center font-medium">사유</th>
                     <th className="pb-2 pr-3 font-medium">처리 관리자</th>
-                    <th className="pb-2 pr-3 font-medium">일시</th>
-                    <th className="pb-2 pr-3 font-medium">상태</th>
-                    <th className="pb-2 font-medium">관리</th>
+                    <th className="pb-2 pr-3 text-center font-medium">일시</th>
+                    <th className="pb-2 pr-3 text-center font-medium">상태</th>
+                    <th className="pb-2 text-center font-medium">관리</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -332,36 +332,42 @@ export function AdminSuspensionPage() {
                           {record.targetNickname}
                         </td>
                         <td className="py-3 pr-3">
-                          <TypeBadge type={record.type} />
+                          <div className="flex justify-center">
+                            <TypeBadge type={record.type} />
+                          </div>
                         </td>
-                        <td className="py-3 pr-3 max-w-28">
+                        <td className="py-3 pr-3 max-w-28 text-center">
                           <p className="truncate text-slate-700" title={record.reason}>
                             {record.reason}
                           </p>
                         </td>
                         <td className="py-3 pr-3 text-slate-600">{record.adminName}</td>
-                        <td className="py-3 pr-3 text-slate-500 whitespace-pre-line text-xs">
+                        <td className="py-3 pr-3 text-center text-slate-500 whitespace-pre-line text-xs">
                           {record.processedAt}
                         </td>
                         <td className="py-3 pr-3">
-                          <StatusBadge status={record.status} />
+                          <div className="flex justify-center">
+                            <StatusBadge status={record.status} />
+                          </div>
                         </td>
                         <td className="py-3">
-                          {record.status === 'SUSPENDED' ? (
-                            <button
-                              onClick={() => handleReleaseRow(record)}
-                              className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-600 hover:bg-emerald-200"
-                            >
-                              해제
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleDetailRow(record)}
-                              className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-200"
-                            >
-                              상세
-                            </button>
-                          )}
+                          <div className="flex justify-center">
+                            {record.status === 'SUSPENDED' ? (
+                              <button
+                                onClick={() => handleReleaseRow(record)}
+                                className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-600 hover:bg-emerald-200"
+                              >
+                                해제
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleDetailRow(record)}
+                                className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-200"
+                              >
+                                상세
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))
