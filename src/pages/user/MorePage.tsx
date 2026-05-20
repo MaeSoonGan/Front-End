@@ -1,11 +1,16 @@
+import { useNavigate } from 'react-router-dom';
 import { PageContainer } from '../../components/common/PageContainer';
 import { MenuCard } from '../../components/user/MenuCard';
 import { userMoreMock } from '../../mocks/userHomeMock';
 
 export function MorePage() {
+  const navigate = useNavigate();
+
   const handleLogout = () => {
     // TODO: authStore/API 연동 후 실제 로그아웃과 토큰 정리를 처리합니다.
     console.log('mock logout');
+    window.sessionStorage.removeItem('mockAuthStatus');
+    navigate('/login', { replace: true });
   };
 
   return (

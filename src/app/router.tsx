@@ -46,6 +46,7 @@ import { MorePage } from '../pages/user/MorePage';
 import { NotificationPage } from '../pages/user/NotificationPage';
 import { OrderPage } from '../pages/user/OrderPage';
 import { ProfileEditPage } from '../pages/user/ProfileEditPage';
+import { SeedMoneyResetPage } from '../pages/user/SeedMoneyResetPage';
 import { StockDetailPage } from '../pages/user/StockDetailPage';
 import { WatchlistPage } from '../pages/user/WatchlistPage';
 
@@ -78,6 +79,7 @@ export const router = createBrowserRouter([
       { path: '/executions', element: <ExecutionHistoryPage /> },
       { path: '/notifications', element: <NotificationPage /> },
       { path: '/profile/edit', element: <ProfileEditPage /> },
+      { path: '/seed-money/reset', element: <SeedMoneyResetPage /> },
     ],
   },
   {

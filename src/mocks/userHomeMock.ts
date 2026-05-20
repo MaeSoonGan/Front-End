@@ -43,6 +43,11 @@ export const userMoreMock = {
     },
     { title: '알림', description: '가격과 대회 알림을 확인해요', icon: '🔔', to: '/notifications' },
     { title: '정보 수정', description: '프로필과 계정 정보를 관리해요', icon: '⚙️', to: '/profile/edit' },
-    { title: '관심종목', description: '저장한 종목을 모아봐요', icon: '⭐', to: '/watchlist' },
+    {
+      title: '시드머니 초기화',
+      description: '모의투자 시작 금액을 초기 상태로 되돌려요',
+      icon: '💰',
+      to: '/seed-money/reset',
+    },
   ],
 };
