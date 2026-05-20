@@ -115,15 +115,6 @@ export function ResetPasswordPage() {
     <Card className="min-h-screen w-full rounded-none border-0 shadow-none sm:min-h-0 sm:max-w-md sm:rounded-lg sm:border sm:shadow-sm">
       <AuthPageHeader onBack={goBack} title="비밀번호 재설정" />
 
-      <div className="mb-4 grid grid-cols-3 gap-1">
-        <div className="h-1 rounded-full bg-[#1565C0]" />
-        <div className="h-1 rounded-full bg-[#1565C0]" />
-        <div className="h-1 rounded-full bg-[#1565C0]" />
-      </div>
-      <p className="mb-5 text-center text-xs text-[#6C88A4]">
-        본인 인증 완료 → <span className="font-bold text-[#1565C0]">새 비밀번호 설정</span>
-      </p>
-
       <InfoBox variant="success">
         <p className="font-bold">☑ 본인 인증이 완료됐어요</p>
         <p className="mt-1 text-emerald-600">
