@@ -1,19 +1,40 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AdminLayout } from '../layouts/AdminLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
 import { InfraLayout } from '../layouts/InfraLayout';
 import { UserLayout } from '../layouts/UserLayout';
-import { AdminContestManagePage } from '../pages/admin/AdminContestManagePage';
-import { AdminDashboardPage } from '../pages/admin/AdminDashboardPage';
-import { AdminNoticeManagePage } from '../pages/admin/AdminNoticeManagePage';
-import { AdminSystemManagePage } from '../pages/admin/AdminSystemManagePage';
-import { AdminUserManagePage } from '../pages/admin/AdminUserManagePage';
+
+// admin - dashboard
+import { AdminDashboardPage } from '../pages/admin/dashboard/AdminDashboardPage';
+
+// admin - members
+import { AdminUserManagePage } from '../pages/admin/members/AdminUserManagePage';
+import { AdminSuspensionPage } from '../pages/admin/members/AdminSuspensionPage';
+import { AdminSeedMoneyPage } from '../pages/admin/members/AdminSeedMoneyPage';
+
+// admin - contests
+import { AdminContestManagePage } from '../pages/admin/contests/AdminContestManagePage';
+import { AdminRankingPage } from '../pages/admin/contests/AdminRankingPage';
+
+// admin - contents
+import { AdminNoticeManagePage } from '../pages/admin/contents/AdminNoticeManagePage';
+
+// admin - system
+import { AdminMonitoringPage } from '../pages/admin/system/AdminMonitoringPage';
+import { AdminAuditLogPage } from '../pages/admin/system/AdminAuditLogPage';
+import { AdminSystemManagePage } from '../pages/admin/system/AdminSystemManagePage';
+
+// auth
 import { FindAccountPage } from '../pages/auth/FindAccountPage';
 import { LoginPage } from '../pages/auth/LoginPage';
 import { ResetPasswordCompletePage } from '../pages/auth/ResetPasswordCompletePage';
 import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
 import { SignupPage } from '../pages/auth/SignupPage';
+
+// infra
 import { InfraDashboardPage } from '../pages/infra/InfraDashboardPage';
+
+// user
 import { ContestDetailPage } from '../pages/user/ContestDetailPage';
 import { ContestListPage } from '../pages/user/ContestListPage';
 import { ContestRankingPage } from '../pages/user/ContestRankingPage';
@@ -58,10 +79,16 @@ export const router = createBrowserRouter([
     path: '/admin',
     element: <AdminLayout />,
     children: [
+      { index: true, element: <Navigate to="/admin/dashboard" replace /> },
       { path: 'dashboard', element: <AdminDashboardPage /> },
       { path: 'users', element: <AdminUserManagePage /> },
+      { path: 'suspensions', element: <AdminSuspensionPage /> },
+      { path: 'seed-money', element: <AdminSeedMoneyPage /> },
       { path: 'contests', element: <AdminContestManagePage /> },
+      { path: 'rankings', element: <AdminRankingPage /> },
       { path: 'notices', element: <AdminNoticeManagePage /> },
+      { path: 'monitoring', element: <AdminMonitoringPage /> },
+      { path: 'audit-log', element: <AdminAuditLogPage /> },
       { path: 'system', element: <AdminSystemManagePage /> },
     ],
   },
