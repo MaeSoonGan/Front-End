@@ -189,7 +189,7 @@ export function AdminSeedMoneyPage() {
       {/* 메인 컨텐츠 */}
       <div className="grid gap-6 lg:grid-cols-5">
         {/* 왼쪽: 시드머니 수동 지급 폼 */}
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-2">
           <Card>
             <h2 className="mb-5 text-base font-semibold text-slate-900">시드머니 수동 지급</h2>
 
@@ -314,7 +314,7 @@ export function AdminSeedMoneyPage() {
         </div>
 
         {/* 오른쪽: 최근 지급 이력 */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-3">
           <Card>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-900">최근 지급 이력</h2>
@@ -328,36 +328,36 @@ export function AdminSeedMoneyPage() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="min-w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                    <th className="pb-2 pr-3 font-medium">수령 회원</th>
-                    <th className="pb-2 pr-3 font-medium">금액</th>
-                    <th className="pb-2 pr-3 font-medium">유형</th>
-                    <th className="pb-2 pr-3 font-medium">사유</th>
-                    <th className="pb-2 pr-3 font-medium">지급 관리자</th>
-                    <th className="pb-2 font-medium">일시</th>
+                    <th className="whitespace-nowrap pb-2 pr-4 font-medium">수령 회원</th>
+                    <th className="whitespace-nowrap pb-2 pr-4 font-medium">금액</th>
+                    <th className="whitespace-nowrap pb-2 pr-4 font-medium">유형</th>
+                    <th className="whitespace-nowrap pb-2 pr-4 font-medium">사유</th>
+                    <th className="whitespace-nowrap pb-2 pr-4 font-medium">지급 관리자</th>
+                    <th className="whitespace-nowrap pb-2 font-medium">일시</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginated.map(record => (
                     <tr key={record.id} className="hover:bg-slate-50">
-                      <td className="py-3 pr-3 font-medium text-slate-900">
+                      <td className="whitespace-nowrap py-3 pr-4 font-medium text-slate-900">
                         {record.recipientNickname}
                       </td>
-                      <td className="py-3 pr-3 font-medium text-[#1565C0] whitespace-nowrap">
+                      <td className="whitespace-nowrap py-3 pr-4 font-medium text-[#1565C0]">
                         +{formatAmount(record.amount)}
                       </td>
-                      <td className="py-3 pr-3">
+                      <td className="whitespace-nowrap py-3 pr-4">
                         <TypeBadge type={record.type} />
                       </td>
-                      <td className="py-3 pr-3 max-w-24">
-                        <p className="truncate text-slate-600" title={record.reason}>
+                      <td className="py-3 pr-4">
+                        <p className="w-20 truncate text-slate-600" title={record.reason}>
                           {record.reason}
                         </p>
                       </td>
-                      <td className="py-3 pr-3 text-slate-500">{record.adminName}</td>
-                      <td className="py-3 text-xs text-slate-400 whitespace-nowrap">{record.paidAt}</td>
+                      <td className="whitespace-nowrap py-3 pr-4 text-slate-500">{record.adminName}</td>
+                      <td className="whitespace-nowrap py-3 text-xs text-slate-400">{record.paidAt}</td>
                     </tr>
                   ))}
                 </tbody>
