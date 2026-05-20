@@ -35,6 +35,7 @@ import { SignupPage } from '../pages/auth/SignupPage';
 import { InfraDashboardPage } from '../pages/infra/InfraDashboardPage';
 
 // user
+import { BalancePage } from '../pages/user/BalancePage';
 import { ContestDetailPage } from '../pages/user/ContestDetailPage';
 import { ContestListPage } from '../pages/user/ContestListPage';
 import { ContestRankingPage } from '../pages/user/ContestRankingPage';
@@ -45,6 +46,7 @@ import { MorePage } from '../pages/user/MorePage';
 import { NotificationPage } from '../pages/user/NotificationPage';
 import { OrderPage } from '../pages/user/OrderPage';
 import { ProfileEditPage } from '../pages/user/ProfileEditPage';
+import { StockDetailPage } from '../pages/user/StockDetailPage';
 import { WatchlistPage } from '../pages/user/WatchlistPage';
 
 export const router = createBrowserRouter([
@@ -63,9 +65,12 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: '/home', element: <HomePage /> },
+      { path: '/balance', element: <BalancePage /> },
       { path: '/market', element: <MarketPage /> },
+      { path: '/stocks/:stockCode', element: <StockDetailPage /> },
       { path: '/order', element: <OrderPage /> },
       { path: '/watchlist', element: <WatchlistPage /> },
+      { path: '/my-contests', element: <ContestListPage /> },
       { path: '/contests', element: <ContestListPage /> },
       { path: '/contests/:contestId', element: <ContestDetailPage /> },
       { path: '/contests/:contestId/ranking', element: <ContestRankingPage /> },
