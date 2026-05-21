@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { Pin, Search, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 
 type NoticeStatus = 'PUBLISHED' | 'SCHEDULED' | 'HIDDEN';
@@ -258,6 +258,13 @@ export function AdminNoticeManagePage() {
     return end ? `${start} ~ ${end}` : `${start} ~`;
   }, [form.startDate, form.endDate]);
 
+  useAdminPageActions(
+    <Button variant="brand" onClick={handleNewNotice}>
+      <Plus size={16} className="mr-1.5" />
+      공지 등록
+    </Button>
+  );
+
   return (
     <>
       {/* 삭제 확인 모달 */}
@@ -288,16 +295,6 @@ export function AdminNoticeManagePage() {
           </div>
         </div>
       )}
-
-      <PageHeader
-        title="공지사항 관리"
-        actions={
-          <Button variant="brand" onClick={handleNewNotice}>
-            <Plus size={16} className="mr-1.5" />
-            공지 등록
-          </Button>
-        }
-      />
 
       <div className={`grid gap-6 ${isFormOpen ? 'lg:grid-cols-5' : 'lg:grid-cols-1'}`}>
         {/* 왼쪽: 공지 목록 */}

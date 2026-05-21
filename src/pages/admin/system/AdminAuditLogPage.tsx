@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Download, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 
 type LogType = '회원관리' | '시드지급' | '주문취소' | '대회관리' | '공지사항' | '랭킹' | '시스템';
@@ -110,18 +110,15 @@ export function AdminAuditLogPage() {
     return [...new Set(pages)];
   }
 
+  useAdminPageActions(
+    <Button variant="secondary" className="h-9 gap-1.5 text-sm">
+      <Download size={14} />
+      CSV 내보내기
+    </Button>
+  );
+
   return (
     <>
-      <PageHeader
-        title="감사 로그"
-        actions={
-          <Button variant="secondary" className="h-9 gap-1.5 text-sm">
-            <Download size={14} />
-            CSV 내보내기
-          </Button>
-        }
-      />
-
       {/* 통계 카드 */}
       <div className="mb-6 grid gap-4 lg:grid-cols-4">
         <Card className="py-6">

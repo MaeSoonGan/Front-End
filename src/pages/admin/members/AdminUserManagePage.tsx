@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Download, UserPlus, Search } from 'lucide-react';
+import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { StatusBadge } from '../../../components/common/StatusBadge';
@@ -237,23 +238,21 @@ export function AdminUserManagePage() {
 
   const paginationPages = getPaginationPages(currentPage, TOTAL_PAGES);
 
+  useAdminPageActions(
+    <div className="flex items-center gap-2">
+      <Button variant="secondary" onClick={handleCsvExport} className="gap-2">
+        <Download size={16} />
+        CSV 내보내기
+      </Button>
+      <Button variant="brand" onClick={() => setIsAddModalOpen(true)} className="gap-2">
+        <UserPlus size={16} />
+        회원 직접 추가
+      </Button>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-950">회원 목록</h1>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={handleCsvExport} className="gap-2">
-            <Download size={16} />
-            CSV 내보내기
-          </Button>
-          <Button variant="brand" onClick={() => setIsAddModalOpen(true)} className="gap-2">
-            <UserPlus size={16} />
-            회원 직접 추가
-          </Button>
-        </div>
-      </div>
-
       {/* 통계 카드 — GET /api/admin/members/count */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card>

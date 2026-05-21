@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Download, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 
 type RankingStatus = 'NORMAL' | 'EXCLUDED';
@@ -115,30 +115,27 @@ export function AdminRankingPage() {
     setPanelMode('exclude');
   }
 
+  useAdminPageActions(
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-slate-500">
+        최근 갱신: {LAST_REFRESH_TIME} (10분마다 자동갱신)
+      </span>
+      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-600">
+        정상 랭킹 집계
+      </span>
+      <Button variant="secondary" className="h-9 gap-1.5 text-sm">
+        <Download size={14} />
+        랭킹 CSV 내보내기
+      </Button>
+      <Button variant="brand" className="h-9 gap-1.5 text-sm">
+        <RefreshCw size={14} />
+        수동 갱신
+      </Button>
+    </div>
+  );
+
   return (
     <>
-      <PageHeader
-        title="랭킹 관리"
-        actions={
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">
-              최근 갱신: {LAST_REFRESH_TIME} (10분마다 자동갱신)
-            </span>
-            <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-600">
-              정상 랭킹 집계
-            </span>
-            <Button variant="secondary" className="h-9 gap-1.5 text-sm">
-              <Download size={14} />
-              랭킹 CSV 내보내기
-            </Button>
-            <Button variant="brand" className="h-9 gap-1.5 text-sm">
-              <RefreshCw size={14} />
-              수동 갱신
-            </Button>
-          </div>
-        }
-      />
-
       <div className="grid gap-6 lg:grid-cols-5">
         {/* 좌측: 대회 선택 + 랭킹 테이블 */}
         <div className="lg:col-span-3">

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 import { useAlertCount } from '../../../contexts/AlertCountContext';
 
@@ -106,24 +106,21 @@ export function AdminMonitoringPage() {
     setAlerts(prev => prev.filter(a => a.id !== id));
   }
 
+  useAdminPageActions(
+    <div className="flex items-center gap-3">
+      <span className="flex items-center gap-1.5 text-sm text-slate-600">
+        <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
+        시스템 정상 운영 중
+      </span>
+      <Button variant="secondary" className="h-9 gap-1.5 text-sm">
+        <RefreshCw size={14} />
+        새로고침
+      </Button>
+    </div>
+  );
+
   return (
     <>
-      <PageHeader
-        title="모니터링"
-        actions={
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 text-sm text-slate-600">
-              <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
-              시스템 정상 운영 중
-            </span>
-            <Button variant="secondary" className="h-9 gap-1.5 text-sm">
-              <RefreshCw size={14} />
-              새로고침
-            </Button>
-          </div>
-        }
-      />
-
       {/* 통계 카드 4개 */}
       <div className="mb-6 grid gap-4 lg:grid-cols-4">
         {/* 오늘 주문 */}

@@ -10,3 +10,16 @@ select {
   font-family: "Noto Sans KR", sans-serif;
   font-weight: 700;
 }
+
+.recharts-wrapper,
+.recharts-wrapper:focus,
+.recharts-wrapper svg,
+.recharts-wrapper svg:focus,
+.recharts-surface,
+.recharts-surface:focus {
+  outline: none !important;
+}
+
+.recharts-wrapper * {
+  outline: none !important;
+}
