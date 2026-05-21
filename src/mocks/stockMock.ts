@@ -1,4 +1,4 @@
-import type { StockMarketData } from '../types/stock';
+import type { ChartPeriod, StockMarketData } from '../types/stock';
 
 function createOrderBook(currentPrice: number, changeRate: number) {
   return {
@@ -12,6 +12,69 @@ function createOrderBook(currentPrice: number, changeRate: number) {
       quantity: [6234, 4891, 8123, 3456, 7789][index],
       changeRate: changeRate - (index + 1) * 0.14,
     })),
+  };
+}
+
+const periodLabels: Record<ChartPeriod, string[]> = {
+  '1m': ['09:00', '', '', '09:03', '', '', '09:06', '', '', '09:09', '', '', '09:12', '', '', '현재'],
+  '5m': ['09:00', '', '', '09:15', '', '', '09:30', '', '', '09:45', '', '', '10:00', '', '', '현재'],
+  '15m': ['09:00', '', '', '09:45', '', '', '10:30', '', '', '11:15', '', '', '12:00', '', '', '현재'],
+  day: ['5/1', '', '', '5/8', '', '', '5/15', '', '', '5/22', '', '', '5/28', '', '', '오늘'],
+  week: ['1주', '', '', '4주', '', '', '7주', '', '', '10주', '', '', '13주', '', '', '현재'],
+  month: ['1월', '', '', '3월', '', '', '5월', '', '', '7월', '', '', '9월', '', '', '현재'],
+};
+
+const periodGapOffsets: Record<ChartPeriod, number> = {
+  '1m': -180,
+  '5m': -320,
+  '15m': -520,
+  day: 0,
+  week: 850,
+  month: 1350,
+};
+
+const periodVolumeScale: Record<ChartPeriod, number> = {
+  '1m': 0.24,
+  '5m': 0.36,
+  '15m': 0.48,
+  day: 1,
+  week: 1.35,
+  month: 1.8,
+};
+
+function createPeriodChartData(currentPrice: number, period: ChartPeriod) {
+  const baseGaps = [-1200, -850, -650, -300, 150, -50, 520, 380, 840, 700, 1180, 1350, 980, 1460, 1280, 1720];
+  const dates = periodLabels[period];
+  const gapOffset = periodGapOffsets[period];
+  const volumeScale = periodVolumeScale[period];
+
+  return baseGaps.map((gap, index) => {
+    const price = currentPrice + gap + gapOffset + (period === 'month' ? index * 24 : 0);
+
+    return {
+      date: dates[index],
+      price,
+      ma5: price - 280 + index * 12,
+      ma20: price - 720 + index * 8,
+      ma60: price - 1550 + index * 5,
+      volume: Math.round(
+        [510, 640, 570, 980, 520, 620, 590, 1120, 530, 620, 1180, 1160, 700, 910, 930, 1250][
+          index
+        ] * volumeScale,
+      ),
+      direction: index % 4 === 2 || index % 5 === 0 ? 'fall' : 'rise',
+    } as const;
+  });
+}
+
+function createChartData(currentPrice: number) {
+  return {
+    '1m': createPeriodChartData(currentPrice, '1m'),
+    '5m': createPeriodChartData(currentPrice, '5m'),
+    '15m': createPeriodChartData(currentPrice, '15m'),
+    day: createPeriodChartData(currentPrice, 'day'),
+    week: createPeriodChartData(currentPrice, 'week'),
+    month: createPeriodChartData(currentPrice, 'month'),
   };
 }
 
@@ -30,6 +93,7 @@ export const stockMocks: StockMarketData[] = [
       previousClose: 74200,
     },
     orderBook: createOrderBook(75400, 1.62),
+    chart: createChartData(75400),
   },
   {
     summary: {
@@ -45,6 +109,7 @@ export const stockMocks: StockMarketData[] = [
       previousClose: 378000,
     },
     orderBook: createOrderBook(384500, 1.72),
+    chart: createChartData(384500),
   },
   {
     summary: {
@@ -60,6 +125,7 @@ export const stockMocks: StockMarketData[] = [
       previousClose: 803000,
     },
     orderBook: createOrderBook(812000, 1.12),
+    chart: createChartData(812000),
   },
   {
     summary: {
@@ -75,6 +141,7 @@ export const stockMocks: StockMarketData[] = [
       previousClose: 148000,
     },
     orderBook: createOrderBook(146800, -0.81),
+    chart: createChartData(146800),
   },
   {
     summary: {
@@ -90,6 +157,7 @@ export const stockMocks: StockMarketData[] = [
       previousClose: 155000,
     },
     orderBook: createOrderBook(157300, 1.48),
+    chart: createChartData(157300),
   },
   {
     summary: {
@@ -105,6 +173,7 @@ export const stockMocks: StockMarketData[] = [
       previousClose: 47800,
     },
     orderBook: createOrderBook(48250, 0.94),
+    chart: createChartData(48250),
   },
   {
     summary: {
@@ -120,6 +189,7 @@ export const stockMocks: StockMarketData[] = [
       previousClose: 177500,
     },
     orderBook: createOrderBook(182500, 2.8),
+    chart: createChartData(182500),
   },
   {
     summary: {
@@ -135,6 +205,7 @@ export const stockMocks: StockMarketData[] = [
       previousClose: 199000,
     },
     orderBook: createOrderBook(198000, -0.5),
+    chart: createChartData(198000),
   },
   {
     summary: {
@@ -150,6 +221,7 @@ export const stockMocks: StockMarketData[] = [
       previousClose: 213600,
     },
     orderBook: createOrderBook(215500, 0.9),
+    chart: createChartData(215500),
   },
   {
     summary: {
@@ -165,6 +237,7 @@ export const stockMocks: StockMarketData[] = [
       previousClose: 44850,
     },
     orderBook: createOrderBook(44350, -1.1),
+    chart: createChartData(44350),
   },
 ];
 

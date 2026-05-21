@@ -2,17 +2,28 @@ import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MarketTabs } from '../../components/user/MarketTabs';
 import { OrderBookList } from '../../components/user/OrderBookList';
+import { StockChartSection } from '../../components/user/StockChartSection';
 import { StockInfoGrid } from '../../components/user/StockInfoGrid';
 import { StockPriceSummary } from '../../components/user/StockPriceSummary';
 import { TradeActionButtons } from '../../components/user/TradeActionButtons';
 import { stockMock, stockMocks } from '../../mocks/stockMock';
-import type { MarketTab } from '../../types/stock';
+import type { ChartPeriod, ChartType, MarketTab } from '../../types/stock';
 import { cn } from '../../utils/cn';
+
+function getInitialTab(tab: string | null): MarketTab {
+  if (tab === 'chart' || tab === 'trades') {
+    return tab;
+  }
+
+  return 'orderBook';
+}
 
 export function MarketPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState<MarketTab>('orderBook');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<MarketTab>(() => getInitialTab(searchParams.get('tab')));
+  const [activePeriod, setActivePeriod] = useState<ChartPeriod>('day');
+  const [activeChartType, setActiveChartType] = useState<ChartType>('line');
   const [isFavorite, setIsFavorite] = useState(false);
   const stockCode = searchParams.get('stockCode');
   const searchQuery = searchParams.get('query')?.trim() ?? '';
@@ -30,11 +41,24 @@ export function MarketPage() {
     stockMocks.find((stock) => stock.summary.stockCode === stockCode) ??
     searchResults[0] ??
     stockMock;
-  const { summary, orderBook } = selectedStock;
+  const { summary, orderBook, chart } = selectedStock;
 
   const handleToggleFavorite = () => {
     // TODO: 관심종목 API 연동 후 서버 상태와 동기화합니다.
     setIsFavorite((current) => !current);
+  };
+
+  const handleChangeTab = (tab: MarketTab) => {
+    setActiveTab(tab);
+    const nextSearchParams = new URLSearchParams(searchParams);
+
+    if (tab === 'orderBook') {
+      nextSearchParams.delete('tab');
+    } else {
+      nextSearchParams.set('tab', tab);
+    }
+
+    setSearchParams(nextSearchParams);
   };
 
   return (
@@ -45,7 +69,7 @@ export function MarketPage() {
         summary={summary}
       />
       <StockInfoGrid summary={summary} />
-      <MarketTabs activeTab={activeTab} onChangeTab={setActiveTab} />
+      <MarketTabs activeTab={activeTab} onChangeTab={handleChangeTab} />
 
       {searchQuery ? (
         <section className="mx-4 mt-4 rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
@@ -91,13 +115,19 @@ export function MarketPage() {
 
       {activeTab === 'orderBook' ? (
         <OrderBookList orderBook={orderBook} summary={summary} />
+      ) : activeTab === 'chart' ? (
+        <StockChartSection
+          activeChartType={activeChartType}
+          activePeriod={activePeriod}
+          chartData={chart[activePeriod]}
+          onChangeChartType={setActiveChartType}
+          onChangePeriod={setActivePeriod}
+        />
       ) : (
         <section className="mx-4 mt-4 rounded-xl border border-blue-100 bg-white px-4 py-16 text-center shadow-sm">
-          {/* TODO: 차트/체결 상세 화면은 추후 이슈에서 구현합니다. */}
+          {/* TODO: 체결 상세 화면은 추후 이슈에서 구현합니다. */}
           <p className="text-sm font-extrabold text-[#1565C0]">준비 중</p>
-          <p className="mt-2 text-xs font-bold text-[#6C88A4]">
-            {activeTab === 'chart' ? '차트' : '체결'} 화면은 곧 연결됩니다.
-          </p>
+          <p className="mt-2 text-xs font-bold text-[#6C88A4]">체결 화면은 곧 연결됩니다.</p>
         </section>
       )}
 
