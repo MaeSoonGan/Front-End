@@ -1,11 +1,11 @@
 export const userHomeMock = {
   userName: '홍길동',
   asset: {
-    total: '10,000,000원',
-    change: '+324,000원',
-    rate: '+3.24%',
+    total: '11,245,320원',
+    change: '+1,245,320원',
+    rate: '+12.45%',
     cash: '3,245,200원',
-    evaluation: '8,000,120원',
+    evaluation: '8,014,000원',
   },
   marketStatus: [
     { title: 'KOSPI', value: '2,847', changeRate: '+0.54%', icon: '📊' },

@@ -22,4 +22,13 @@ select {
 
 .recharts-wrapper * {
   outline: none !important;
+@keyframes orderSheetUp {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}
 }
