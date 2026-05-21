@@ -65,7 +65,7 @@ export function HomePage() {
             <button
               className="flex w-full items-center justify-between rounded-xl border border-blue-100 bg-white px-4 py-3 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]"
               key={stock.code}
-              onClick={() => navigate(`/stocks/${stock.code}`)}
+              onClick={() => navigate(`/market?stockCode=${stock.code}`)}
               type="button"
             >
               <div className="flex items-center gap-3">

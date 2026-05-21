@@ -1,0 +1,171 @@
+import type { StockMarketData } from '../types/stock';
+
+function createOrderBook(currentPrice: number, changeRate: number) {
+  return {
+    askOrders: [400, 300, 200, 100, 0].map((gap, index) => ({
+      price: currentPrice + gap,
+      quantity: [3214, 5892, 7441, 4122, 9567][index],
+      changeRate: changeRate + (4 - index) * 0.13,
+    })),
+    bidOrders: [100, 200, 300, 400, 500].map((gap, index) => ({
+      price: currentPrice - gap,
+      quantity: [6234, 4891, 8123, 3456, 7789][index],
+      changeRate: changeRate - (index + 1) * 0.14,
+    })),
+  };
+}
+
+export const stockMocks: StockMarketData[] = [
+  {
+    summary: {
+      stockName: '삼성전자',
+      stockCode: '005930',
+      currentPrice: 75400,
+      changeAmount: 1200,
+      changeRate: 1.62,
+      volume: '12.3M',
+      openPrice: 74200,
+      highPrice: 75900,
+      lowPrice: 74100,
+      previousClose: 74200,
+    },
+    orderBook: createOrderBook(75400, 1.62),
+  },
+  {
+    summary: {
+      stockName: '삼성SDI',
+      stockCode: '006400',
+      currentPrice: 384500,
+      changeAmount: 6500,
+      changeRate: 1.72,
+      volume: '1.8M',
+      openPrice: 377000,
+      highPrice: 388000,
+      lowPrice: 376500,
+      previousClose: 378000,
+    },
+    orderBook: createOrderBook(384500, 1.72),
+  },
+  {
+    summary: {
+      stockName: '삼성바이오로직스',
+      stockCode: '207940',
+      currentPrice: 812000,
+      changeAmount: 9000,
+      changeRate: 1.12,
+      volume: '0.7M',
+      openPrice: 805000,
+      highPrice: 817000,
+      lowPrice: 801000,
+      previousClose: 803000,
+    },
+    orderBook: createOrderBook(812000, 1.12),
+  },
+  {
+    summary: {
+      stockName: '삼성물산',
+      stockCode: '028260',
+      currentPrice: 146800,
+      changeAmount: -1200,
+      changeRate: -0.81,
+      volume: '2.4M',
+      openPrice: 148400,
+      highPrice: 149200,
+      lowPrice: 146100,
+      previousClose: 148000,
+    },
+    orderBook: createOrderBook(146800, -0.81),
+  },
+  {
+    summary: {
+      stockName: '삼성전기',
+      stockCode: '009150',
+      currentPrice: 157300,
+      changeAmount: 2300,
+      changeRate: 1.48,
+      volume: '3.1M',
+      openPrice: 155000,
+      highPrice: 158600,
+      lowPrice: 154300,
+      previousClose: 155000,
+    },
+    orderBook: createOrderBook(157300, 1.48),
+  },
+  {
+    summary: {
+      stockName: '삼성증권',
+      stockCode: '016360',
+      currentPrice: 48250,
+      changeAmount: 450,
+      changeRate: 0.94,
+      volume: '1.2M',
+      openPrice: 47800,
+      highPrice: 48600,
+      lowPrice: 47650,
+      previousClose: 47800,
+    },
+    orderBook: createOrderBook(48250, 0.94),
+  },
+  {
+    summary: {
+      stockName: 'SK하이닉스',
+      stockCode: '000660',
+      currentPrice: 182500,
+      changeAmount: 5000,
+      changeRate: 2.8,
+      volume: '8.7M',
+      openPrice: 178000,
+      highPrice: 184000,
+      lowPrice: 177500,
+      previousClose: 177500,
+    },
+    orderBook: createOrderBook(182500, 2.8),
+  },
+  {
+    summary: {
+      stockName: 'NAVER',
+      stockCode: '035420',
+      currentPrice: 198000,
+      changeAmount: -1000,
+      changeRate: -0.5,
+      volume: '2.1M',
+      openPrice: 199500,
+      highPrice: 201000,
+      lowPrice: 197500,
+      previousClose: 199000,
+    },
+    orderBook: createOrderBook(198000, -0.5),
+  },
+  {
+    summary: {
+      stockName: '현대차',
+      stockCode: '005380',
+      currentPrice: 215500,
+      changeAmount: 1900,
+      changeRate: 0.9,
+      volume: '4.5M',
+      openPrice: 213000,
+      highPrice: 216500,
+      lowPrice: 212500,
+      previousClose: 213600,
+    },
+    orderBook: createOrderBook(215500, 0.9),
+  },
+  {
+    summary: {
+      stockName: '카카오',
+      stockCode: '035720',
+      currentPrice: 44350,
+      changeAmount: -500,
+      changeRate: -1.1,
+      volume: '6.4M',
+      openPrice: 44900,
+      highPrice: 45100,
+      lowPrice: 44100,
+      previousClose: 44850,
+    },
+    orderBook: createOrderBook(44350, -1.1),
+  },
+];
+
+export const stockMock = stockMocks[0];
