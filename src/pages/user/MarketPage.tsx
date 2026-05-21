@@ -38,7 +38,7 @@ export function MarketPage() {
   };
 
   return (
-    <div className="min-h-full bg-[#F3F7FC] pb-6">
+    <div className="min-h-full bg-[#F3F7FC]">
       <StockPriceSummary
         isFavorite={isFavorite}
         onToggleFavorite={handleToggleFavorite}
