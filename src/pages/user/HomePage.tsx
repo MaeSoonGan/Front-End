@@ -20,7 +20,11 @@ export function HomePage() {
 
   return (
     <PageContainer>
-      <section className="rounded-2xl bg-gradient-to-br from-[#1565C0] to-[#4F8ED9] p-5 text-white shadow-sm">
+      <button
+        className="w-full rounded-2xl bg-gradient-to-br from-[#1565C0] to-[#4F8ED9] p-5 text-left text-white shadow-sm transition hover:shadow-md"
+        onClick={() => navigate('/balance')}
+        type="button"
+      >
         <p className="text-xs font-semibold text-blue-100">내 총 자산</p>
         <p className="mt-2 text-2xl font-extrabold">{asset.total}</p>
         <p className="mt-1 text-xs text-blue-100">
@@ -36,7 +40,7 @@ export function HomePage() {
             <p className="mt-1 text-sm font-bold">{asset.evaluation}</p>
           </div>
         </div>
-      </section>
+      </button>
 
       <section className="mt-4 grid grid-cols-3 gap-3">
         {marketStatus.map((status) => (

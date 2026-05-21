@@ -21,6 +21,14 @@ function getInitialTab(tab: string | null): MarketTab {
   return 'orderBook';
 }
 
+function getInitialOrderSide(orderSide: string | null): OrderSide | null {
+  if (orderSide === 'BUY' || orderSide === 'SELL') {
+    return orderSide;
+  }
+
+  return null;
+}
+
 export function MarketPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -28,7 +36,9 @@ export function MarketPage() {
   const [activePeriod, setActivePeriod] = useState<ChartPeriod>('day');
   const [activeChartType, setActiveChartType] = useState<ChartType>('line');
   const [isFavorite, setIsFavorite] = useState(false);
-  const [orderSheetSide, setOrderSheetSide] = useState<OrderSide | null>(null);
+  const [orderSheetSide, setOrderSheetSide] = useState<OrderSide | null>(() =>
+    getInitialOrderSide(searchParams.get('orderSide')),
+  );
   const stockCode = searchParams.get('stockCode');
   const searchQuery = searchParams.get('query')?.trim() ?? '';
   const searchResults = searchQuery
@@ -69,6 +79,14 @@ export function MarketPage() {
       nextSearchParams.set('tab', tab);
     }
 
+    setSearchParams(nextSearchParams);
+  };
+
+  const handleCloseOrderSheet = () => {
+    setOrderSheetSide(null);
+    const nextSearchParams = new URLSearchParams(searchParams);
+
+    nextSearchParams.delete('orderSide');
     setSearchParams(nextSearchParams);
   };
 
@@ -144,7 +162,7 @@ export function MarketPage() {
           initialSide={orderSheetSide}
           isOpen={Boolean(orderSheetSide)}
           key={`${summary.stockCode}-${orderSheetSide}`}
-          onClose={() => setOrderSheetSide(null)}
+          onClose={handleCloseOrderSheet}
           stock={orderStock}
         />
       ) : null}
