@@ -36,8 +36,28 @@ export interface StockChartPoint {
   direction: 'rise' | 'fall';
 }
 
+export type TradeDirection = 'UP' | 'DOWN';
+
+export interface TradeTrendPoint {
+  time: string;
+  todayValue: number;
+  previousValue: number;
+}
+
+export interface TradeHistoryItem {
+  tradeTime: string;
+  price: number;
+  changeAmount: number;
+  quantity: number;
+  strength: number;
+  direction: TradeDirection;
+  quantityDirection: TradeDirection;
+}
+
 export interface StockMarketData {
   summary: StockSummary;
   orderBook: OrderBookData;
   chart: Record<ChartPeriod, StockChartPoint[]>;
+  tradeTrend: TradeTrendPoint[];
+  tradeHistory: TradeHistoryItem[];
 }

@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MarketTabs } from '../../components/user/MarketTabs';
+import { OrderBottomSheet } from '../../components/user/OrderBottomSheet';
 import { OrderBookList } from '../../components/user/OrderBookList';
 import { StockChartSection } from '../../components/user/StockChartSection';
 import { StockInfoGrid } from '../../components/user/StockInfoGrid';
 import { StockPriceSummary } from '../../components/user/StockPriceSummary';
 import { TradeActionButtons } from '../../components/user/TradeActionButtons';
+import { TradeHistoryTab } from '../../components/user/TradeHistoryTab';
 import { stockMock, stockMocks } from '../../mocks/stockMock';
+import type { OrderSide, OrderStockInfo } from '../../types/order';
 import type { ChartPeriod, ChartType, MarketTab } from '../../types/stock';
 import { cn } from '../../utils/cn';
 
@@ -25,6 +28,7 @@ export function MarketPage() {
   const [activePeriod, setActivePeriod] = useState<ChartPeriod>('day');
   const [activeChartType, setActiveChartType] = useState<ChartType>('line');
   const [isFavorite, setIsFavorite] = useState(false);
+  const [orderSheetSide, setOrderSheetSide] = useState<OrderSide | null>(null);
   const stockCode = searchParams.get('stockCode');
   const searchQuery = searchParams.get('query')?.trim() ?? '';
   const searchResults = searchQuery
@@ -41,7 +45,14 @@ export function MarketPage() {
     stockMocks.find((stock) => stock.summary.stockCode === stockCode) ??
     searchResults[0] ??
     stockMock;
-  const { summary, orderBook, chart } = selectedStock;
+  const { summary, orderBook, chart, tradeTrend, tradeHistory } = selectedStock;
+  const orderStock: OrderStockInfo = {
+    stockName: summary.stockName,
+    stockCode: summary.stockCode,
+    market: 'KOSPI',
+    currentPrice: summary.currentPrice,
+    changeRate: summary.changeRate,
+  };
 
   const handleToggleFavorite = () => {
     // TODO: 관심종목 API 연동 후 서버 상태와 동기화합니다.
@@ -124,14 +135,19 @@ export function MarketPage() {
           onChangePeriod={setActivePeriod}
         />
       ) : (
-        <section className="mx-4 mt-4 rounded-xl border border-blue-100 bg-white px-4 py-16 text-center shadow-sm">
-          {/* TODO: 체결 상세 화면은 추후 이슈에서 구현합니다. */}
-          <p className="text-sm font-extrabold text-[#1565C0]">준비 중</p>
-          <p className="mt-2 text-xs font-bold text-[#6C88A4]">체결 화면은 곧 연결됩니다.</p>
-        </section>
+        <TradeHistoryTab trades={tradeHistory} trendData={tradeTrend} />
       )}
 
-      <TradeActionButtons stockCode={summary.stockCode} />
+      <TradeActionButtons onSelectSide={setOrderSheetSide} />
+      {orderSheetSide ? (
+        <OrderBottomSheet
+          initialSide={orderSheetSide}
+          isOpen={Boolean(orderSheetSide)}
+          key={`${summary.stockCode}-${orderSheetSide}`}
+          onClose={() => setOrderSheetSide(null)}
+          stock={orderStock}
+        />
+      ) : null}
     </div>
   );
 }

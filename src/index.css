@@ -10,3 +10,13 @@ select {
   font-family: "Noto Sans KR", sans-serif;
   font-weight: 700;
 }
+
+@keyframes orderSheetUp {
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
+}

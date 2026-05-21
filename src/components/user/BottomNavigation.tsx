@@ -3,7 +3,7 @@ import { cn } from '../../utils/cn';
 
 const items = [
   { label: '홈', to: '/home', icon: '🏠' },
-  { label: '잔고', to: '/balance', icon: '💼' },
+  { label: '잔고·체결', to: '/balance', icon: '💼' },
   { label: '관심 종목', to: '/watchlist', icon: '⭐' },
   { label: '대회', to: '/contests', icon: '🏆' },
   { label: '더보기', to: '/more', icon: '☰' },

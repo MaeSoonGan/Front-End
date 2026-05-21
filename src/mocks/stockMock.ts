@@ -78,6 +78,43 @@ function createChartData(currentPrice: number) {
   };
 }
 
+function createTradeTrendData(currentPrice: number) {
+  return [
+    { time: '10:00', todayValue: currentPrice - 820, previousValue: currentPrice - 1340 },
+    { time: '12:00', todayValue: currentPrice - 360, previousValue: currentPrice - 760 },
+    { time: '14:00', todayValue: currentPrice - 120, previousValue: currentPrice - 980 },
+    { time: '16:00', todayValue: currentPrice + 280, previousValue: currentPrice - 420 },
+    { time: '18:00', todayValue: currentPrice + 120, previousValue: currentPrice - 180 },
+  ];
+}
+
+function createTradeHistoryData(currentPrice: number, changeAmount: number) {
+  const rows = [
+    ['10:32:06', 0, 4, 217.25, 'UP', 'DOWN'],
+    ['10:32:05', 0, 5, 217.98, 'UP', 'DOWN'],
+    ['10:32:03', -100, 1, 218.19, 'UP', 'DOWN'],
+    ['10:32:02', 100, 1, 218.22, 'UP', 'UP'],
+    ['10:32:00', -100, 16, 218.21, 'UP', 'DOWN'],
+    ['10:32:00', 0, 1, 218.82, 'UP', 'DOWN'],
+    ['10:31:57', 100, 1, 219.32, 'UP', 'UP'],
+    ['10:31:53', 0, 2, 219.31, 'UP', 'DOWN'],
+    ['10:31:53', 100, 1, 219.37, 'UP', 'UP'],
+    ['10:31:51', -200, 12, 216.44, 'DOWN', 'DOWN'],
+    ['10:31:48', -100, 7, 216.12, 'DOWN', 'DOWN'],
+    ['10:31:45', 0, 20, 217.01, 'UP', 'UP'],
+  ] as const;
+
+  return rows.map(([tradeTime, priceGap, quantity, strength, direction, quantityDirection]) => ({
+    tradeTime,
+    price: currentPrice + priceGap,
+    changeAmount: changeAmount + priceGap,
+    quantity,
+    strength,
+    direction,
+    quantityDirection,
+  }));
+}
+
 export const stockMocks: StockMarketData[] = [
   {
     summary: {
@@ -94,6 +131,8 @@ export const stockMocks: StockMarketData[] = [
     },
     orderBook: createOrderBook(75400, 1.62),
     chart: createChartData(75400),
+    tradeTrend: createTradeTrendData(75400),
+    tradeHistory: createTradeHistoryData(75400, 1200),
   },
   {
     summary: {
@@ -110,6 +149,8 @@ export const stockMocks: StockMarketData[] = [
     },
     orderBook: createOrderBook(384500, 1.72),
     chart: createChartData(384500),
+    tradeTrend: createTradeTrendData(384500),
+    tradeHistory: createTradeHistoryData(384500, 6500),
   },
   {
     summary: {
@@ -126,6 +167,8 @@ export const stockMocks: StockMarketData[] = [
     },
     orderBook: createOrderBook(812000, 1.12),
     chart: createChartData(812000),
+    tradeTrend: createTradeTrendData(812000),
+    tradeHistory: createTradeHistoryData(812000, 9000),
   },
   {
     summary: {
@@ -142,6 +185,8 @@ export const stockMocks: StockMarketData[] = [
     },
     orderBook: createOrderBook(146800, -0.81),
     chart: createChartData(146800),
+    tradeTrend: createTradeTrendData(146800),
+    tradeHistory: createTradeHistoryData(146800, -1200),
   },
   {
     summary: {
@@ -158,6 +203,8 @@ export const stockMocks: StockMarketData[] = [
     },
     orderBook: createOrderBook(157300, 1.48),
     chart: createChartData(157300),
+    tradeTrend: createTradeTrendData(157300),
+    tradeHistory: createTradeHistoryData(157300, 2300),
   },
   {
     summary: {
@@ -174,6 +221,8 @@ export const stockMocks: StockMarketData[] = [
     },
     orderBook: createOrderBook(48250, 0.94),
     chart: createChartData(48250),
+    tradeTrend: createTradeTrendData(48250),
+    tradeHistory: createTradeHistoryData(48250, 450),
   },
   {
     summary: {
@@ -190,6 +239,8 @@ export const stockMocks: StockMarketData[] = [
     },
     orderBook: createOrderBook(182500, 2.8),
     chart: createChartData(182500),
+    tradeTrend: createTradeTrendData(182500),
+    tradeHistory: createTradeHistoryData(182500, 5000),
   },
   {
     summary: {
@@ -206,6 +257,8 @@ export const stockMocks: StockMarketData[] = [
     },
     orderBook: createOrderBook(198000, -0.5),
     chart: createChartData(198000),
+    tradeTrend: createTradeTrendData(198000),
+    tradeHistory: createTradeHistoryData(198000, -1000),
   },
   {
     summary: {
@@ -222,6 +275,8 @@ export const stockMocks: StockMarketData[] = [
     },
     orderBook: createOrderBook(215500, 0.9),
     chart: createChartData(215500),
+    tradeTrend: createTradeTrendData(215500),
+    tradeHistory: createTradeHistoryData(215500, 1900),
   },
   {
     summary: {
@@ -238,6 +293,8 @@ export const stockMocks: StockMarketData[] = [
     },
     orderBook: createOrderBook(44350, -1.1),
     chart: createChartData(44350),
+    tradeTrend: createTradeTrendData(44350),
+    tradeHistory: createTradeHistoryData(44350, -500),
   },
 ];
 
