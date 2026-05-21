@@ -21,7 +21,9 @@ interface AdminHeaderProps {
 
 export function AdminHeader({ isSidebarOpen, onToggleSidebar }: AdminHeaderProps) {
   const { pathname } = useLocation();
-  const pageName = PAGE_NAME_MAP[pathname] ?? '관리자 콘솔';
+  const pageName = pathname.startsWith('/admin/contests/')
+    ? '대회 상세'
+    : PAGE_NAME_MAP[pathname] ?? '관리자 콘솔';
 
   return (
     <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3">

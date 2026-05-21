@@ -14,6 +14,7 @@ import { AdminSeedMoneyPage } from '../pages/admin/members/AdminSeedMoneyPage';
 
 // admin - contests
 import { AdminContestManagePage } from '../pages/admin/contests/AdminContestManagePage';
+import { AdminContestDetailPage } from '../pages/admin/contests/AdminContestDetailPage';
 import { AdminRankingPage } from '../pages/admin/contests/AdminRankingPage';
 
 // admin - contents
@@ -92,6 +93,7 @@ export const router = createBrowserRouter([
       { path: 'suspensions', element: <AdminSuspensionPage /> },
       { path: 'seed-money', element: <AdminSeedMoneyPage /> },
       { path: 'contests', element: <AdminContestManagePage /> },
+      { path: 'contests/:contestId', element: <AdminContestDetailPage /> },
       { path: 'rankings', element: <AdminRankingPage /> },
       { path: 'notices', element: <AdminNoticeManagePage /> },
       { path: 'monitoring', element: <AdminMonitoringPage /> },
