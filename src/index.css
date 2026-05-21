@@ -11,6 +11,17 @@ select {
   font-weight: 700;
 }
 
+.recharts-wrapper,
+.recharts-wrapper:focus,
+.recharts-wrapper svg,
+.recharts-wrapper svg:focus,
+.recharts-surface,
+.recharts-surface:focus {
+  outline: none !important;
+}
+
+.recharts-wrapper * {
+  outline: none !important;
 @keyframes orderSheetUp {
   from {
     transform: translateY(100%);
@@ -19,4 +30,5 @@ select {
   to {
     transform: translateY(0);
   }
+}
 }

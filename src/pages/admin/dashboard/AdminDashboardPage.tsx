@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -32,6 +33,7 @@ interface DashboardStats {
 interface AlertItem {
   id: string;
   memberId: string;
+  userId: string;
   orderId?: string;
   alertType: AlertType;
   memberName: string;
@@ -74,21 +76,13 @@ const MOCK_STATS: DashboardStats = {
 };
 
 const MOCK_ALERTS: AlertItem[] = [
-  {
-    id: 'alert-1',
-    memberId: 'member-101',
-    alertType: 'ABNORMAL_ORDER',
-    memberName: '이영희',
-    description: '3분 내 50건 주문 (임계치 30건 초과) · 14:28',
-  },
-  {
-    id: 'alert-2',
-    memberId: 'member-202',
-    orderId: 'order-303',
-    alertType: 'DUPLICATE_ORDER',
-    memberName: '박민준',
-    description: '동일 종목 동일가 5회 반복 · 13:55',
-  },
+  { id: 'alert-1', memberId: 'member-101', userId: 'user003', alertType: 'ABNORMAL_ORDER',  memberName: '이영희', description: '3분 내 50건 주문 / 일계치 30건 초과 / 25.05.08 14:28' },
+  { id: 'alert-2', memberId: 'member-202', userId: 'user004', orderId: 'order-303', alertType: 'DUPLICATE_ORDER', memberName: '박민준', description: '동일 종목 동일가 5회 반복 / 25.05.08 13:55' },
+  { id: 'alert-3', memberId: 'member-303', userId: 'user007', alertType: 'ABNORMAL_ORDER',  memberName: '김수현', description: '5분 내 80건 주문 / 일계치 30건 초과 / 25.05.08 13:10' },
+  { id: 'alert-4', memberId: 'member-404', userId: 'user012', orderId: 'order-505', alertType: 'DUPLICATE_ORDER', memberName: '최준혁', description: '동일 종목 동일가 8회 반복 / 25.05.08 12:40' },
+  { id: 'alert-5', memberId: 'member-505', userId: 'user019', alertType: 'ABNORMAL_ORDER',  memberName: '정다은', description: '2분 내 45건 주문 / 일계치 30건 초과 / 25.05.08 11:55' },
+  { id: 'alert-6', memberId: 'member-606', userId: 'user023', orderId: 'order-707', alertType: 'DUPLICATE_ORDER', memberName: '한지민', description: '동일 종목 동일가 6회 반복 / 25.05.08 11:20' },
+  { id: 'alert-7', memberId: 'member-707', userId: 'user031', alertType: 'ABNORMAL_ORDER',  memberName: '오세훈', description: '4분 내 60건 주문 / 일계치 30건 초과 / 25.05.08 10:45' },
 ];
 
 const MOCK_DAILY_ORDERS: DailyOrderStat[] = [
@@ -102,20 +96,13 @@ const MOCK_DAILY_ORDERS: DailyOrderStat[] = [
 ];
 
 const MOCK_CONTESTS: ContestItem[] = [
-  {
-    id: 'contest-1',
-    name: '5월 정기 대회',
-    period: '05.01–05.31',
-    participants: '234명',
-    contestStatus: 'ACTIVE',
-  },
-  {
-    id: 'contest-2',
-    name: '반도체 특별전',
-    period: '05.05–05.20',
-    participants: '89/100명',
-    contestStatus: 'CLOSING_SOON',
-  },
+  { id: 'contest-1', name: '5월 정기 대회',       period: '05.01–05.31', participants: '234명',     contestStatus: 'ACTIVE' },
+  { id: 'contest-2', name: '반도체 특별전',        period: '05.05–05.20', participants: '89/100명',  contestStatus: 'ACTIVE' },
+  { id: 'contest-3', name: '바이오 섹터 챌린지',   period: '05.10–05.25', participants: '157명',     contestStatus: 'ACTIVE' },
+  { id: 'contest-4', name: '코스닥 단기 트레이딩', period: '05.12–05.18', participants: '43/50명',   contestStatus: 'ACTIVE' },
+  { id: 'contest-5', name: '에너지 주식 대전',     period: '05.15–05.31', participants: '312명',     contestStatus: 'ACTIVE' },
+  { id: 'contest-6', name: '신규 회원 환영 대회',  period: '05.01–05.15', participants: '28명',      contestStatus: 'ACTIVE' },
+  { id: 'contest-7', name: '퀀트 투자 경진대회',   period: '05.08–05.22', participants: '95/100명',  contestStatus: 'ACTIVE' },
 ];
 
 const MOCK_ACTIVITIES: ActivityItem[] = [
@@ -147,14 +134,19 @@ const MOCK_ACTIVITIES: ActivityItem[] = [
     createdAt: '25.05.06',
     activityType: 'ORDER_CANCEL',
   },
+  { id: 'act-5', content: '반도체 특별전 대회 생성',   adminId: 'admin01', createdAt: '25.05.05', activityType: 'CONTEST'      },
+  { id: 'act-6', content: '김수현 계정 정지',           adminId: 'admin02', createdAt: '25.05.08', activityType: 'SUSPEND'      },
+  { id: 'act-7', content: '최준혁 시드 +50만원',        adminId: 'admin01', createdAt: '25.05.07', activityType: 'SEED'         },
+  { id: 'act-8', content: '오세훈 주문 강제 취소',      adminId: 'admin02', createdAt: '25.05.08', activityType: 'ORDER_CANCEL' },
 ];
 
 // ---- Lookup Maps ----
 
 const ALERT_TYPE_LABEL: Record<AlertType, string> = {
-  ABNORMAL_ORDER: '비정상 주문 탐지',
+  ABNORMAL_ORDER: '대량 주문 탐지',
   DUPLICATE_ORDER: '중복 주문 탐지',
 };
+
 
 const CONTEST_STATUS_TONE: Record<ContestStatus, StatusTone> = {
   ACTIVE: 'info',
@@ -178,28 +170,31 @@ const ACTIVITY_DOT_COLOR: Record<ActivityType, string> = {
 export function AdminDashboardPage() {
   const navigate = useNavigate();
   const [alerts, setAlerts] = useState<AlertItem[]>(MOCK_ALERTS);
-  const [lastUpdated, setLastUpdated] = useState(() => formatDateTime(new Date()));
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [alertConfirm, setAlertConfirm] = useState<{
+    alertId: string;
+    action: 'suspend' | 'cancel' | 'dismiss';
+    memberId: string;
+    orderId?: string;
+  } | null>(null);
+  const [contestPage, setContestPage]   = useState(1);
+  const [alertPage, setAlertPage]       = useState(1);
+  const [activityPage, setActivityPage] = useState(1);
 
   const isSystemNormal = alerts.length === 0;
 
-  function formatDateTime(date: Date): string {
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    const hh = String(date.getHours()).padStart(2, '0');
-    const min = String(date.getMinutes()).padStart(2, '0');
-    return `${yyyy}.${mm}.${dd} ${hh}:${min}`;
-  }
+  const ALERT_PAGE_SIZE    = 3;
+  const CONTEST_PAGE_SIZE  = 3;
+  const ACTIVITY_PAGE_SIZE = 4;
 
-  function handleRefresh() {
-    // GET /api/admin/dashboard
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setLastUpdated(formatDateTime(new Date()));
-      setIsRefreshing(false);
-    }, 500);
-  }
+  const activeContests     = MOCK_CONTESTS.filter(c => c.contestStatus === 'ACTIVE');
+  const totalContestPages  = Math.max(1, Math.ceil(activeContests.length / CONTEST_PAGE_SIZE));
+  const pagedContests      = activeContests.slice((contestPage - 1) * CONTEST_PAGE_SIZE, contestPage * CONTEST_PAGE_SIZE);
+
+  const totalAlertPages    = Math.max(1, Math.ceil(alerts.length / ALERT_PAGE_SIZE));
+  const pagedAlerts        = alerts.slice((alertPage - 1) * ALERT_PAGE_SIZE, alertPage * ALERT_PAGE_SIZE);
+
+  const totalActivityPages = Math.max(1, Math.ceil(MOCK_ACTIVITIES.length / ACTIVITY_PAGE_SIZE));
+  const pagedActivities    = MOCK_ACTIVITIES.slice((activityPage - 1) * ACTIVITY_PAGE_SIZE, activityPage * ACTIVITY_PAGE_SIZE);
 
   function handleSuspend(memberId: string) {
     // POST /api/admin/members/{memberId}/suspend
@@ -215,29 +210,58 @@ export function AdminDashboardPage() {
     setAlerts(prev => prev.filter(a => a.id !== alertId));
   }
 
-  return (
-    <div className="space-y-6">
-      {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-slate-950">대시보드</h1>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-slate-500">{lastUpdated} 기준</span>
-          <Button variant="secondary" onClick={handleRefresh} disabled={isRefreshing}>
-            {isRefreshing ? '로딩 중...' : '↻ 새로고침'}
-          </Button>
-        </div>
-      </div>
 
+  return (
+    <>
+      {/* 알림 처리 확인 모달 */}
+      {alertConfirm && (() => {
+        const target = alerts.find(a => a.id === alertConfirm.alertId);
+        if (!target) return null;
+
+        const ACTION_META = {
+          cancel:  { label: '주문취소', desc: `"${target.memberName}(${target.userId})"의 해당 주문을 강제 취소합니다.`, btnVariant: 'secondary' as const },
+          suspend: { label: '계정정지', desc: `"${target.memberName}(${target.userId})" 계정을 즉시 정지합니다.`,       btnVariant: 'danger'    as const },
+          dismiss: { label: '무시',     desc: '해당 탐지 알림을 목록에서 제거합니다.',                                    btnVariant: 'secondary' as const },
+        };
+        const meta = ACTION_META[alertConfirm.action];
+
+        function handleConfirm() {
+          if (alertConfirm!.action === 'cancel')  handleCancelOrder(alertConfirm!.orderId ?? alertConfirm!.alertId);
+          if (alertConfirm!.action === 'suspend') handleSuspend(alertConfirm!.memberId);
+          if (alertConfirm!.action === 'dismiss') handleDismiss(alertConfirm!.alertId);
+          setAlertConfirm(null);
+        }
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="w-120 rounded-xl bg-white p-6 shadow-xl">
+              <h3 className="mb-1 text-base font-semibold text-slate-900">{meta.label} 확인</h3>
+              <p className="mb-1 text-sm text-slate-500">{meta.desc}</p>
+              <p className="mb-2 text-xs text-slate-400">{ALERT_TYPE_LABEL[target.alertType]} · {target.description}</p>
+              <p className="mb-4 text-sm font-medium text-slate-700">정말 진행하시겠습니까?</p>
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" onClick={() => setAlertConfirm(null)}>취소</Button>
+                <Button variant={meta.btnVariant} onClick={handleConfirm}>{meta.label}</Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+    <div className="space-y-6">
       {/* 통계 카드 4종 */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {/* GET /api/admin/members/count */}
-        <Card>
+        <Card
+          className="cursor-pointer transition-shadow hover:shadow-md"
+          onClick={() => navigate('/admin/users')}
+        >
           <p className="text-sm font-medium text-slate-500">전체 회원</p>
           <p className="mt-2 text-3xl font-bold text-slate-950">
             {MOCK_STATS.totalMembers.toLocaleString()}명
           </p>
           <p className="mt-1 text-sm text-slate-500">
-            오늘 기입{' '}
+            오늘 가입{' '}
             <span className="font-medium text-emerald-600">
               +{MOCK_STATS.todayNewMembers}명
             </span>
@@ -259,7 +283,10 @@ export function AdminDashboardPage() {
         </Card>
 
         {/* GET /api/admin/contests/active */}
-        <Card>
+        <Card
+          className="cursor-pointer transition-shadow hover:shadow-md"
+          onClick={() => navigate('/admin/contests')}
+        >
           <p className="text-sm font-medium text-slate-500">진행 중 대회</p>
           <p className="mt-2 text-3xl font-bold text-slate-950">
             {MOCK_STATS.activeContestCount}개
@@ -275,7 +302,7 @@ export function AdminDashboardPage() {
         {/* GET /api/admin/monitoring/alerts — 클릭 시 모니터링 이동 */}
         <Card
           className="cursor-pointer transition-shadow hover:shadow-md"
-          onClick={() => navigate('/admin/system')}
+          onClick={() => navigate('/admin/monitoring')}
         >
           <p className="text-sm font-medium text-slate-500">비정상 탐지</p>
           <p className="mt-2 text-3xl font-bold text-rose-600">
@@ -288,7 +315,7 @@ export function AdminDashboardPage() {
       {/* 중간 행: 알림 + 차트 */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* 알림 — GET /api/admin/monitoring/alerts */}
-        <Card className="lg:col-span-3">
+        <Card className="flex flex-col lg:col-span-3">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-semibold text-slate-900">알림 — 즉시 처리 필요</h2>
             {alerts.length > 0 && (
@@ -296,41 +323,37 @@ export function AdminDashboardPage() {
             )}
           </div>
 
-          <div className="space-y-3">
-            {alerts.map(alert => (
+          <div className="h-64 space-y-3 overflow-hidden">
+            {pagedAlerts.map(alert => (
               <div
                 key={alert.id}
-                className="flex items-start justify-between rounded-lg border border-rose-200 bg-rose-50 p-4"
+                className="flex items-center justify-between rounded-lg border-l-4 border-rose-400 bg-rose-50 px-4 py-3"
               >
                 <div>
-                  <p className="font-medium text-rose-800">
-                    {ALERT_TYPE_LABEL[alert.alertType]} — {alert.memberName}
+                  <p className="font-semibold text-slate-900">
+                    {ALERT_TYPE_LABEL[alert.alertType]} — {alert.memberName} ({alert.userId})
                   </p>
-                  <p className="mt-0.5 text-sm text-rose-600">{alert.description}</p>
+                  <p className="mt-0.5 text-sm text-slate-500">{alert.description}</p>
                 </div>
                 <div className="ml-4 flex shrink-0 gap-2">
-                  {alert.alertType === 'ABNORMAL_ORDER' && (
-                    <Button
-                      variant="secondary"
-                      className="h-8 px-3 text-xs"
-                      onClick={() => handleSuspend(alert.memberId)}
-                    >
-                      계정 정지
-                    </Button>
-                  )}
-                  {alert.alertType === 'DUPLICATE_ORDER' && alert.orderId && (
-                    <Button
-                      variant="secondary"
-                      className="h-8 px-3 text-xs"
-                      onClick={() => handleCancelOrder(alert.orderId!)}
-                    >
-                      주문 취소
-                    </Button>
-                  )}
                   <Button
                     variant="secondary"
                     className="h-8 px-3 text-xs"
-                    onClick={() => handleDismiss(alert.id)}
+                    onClick={() => setAlertConfirm({ alertId: alert.id, action: 'cancel', memberId: alert.memberId, orderId: alert.orderId })}
+                  >
+                    주문취소
+                  </Button>
+                  <Button
+                    variant="danger"
+                    className="h-8 px-3 text-xs"
+                    onClick={() => setAlertConfirm({ alertId: alert.id, action: 'suspend', memberId: alert.memberId })}
+                  >
+                    계정정지
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="h-8 border border-slate-300 px-3 text-xs"
+                    onClick={() => setAlertConfirm({ alertId: alert.id, action: 'dismiss', memberId: alert.memberId })}
                   >
                     무시
                   </Button>
@@ -349,6 +372,22 @@ export function AdminDashboardPage() {
               </div>
             )}
           </div>
+
+          {totalAlertPages > 1 && (
+            <div className="mt-3 flex items-center justify-center gap-1">
+              <button onClick={() => setAlertPage(p => Math.max(1, p - 1))} disabled={alertPage === 1} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30">
+                <ChevronLeft size={16} />
+              </button>
+              {Array.from({ length: totalAlertPages }, (_, i) => i + 1).map(page => (
+                <button key={page} onClick={() => setAlertPage(page)} className={`min-w-7 cursor-pointer rounded px-2 py-1 text-xs font-medium ${alertPage === page ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+                  {page}
+                </button>
+              ))}
+              <button onClick={() => setAlertPage(p => Math.min(totalAlertPages, p + 1))} disabled={alertPage === totalAlertPages} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
         </Card>
 
         {/* 일별 주문 건수 차트 — GET /api/admin/orders/daily?days=7 */}
@@ -357,11 +396,12 @@ export function AdminDashboardPage() {
             <h2 className="font-semibold text-slate-900">일별 주문 건수</h2>
             <span className="text-sm text-slate-500">최근 7일</span>
           </div>
-          <ResponsiveContainer width="100%" height={240}>
+          <ResponsiveContainer width="100%" height={240} className="outline-none">
             <BarChart
               layout="vertical"
               data={MOCK_DAILY_ORDERS}
               margin={{ top: 0, right: 52, bottom: 0, left: 0 }}
+              tabIndex={-1}
             >
               <XAxis type="number" hide />
               <YAxis
@@ -372,7 +412,7 @@ export function AdminDashboardPage() {
                 axisLine={false}
                 tickLine={false}
               />
-              <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+              <Bar dataKey="count" radius={[0, 4, 4, 0]} isAnimationActive={false}>
                 <LabelList
                   dataKey="count"
                   position="right"
@@ -388,24 +428,38 @@ export function AdminDashboardPage() {
       {/* 하단 행: 대회 목록 + 최근 활동 */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
         {/* 진행 중인 대회 — GET /api/admin/contests?status=ACTIVE */}
-        <Card className="lg:col-span-3">
+        <Card className="flex flex-col lg:col-span-3">
           <h2 className="mb-4 font-semibold text-slate-900">진행 중인 대회</h2>
+          <div className="min-h-40 flex-1">
           <table className="w-full text-sm">
+            <colgroup>
+              <col className="w-1/4" />
+              <col className="w-1/4" />
+              <col className="w-1/4" />
+              <col className="w-1/4" />
+            </colgroup>
             <thead>
-              <tr className="border-b border-slate-100 text-left text-slate-500">
-                <th className="pb-3 font-medium">대회명</th>
-                <th className="pb-3 font-medium">기간</th>
-                <th className="pb-3 font-medium">참가자</th>
-                <th className="pb-3 font-medium">상태</th>
+              <tr className="border-b border-slate-100 text-slate-500">
+                <th className="pb-3 text-left font-medium">대회명</th>
+                <th className="pb-3 pr-10 text-center font-medium">기간</th>
+                <th className="pb-3 text-center font-medium">참가자</th>
+                <th className="pb-3 text-center font-medium">상태</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {MOCK_CONTESTS.map(contest => (
+              {pagedContests.map(contest => (
                 <tr key={contest.id}>
-                  <td className="py-3 font-medium text-slate-900">{contest.name}</td>
-                  <td className="py-3 text-slate-600">{contest.period}</td>
-                  <td className="py-3 text-slate-600">{contest.participants}</td>
-                  <td className="py-3">
+                  <td className="py-3 text-left">
+                    <Link
+                      to={`/admin/contests/${contest.id}`}
+                      className="font-medium text-[#1565C0] hover:underline"
+                    >
+                      {contest.name}
+                    </Link>
+                  </td>
+                  <td className="py-3 pr-10 text-center text-slate-600">{contest.period}</td>
+                  <td className="py-3 text-center text-slate-600">{contest.participants}</td>
+                  <td className="py-3 text-center">
                     <StatusBadge tone={CONTEST_STATUS_TONE[contest.contestStatus]}>
                       {CONTEST_STATUS_LABEL[contest.contestStatus]}
                     </StatusBadge>
@@ -414,13 +468,45 @@ export function AdminDashboardPage() {
               ))}
             </tbody>
           </table>
+          </div>
+          {totalContestPages > 1 && (
+            <div className="mt-3 flex items-center justify-center gap-1">
+              <button
+                onClick={() => setContestPage(p => Math.max(1, p - 1))}
+                disabled={contestPage === 1}
+                className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              {Array.from({ length: totalContestPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setContestPage(page)}
+                  className={`min-w-7 cursor-pointer rounded px-2 py-1 text-xs font-medium ${
+                    contestPage === page
+                      ? 'bg-[#1565C0] text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                onClick={() => setContestPage(p => Math.min(totalContestPages, p + 1))}
+                disabled={contestPage === totalContestPages}
+                className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
         </Card>
 
         {/* 최근 관리 활동 — GET /api/admin/audit-log?limit=5 */}
-        <Card className="lg:col-span-2">
+        <Card className="flex flex-col lg:col-span-2">
           <h2 className="mb-4 font-semibold text-slate-900">최근 관리 활동</h2>
-          <ul className="space-y-4">
-            {MOCK_ACTIVITIES.map(activity => (
+          <ul className="min-h-44 flex-1 space-y-3">
+            {pagedActivities.map(activity => (
               <li key={activity.id} className="flex items-start gap-3">
                 <span
                   className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${ACTIVITY_DOT_COLOR[activity.activityType]}`}
@@ -434,8 +520,25 @@ export function AdminDashboardPage() {
               </li>
             ))}
           </ul>
+
+          {totalActivityPages > 1 && (
+            <div className="mt-auto flex items-center justify-center gap-1 pt-4">
+              <button onClick={() => setActivityPage(p => Math.max(1, p - 1))} disabled={activityPage === 1} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30">
+                <ChevronLeft size={16} />
+              </button>
+              {Array.from({ length: totalActivityPages }, (_, i) => i + 1).map(page => (
+                <button key={page} onClick={() => setActivityPage(page)} className={`min-w-7 cursor-pointer rounded px-2 py-1 text-xs font-medium ${activityPage === page ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>
+                  {page}
+                </button>
+              ))}
+              <button onClick={() => setActivityPage(p => Math.min(totalActivityPages, p + 1))} disabled={activityPage === totalActivityPages} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          )}
         </Card>
       </div>
     </div>
+    </>
   );
 }

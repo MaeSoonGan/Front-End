@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 
 type ContestStatus = 'ONGOING' | 'CLOSING_SOON' | 'SCHEDULED' | 'ENDED';
@@ -195,18 +195,15 @@ export function AdminContestManagePage() {
     setIsFormOpen(false);
   }
 
+  useAdminPageActions(
+    <Button variant="brand" onClick={handleNewContest}>
+      <Plus size={16} className="mr-1.5" />
+      새 대회 생성
+    </Button>
+  );
+
   return (
     <>
-      <PageHeader
-        title="대회 목록"
-        actions={
-          <Button variant="brand" onClick={handleNewContest}>
-            <Plus size={16} className="mr-1.5" />
-            새 대회 생성
-          </Button>
-        }
-      />
-
       {/* 요약 카드 */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="py-6">

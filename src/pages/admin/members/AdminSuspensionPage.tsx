@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Search, Download, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 import { TextInput } from '../../../components/common/TextInput';
 
@@ -183,6 +183,8 @@ export function AdminSuspensionPage() {
     </button>
   );
 
+  useAdminPageActions(csvAction);
+
   return (
     <>
       {/* 처리 확인 모달 */}
@@ -229,11 +231,6 @@ export function AdminSuspensionPage() {
           </div>
         </div>
       )}
-
-      <PageHeader
-        title="계정 정지 이력"
-        actions={csvAction}
-      />
 
       {/* 요약 카드 */}
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">

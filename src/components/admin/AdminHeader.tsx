@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 
@@ -17,9 +18,10 @@ const PAGE_NAME_MAP: Record<string, string> = {
 interface AdminHeaderProps {
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
+  actions?: ReactNode;
 }
 
-export function AdminHeader({ isSidebarOpen, onToggleSidebar }: AdminHeaderProps) {
+export function AdminHeader({ isSidebarOpen, onToggleSidebar, actions }: AdminHeaderProps) {
   const { pathname } = useLocation();
   const pageName = pathname.startsWith('/admin/contests/')
     ? '대회 상세'
@@ -30,14 +32,15 @@ export function AdminHeader({ isSidebarOpen, onToggleSidebar }: AdminHeaderProps
       <button
         onClick={onToggleSidebar}
         aria-label={isSidebarOpen ? '사이드바 닫기' : '사이드바 열기'}
-        className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+        className="cursor-pointer rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
       >
         {isSidebarOpen
           ? <PanelLeftClose size={20} />
           : <PanelLeftOpen size={20} />
         }
       </button>
-      <h2 className="text-sm font-semibold text-slate-700">{pageName}</h2>
+      <h2 className="text-xl font-bold text-slate-900">{pageName}</h2>
+      {actions ? <div className="ml-auto flex items-center gap-2">{actions}</div> : null}
     </header>
   );
 }

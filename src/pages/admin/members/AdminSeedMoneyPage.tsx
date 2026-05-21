@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Download, ChevronLeft, ChevronRight, AlertTriangle, Search } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
-import { PageHeader } from '../../../components/common/PageHeader';
 import { Button } from '../../../components/common/Button';
 
 type PaymentType = '이벤트 당첨' | '보상' | '상금' | '기타';
@@ -164,8 +163,6 @@ export function AdminSeedMoneyPage() {
           </div>
         </div>
       )}
-
-      <PageHeader title="시드머니 지급" />
 
       {/* 요약 카드 */}
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
