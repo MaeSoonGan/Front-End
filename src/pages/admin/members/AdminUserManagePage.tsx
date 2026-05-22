@@ -31,8 +31,6 @@ interface Member {
 // ---- Constants ----
 
 const ITEMS_PER_PAGE = 6;
-const TOTAL_MEMBER_COUNT = 1234;
-const TOTAL_PAGES = Math.ceil(TOTAL_MEMBER_COUNT / ITEMS_PER_PAGE);
 
 const MOCK_SUMMARY = {
   total: 1234,
