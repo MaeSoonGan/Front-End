@@ -45,7 +45,11 @@ export function UserHeader() {
   const [searchKeyword, setSearchKeyword] = useState('');
   const isHome = pathname === '/' || pathname === '/home';
   const canGoBack =
-    pathname === '/more' || pathname === '/market' || pathname === '/balance' || pathname === '/watchlist';
+    pathname === '/more' ||
+    pathname === '/market' ||
+    pathname === '/balance' ||
+    pathname === '/watchlist' ||
+    pathname === '/contests';
   const pageTitle = getTitle(pathname, search);
   const searchResults = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase();
@@ -149,7 +153,12 @@ export function UserHeader() {
                 aria-label="뒤로가기"
                 className="relative flex h-8 w-8 items-center justify-center rounded-full text-[#1565C0] hover:bg-[#F0F6FF]"
                 onClick={() => {
-                  if (pathname === '/market' || pathname === '/balance' || pathname === '/watchlist') {
+                  if (
+                    pathname === '/market' ||
+                    pathname === '/balance' ||
+                    pathname === '/watchlist' ||
+                    pathname === '/contests'
+                  ) {
                     const searchParams = new URLSearchParams(search);
 
                     navigate(
