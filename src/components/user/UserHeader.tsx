@@ -18,6 +18,7 @@ const pageTitles: Record<string, string> = {
   '/watchlist': '관심 종목',
   '/ranking': '대회 랭킹',
   '/notices': '공지',
+  '/notifications': '알림',
   '/notifications/settings': '알림 설정',
   '/profile/edit': '정보 수정',
   '/seed-money/reset': '시드머니 초기화',
@@ -53,7 +54,8 @@ function getTitle(pathname: string, search: string) {
 }
 
 export function UserHeader() {
-  const { pathname, search } = useLocation();
+  const location = useLocation();
+  const { pathname, search, state } = location;
   const navigate = useNavigate();
   const { contest, getContestPath, isContestMode } = useContestMode();
   const titlePathname = isContestMode ? stripContestPrefix(pathname) : pathname;
@@ -68,12 +70,21 @@ export function UserHeader() {
     pathname === '/my-contests' ||
     pathname === '/contests' ||
     titlePathname === '/notices' ||
+    titlePathname === '/notifications' ||
     titlePathname === '/notifications/settings' ||
     titlePathname === '/profile/edit' ||
     titlePathname === '/seed-money/reset';
   const contestTitle = contest ? `${contest.startAt.slice(0, 4)}년 ${contest.title}` : '대회';
   const pageTitle =
     isContestMode && titlePathname === '/home' ? contestTitle : getTitle(titlePathname, search);
+  const isNotificationListPage = titlePathname === '/notifications';
+  const notificationBackPath =
+    typeof state === 'object' &&
+    state !== null &&
+    'from' in state &&
+    typeof state.from === 'string'
+      ? state.from
+      : null;
   const searchResults = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase();
 
@@ -208,6 +219,17 @@ export function UserHeader() {
                     return;
                   }
 
+                  if (titlePathname === '/notifications') {
+                    if (notificationBackPath) {
+                      navigate(notificationBackPath);
+                    } else if (window.history.length > 1) {
+                      navigate(-1);
+                    } else {
+                      navigate(isContestMode ? getContestPath('/more') : '/more');
+                    }
+                    return;
+                  }
+
                   if (titlePathname === '/notices') {
                     navigate(isContestMode ? getContestPath('/more') : '/more');
                     return;
@@ -251,23 +273,26 @@ export function UserHeader() {
               )}
             </Link>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              aria-label="알림"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-sm text-[#1565C0] hover:bg-[#F0F6FF]"
-              to={isContestMode ? getContestPath('/notifications') : '/notifications'}
-            >
-              🔔
-            </Link>
-            <button
-              aria-label="검색"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[#6C88A4] hover:bg-[#F0F6FF]"
-              onClick={() => setIsSearchOpen(true)}
-              type="button"
-            >
-              <Search size={18} strokeWidth={2.5} />
-            </button>
-          </div>
+          {!isNotificationListPage ? (
+            <div className="flex items-center gap-2">
+              <Link
+                aria-label="알림"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-sm text-[#1565C0] hover:bg-[#F0F6FF]"
+                state={{ from: `${pathname}${search}` }}
+                to={isContestMode ? getContestPath('/notifications') : '/notifications'}
+              >
+                🔔
+              </Link>
+              <button
+                aria-label="검색"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-[#6C88A4] hover:bg-[#F0F6FF]"
+                onClick={() => setIsSearchOpen(true)}
+                type="button"
+              >
+                <Search size={18} strokeWidth={2.5} />
+              </button>
+            </div>
+          ) : null}
         </div>
       )}
     </header>

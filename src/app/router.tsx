@@ -46,7 +46,7 @@ import { MarketPage } from '../pages/user/MarketPage';
 import { MorePage } from '../pages/user/MorePage';
 import { MyContestsPage } from '../pages/user/MyContestsPage';
 import { NoticePage } from '../pages/user/NoticePage';
-import { NotificationPage } from '../pages/user/NotificationPage';
+import { NotificationListPage } from '../pages/user/NotificationListPage';
 import { NotificationSettingPage } from '../pages/user/NotificationSettingPage';
 import { OrderPage } from '../pages/user/OrderPage';
 import { ProfileEditPage } from '../pages/user/ProfileEditPage';
@@ -87,14 +87,14 @@ export const router = createBrowserRouter([
       { path: '/contests/:contestId/ranking', element: <ContestRankingPage /> },
       { path: '/contests/:contestId/executions', element: <ExecutionHistoryPage /> },
       { path: '/contests/:contestId/notices', element: <NoticePage /> },
-      { path: '/contests/:contestId/notifications', element: <NotificationPage /> },
+      { path: '/contests/:contestId/notifications', element: <NotificationListPage /> },
       { path: '/contests/:contestId/notifications/settings', element: <NotificationSettingPage /> },
       { path: '/contests/:contestId/profile/edit', element: <ProfileEditPage /> },
       { path: '/contests/:contestId/seed-money/reset', element: <SeedMoneyResetPage /> },
       { path: '/more', element: <MorePage /> },
       { path: '/executions', element: <ExecutionHistoryPage /> },
       { path: '/notices', element: <NoticePage /> },
-      { path: '/notifications', element: <NotificationPage /> },
+      { path: '/notifications', element: <NotificationListPage /> },
       { path: '/notifications/settings', element: <NotificationSettingPage /> },
       { path: '/profile/edit', element: <ProfileEditPage /> },
       { path: '/seed-money/reset', element: <SeedMoneyResetPage /> },

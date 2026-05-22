@@ -27,3 +27,24 @@ export interface NotificationSettingItem {
   key: NotificationSettingKey;
   title: string;
 }
+
+export type NotificationType =
+  | 'EXECUTION'
+  | 'ORDER_CANCEL'
+  | 'CONTEST'
+  | 'NOTICE'
+  | 'MARKET_OPEN';
+
+export type NotificationDirection = 'BUY' | 'SELL';
+
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  title: string;
+  direction?: NotificationDirection;
+  message: string;
+  detail?: string;
+  displayTime: string;
+  isRead: boolean;
+  createdAt: string;
+}
