@@ -67,6 +67,7 @@ export function UserHeader() {
     pathname === '/watchlist' ||
     pathname === '/my-contests' ||
     pathname === '/contests' ||
+    titlePathname === '/notices' ||
     titlePathname === '/notifications/settings' ||
     titlePathname === '/profile/edit' ||
     titlePathname === '/seed-money/reset';
@@ -204,6 +205,11 @@ export function UserHeader() {
                     } else {
                       navigate(isContestMode ? getContestPath('/more') : '/more');
                     }
+                    return;
+                  }
+
+                  if (titlePathname === '/notices') {
+                    navigate(isContestMode ? getContestPath('/more') : '/more');
                     return;
                   }
 
