@@ -17,6 +17,7 @@ const pageTitles: Record<string, string> = {
   '/watchlist': '관심 종목',
   '/ranking': '대회 랭킹',
   '/notices': '공지',
+  '/notifications/settings': '알림 설정',
   '/seed-money/reset': '시드머니 초기화',
 };
 
@@ -58,7 +59,8 @@ export function UserHeader() {
     pathname === '/market' ||
     pathname === '/balance' ||
     pathname === '/watchlist' ||
-    pathname === '/contests';
+    pathname === '/contests' ||
+    titlePathname === '/notifications/settings';
   const contestTitle = contest ? `${contest.startAt.slice(0, 4)}년 ${contest.title}` : '대회';
   const pageTitle =
     isContestMode && titlePathname === '/home' ? contestTitle : getTitle(titlePathname, search);
@@ -178,6 +180,15 @@ export function UserHeader() {
                         ? '/balance'
                         : '/home',
                     );
+                    return;
+                  }
+
+                  if (titlePathname === '/notifications/settings') {
+                    if (window.history.length > 1) {
+                      navigate(-1);
+                    } else {
+                      navigate(isContestMode ? getContestPath('/more') : '/more');
+                    }
                     return;
                   }
 

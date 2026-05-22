@@ -41,7 +41,12 @@ export const userMoreMock = {
       icon: '🏆',
       to: '/my-contests',
     },
-    { title: '알림', description: '가격과 대회 알림을 확인해요', icon: '🔔', to: '/notifications' },
+    {
+      title: '알림',
+      description: '거래, 대회, 시장 알림을 설정해요',
+      icon: '🔔',
+      to: '/notifications/settings',
+    },
   ],
   accountMenus: [
     {
