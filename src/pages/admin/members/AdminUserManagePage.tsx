@@ -462,7 +462,8 @@ export function AdminUserManagePage() {
         </div>
 
         {/* 테이블 */}
-        <div className="h-80 overflow-x-auto overflow-y-hidden">
+        <div className="h-80 overflow-hidden">
+          <div className="h-full overflow-x-auto">
           <table className="min-w-full text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-slate-500">
@@ -511,66 +512,69 @@ export function AdminUserManagePage() {
                 <th className="px-4 py-3 text-center font-medium">상태</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {pagedMembers.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="py-16 text-center text-sm text-slate-400">
+            <tbody>
+              {pagedMembers.length === 0 && (
+                <tr className="h-10.25">
+                  <td colSpan={10} className="px-4 py-3 text-center text-sm text-slate-400">
                     검색 결과가 없습니다.
                   </td>
                 </tr>
-              ) : (
-                pagedMembers.map(member => {
-                  const isSelected = selectedIds.includes(member.id);
-                  return (
-                    <tr
-                      key={member.id}
+              )}
+              {pagedMembers.map(member => {
+                const isSelected = selectedIds.includes(member.id);
+                return (
+                  <tr
+                    key={member.id}
+                    className={cn(
+                      'h-10.25 cursor-pointer border-t border-slate-100 transition-colors hover:bg-slate-50',
+                      isSelected && 'bg-[#E8F0FE] hover:bg-[#dce8fd]',
+                    )}
+                  >
+                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleSelectOne(member.id)}
+                        className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-[#1565C0]"
+                      />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{member.nickname}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-center text-slate-500">{member.accountId}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-center text-slate-600">{member.email}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-center text-slate-600">{member.joinedAt}</td>
+                    <td className="px-4 py-3 text-center text-slate-600">{member.contestCount}개</td>
+                    <td className="px-4 py-3 text-right text-slate-600">{member.totalAsset ?? '—'}</td>
+                    <td
                       className={cn(
-                        'cursor-pointer transition-colors hover:bg-slate-50',
-                        isSelected && 'bg-[#E8F0FE] hover:bg-[#dce8fd]',
+                        'px-4 py-3 text-right font-medium',
+                        member.profitRate === null
+                          ? 'text-slate-400'
+                          : member.profitRate > 0
+                            ? 'text-emerald-600'
+                            : 'text-rose-600',
                       )}
                     >
-                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => handleSelectOne(member.id)}
-                          className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-[#1565C0]"
-                        />
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{member.nickname}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-center text-slate-500">{member.accountId}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-center text-slate-600">{member.email}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-center text-slate-600">{member.joinedAt}</td>
-                      <td className="px-4 py-3 text-center text-slate-600">{member.contestCount}개</td>
-                      <td className="px-4 py-3 text-right text-slate-600">{member.totalAsset ?? '—'}</td>
-                      <td
-                        className={cn(
-                          'px-4 py-3 text-right font-medium',
-                          member.profitRate === null
-                            ? 'text-slate-400'
-                            : member.profitRate > 0
-                              ? 'text-emerald-600'
-                              : 'text-rose-600',
-                        )}
-                      >
-                        {member.profitRate === null
-                          ? '—'
-                          : `${member.profitRate > 0 ? '+' : ''}${member.profitRate}%`}
-                      </td>
-                      <td className="px-4 py-3 text-center text-slate-600">{member.loginFailCount}회</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-center">
-                          <StatusBadge tone={MEMBER_STATUS_TONE[member.memberStatus]}>
-                            {MEMBER_STATUS_LABEL[member.memberStatus]}
-                          </StatusBadge>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                      {member.profitRate === null
+                        ? '—'
+                        : `${member.profitRate > 0 ? '+' : ''}${member.profitRate}%`}
+                    </td>
+                    <td className="px-4 py-3 text-center text-slate-600">{member.loginFailCount}회</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-center">
+                        <StatusBadge tone={MEMBER_STATUS_TONE[member.memberStatus]}>
+                          {MEMBER_STATUS_LABEL[member.memberStatus]}
+                        </StatusBadge>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {Array.from({ length: ITEMS_PER_PAGE - Math.max(pagedMembers.length, pagedMembers.length === 0 ? 1 : 0) }).map((_, i) => (
+                <tr key={`ghost-${i}`} className="h-10.25 border-t border-slate-100" />
+              ))}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* 페이지네이션 */}
