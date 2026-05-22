@@ -11,19 +11,36 @@ const items = [
 ];
 
 export function BottomNavigation() {
-  const { getContestPath, isContestMode } = useContestMode();
+  const { getContestPath, isContestMode, leaveContest } = useContestMode();
 
   return (
     <nav className="z-20 shrink-0 border-t border-blue-100 bg-white/95 backdrop-blur">
       <div className="grid h-16 grid-cols-5 px-1">
         {items.map((item) => {
           const isContestItem = item.to === '/contests';
+          const isMoreItem = item.to === '/more';
           const to = isContestMode
             ? isContestItem
               ? getContestPath('/ranking')
               : getContestPath(item.to)
             : item.to;
           const label = isContestMode && isContestItem ? '랭킹' : item.label;
+
+          if (isContestMode && isMoreItem) {
+            return (
+              <button
+                className="flex flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-bold text-[#A3B4C6] transition hover:text-[#1565C0]"
+                key={item.to}
+                onClick={leaveContest}
+                type="button"
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-full text-sm">
+                  🚪
+                </span>
+                <span>나가기</span>
+              </button>
+            );
+          }
 
           return (
             <NavLink

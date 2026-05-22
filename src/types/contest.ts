@@ -14,3 +14,20 @@ export interface ContestListItem {
   seedMoney: number;
   isJoined: boolean;
 }
+
+export interface ContestRankingItem {
+  rank: number;
+  nickname: string;
+  profitAmount: number;
+  profitRate: number;
+}
+
+export type ContestMyRanking = ContestRankingItem;
+
+export interface ContestRankingResponse {
+  contestId: string;
+  contestTitle: string;
+  totalParticipants: number;
+  myRanking: ContestMyRanking;
+  rankingList: ContestRankingItem[];
+}

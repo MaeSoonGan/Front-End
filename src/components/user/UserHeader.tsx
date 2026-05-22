@@ -15,8 +15,13 @@ const pageTitles: Record<string, string> = {
   '/more': '더보기',
   '/balance': '잔고',
   '/watchlist': '관심 종목',
+  '/ranking': '대회 랭킹',
   '/seed-money/reset': '시드머니 초기화',
 };
+
+function stripContestPrefix(pathname: string) {
+  return pathname.replace(/^\/contests\/[^/]+/, '') || '/home';
+}
 
 function getTitle(pathname: string, search: string) {
   if (pathname === '/market') {
@@ -42,7 +47,8 @@ function getTitle(pathname: string, search: string) {
 export function UserHeader() {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
-  const { getContestPath, isContestMode } = useContestMode();
+  const { contest, getContestPath, isContestMode } = useContestMode();
+  const titlePathname = isContestMode ? stripContestPrefix(pathname) : pathname;
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const isHome = pathname === '/' || pathname === '/home';
@@ -52,7 +58,9 @@ export function UserHeader() {
     pathname === '/balance' ||
     pathname === '/watchlist' ||
     pathname === '/contests';
-  const pageTitle = getTitle(pathname, search);
+  const contestTitle = contest ? `${contest.startAt.slice(0, 4)}년 ${contest.title}` : '대회';
+  const pageTitle =
+    isContestMode && titlePathname === '/home' ? contestTitle : getTitle(titlePathname, search);
   const searchResults = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase();
 
