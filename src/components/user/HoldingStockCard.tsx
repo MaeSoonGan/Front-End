@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useContestMode } from '../../contexts/ContestModeContext';
 import type { HoldingItem } from '../../types/balance';
 import { cn } from '../../utils/cn';
 
@@ -12,8 +13,10 @@ function formatWon(value: number) {
 
 export function HoldingStockCard({ holding }: HoldingStockCardProps) {
   const navigate = useNavigate();
+  const { getContestPath, isContestMode } = useContestMode();
   const isProfit = holding.profitAmount >= 0;
   const evaluationAmount = holding.currentPrice * holding.quantity;
+  const marketPath = isContestMode ? getContestPath('/market') : '/market';
 
   return (
     <article className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
@@ -50,28 +53,28 @@ export function HoldingStockCard({ holding }: HoldingStockCardProps) {
       <div className="mt-4 grid grid-cols-4 gap-2">
         <button
           className="h-10 rounded-xl border border-blue-100 bg-white text-xs font-extrabold text-slate-700 transition hover:bg-[#F8FBFF]"
-          onClick={() => navigate(`/market?stockCode=${holding.stockCode}&from=balance`)}
+          onClick={() => navigate(`${marketPath}?stockCode=${holding.stockCode}&from=balance`)}
           type="button"
         >
           현재가
         </button>
         <button
           className="h-10 rounded-xl border border-blue-100 bg-white text-xs font-extrabold text-slate-700 transition hover:bg-[#F8FBFF]"
-          onClick={() => navigate(`/market?stockCode=${holding.stockCode}&tab=chart&from=balance`)}
+          onClick={() => navigate(`${marketPath}?stockCode=${holding.stockCode}&tab=chart&from=balance`)}
           type="button"
         >
           차트
         </button>
         <button
           className="h-10 rounded-xl border border-red-200 bg-white text-xs font-extrabold text-red-500 transition hover:bg-red-50"
-          onClick={() => navigate(`/market?stockCode=${holding.stockCode}&orderSide=BUY&from=balance`)}
+          onClick={() => navigate(`${marketPath}?stockCode=${holding.stockCode}&orderSide=BUY&from=balance`)}
           type="button"
         >
           매수
         </button>
         <button
           className="h-10 rounded-xl border border-blue-200 bg-white text-xs font-extrabold text-[#1565C0] transition hover:bg-[#F0F6FF]"
-          onClick={() => navigate(`/market?stockCode=${holding.stockCode}&orderSide=SELL&from=balance`)}
+          onClick={() => navigate(`${marketPath}?stockCode=${holding.stockCode}&orderSide=SELL&from=balance`)}
           type="button"
         >
           매도

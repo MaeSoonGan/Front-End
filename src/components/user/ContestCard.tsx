@@ -85,7 +85,7 @@ export function ContestCard({ contest, isJoining, onJoin }: ContestCardProps) {
     }
 
     if (canEnter) {
-      navigate(`/contests/${contest.id}`);
+      navigate(`/contests/${contest.id}/home`);
       return;
     }
 

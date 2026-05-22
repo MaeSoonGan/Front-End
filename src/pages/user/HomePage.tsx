@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { PageContainer } from '../../components/common/PageContainer';
+import { useContestMode } from '../../contexts/ContestModeContext';
 import { userHomeMock } from '../../mocks/userHomeMock';
 
 function getChangeClass(changeRate: string) {
@@ -16,30 +17,50 @@ function getChangeClass(changeRate: string) {
 
 export function HomePage() {
   const navigate = useNavigate();
+  const { contest, getContestPath, isContestMode } = useContestMode();
   const { asset, marketStatus, watchlist, activeContest } = userHomeMock;
+  const getPath = (path: string) => (isContestMode ? getContestPath(path) : path);
+  const contestTitle = contest ? `${contest.startAt.slice(0, 4)}년 ${contest.title}` : '참여 대회';
 
   return (
     <PageContainer>
       <button
         className="w-full rounded-2xl bg-gradient-to-br from-[#1565C0] to-[#4F8ED9] p-5 text-left text-white shadow-sm transition hover:shadow-md"
-        onClick={() => navigate('/balance')}
+        onClick={() => navigate(getPath('/balance'))}
         type="button"
       >
-        <p className="text-xs font-semibold text-blue-100">내 총 자산</p>
-        <p className="mt-2 text-2xl font-extrabold">{asset.total}</p>
-        <p className="mt-1 text-xs text-blue-100">
-          ▲ {asset.change} ({asset.rate})
-        </p>
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-white/15 p-3">
-            <p className="text-xs text-blue-100">예수금</p>
-            <p className="mt-1 text-sm font-bold">{asset.cash}</p>
+        <div className={isContestMode ? 'flex items-start justify-between gap-4' : undefined}>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-blue-100">내 총 자산</p>
+            <p className="mt-2 text-2xl font-extrabold">{asset.total}</p>
+            <p className="mt-1 text-xs text-blue-100">
+              {isContestMode ? contestTitle : `▲ ${asset.change} (${asset.rate})`}
+            </p>
           </div>
-          <div className="rounded-xl bg-white/15 p-3">
-            <p className="text-xs text-blue-100">주식평가</p>
-            <p className="mt-1 text-sm font-bold">{asset.evaluation}</p>
-          </div>
+          {isContestMode ? (
+            <div className="shrink-0 rounded-2xl bg-white/15 px-4 py-3 text-right">
+              <p className="text-[11px] font-bold text-blue-100">현재 순위</p>
+              <p className="mt-1 text-2xl font-extrabold leading-none">
+                {activeContest.rank}
+                <span className="ml-1 text-sm font-bold text-blue-100">
+                  / {activeContest.participants}
+                </span>
+              </p>
+            </div>
+          ) : null}
         </div>
+        {!isContestMode ? (
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-xl bg-white/15 p-3">
+              <p className="text-xs text-blue-100">예수금</p>
+              <p className="mt-1 text-sm font-bold">{asset.cash}</p>
+            </div>
+            <div className="rounded-xl bg-white/15 p-3">
+              <p className="text-xs text-blue-100">주식평가</p>
+              <p className="mt-1 text-sm font-bold">{asset.evaluation}</p>
+            </div>
+          </div>
+        ) : null}
       </button>
 
       <section className="mt-4 grid grid-cols-3 gap-3">
@@ -69,7 +90,7 @@ export function HomePage() {
             <button
               className="flex w-full items-center justify-between rounded-xl border border-blue-100 bg-white px-4 py-3 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]"
               key={stock.code}
-              onClick={() => navigate(`/market?stockCode=${stock.code}`)}
+              onClick={() => navigate(`${getPath('/market')}?stockCode=${stock.code}`)}
               type="button"
             >
               <div className="flex items-center gap-3">
@@ -92,43 +113,45 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="mt-5">
-        <h2 className="mb-3 text-base font-extrabold text-slate-950">참여 중인 대회</h2>
-        <button
-          className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]"
-          onClick={() => navigate(`/contests/${activeContest.id}`)}
-          type="button"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-bold text-[#1565C0]">{activeContest.type}</p>
-              <p className="mt-1 text-base font-extrabold text-slate-950">
-                {activeContest.title}
-              </p>
+      {!isContestMode ? (
+        <section className="mt-5">
+          <h2 className="mb-3 text-base font-extrabold text-slate-950">참여 중인 대회</h2>
+          <button
+            className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]"
+            onClick={() => navigate(`/contests/${activeContest.id}/home`)}
+            type="button"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-[#1565C0]">{activeContest.type}</p>
+                <p className="mt-1 text-base font-extrabold text-slate-950">
+                  {activeContest.title}
+                </p>
+              </div>
+              <span className="rounded-full bg-[#E5F4FF] px-3 py-1 text-xs font-bold text-[#1565C0]">
+                {activeContest.endDate}
+              </span>
             </div>
-            <span className="rounded-full bg-[#E5F4FF] px-3 py-1 text-xs font-bold text-[#1565C0]">
-              {activeContest.endDate}
-            </span>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-[#F0F6FF] p-3">
-              <p className="text-xs text-[#6C88A4]">내 자산</p>
-              <p className="mt-1 text-sm font-bold text-slate-950">
-                {activeContest.myAsset}
-              </p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-[#F0F6FF] p-3">
+                <p className="text-xs text-[#6C88A4]">내 자산</p>
+                <p className="mt-1 text-sm font-bold text-slate-950">
+                  {activeContest.myAsset}
+                </p>
+              </div>
+              <div className="rounded-xl bg-[#F0F6FF] p-3">
+                <p className="text-xs text-[#6C88A4]">대회 순위</p>
+                <p className="mt-1 text-sm font-bold text-[#1565C0]">
+                  {activeContest.rank}
+                  <span className="ml-1 text-xs font-medium text-[#6C88A4]">
+                    / {activeContest.participants}
+                  </span>
+                </p>
+              </div>
             </div>
-            <div className="rounded-xl bg-[#F0F6FF] p-3">
-              <p className="text-xs text-[#6C88A4]">대회 순위</p>
-              <p className="mt-1 text-sm font-bold text-[#1565C0]">
-                {activeContest.rank}
-                <span className="ml-1 text-xs font-medium text-[#6C88A4]">
-                  / {activeContest.participants}
-                </span>
-              </p>
-            </div>
-          </div>
-        </button>
-      </section>
+          </button>
+        </section>
+      ) : null}
     </PageContainer>
   );
 }
