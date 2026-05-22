@@ -44,6 +44,7 @@ import { ExecutionHistoryPage } from '../pages/user/ExecutionHistoryPage';
 import { HomePage } from '../pages/user/HomePage';
 import { MarketPage } from '../pages/user/MarketPage';
 import { MorePage } from '../pages/user/MorePage';
+import { NoticePage } from '../pages/user/NoticePage';
 import { NotificationPage } from '../pages/user/NotificationPage';
 import { OrderPage } from '../pages/user/OrderPage';
 import { ProfileEditPage } from '../pages/user/ProfileEditPage';
@@ -82,11 +83,13 @@ export const router = createBrowserRouter([
       { path: '/contests/:contestId/more', element: <MorePage /> },
       { path: '/contests/:contestId/ranking', element: <ContestRankingPage /> },
       { path: '/contests/:contestId/executions', element: <ExecutionHistoryPage /> },
+      { path: '/contests/:contestId/notices', element: <NoticePage /> },
       { path: '/contests/:contestId/notifications', element: <NotificationPage /> },
       { path: '/contests/:contestId/profile/edit', element: <ProfileEditPage /> },
       { path: '/contests/:contestId/seed-money/reset', element: <SeedMoneyResetPage /> },
       { path: '/more', element: <MorePage /> },
       { path: '/executions', element: <ExecutionHistoryPage /> },
+      { path: '/notices', element: <NoticePage /> },
       { path: '/notifications', element: <NotificationPage /> },
       { path: '/profile/edit', element: <ProfileEditPage /> },
       { path: '/seed-money/reset', element: <SeedMoneyResetPage /> },

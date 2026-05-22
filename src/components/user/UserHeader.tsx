@@ -16,6 +16,7 @@ const pageTitles: Record<string, string> = {
   '/balance': '잔고',
   '/watchlist': '관심 종목',
   '/ranking': '대회 랭킹',
+  '/notices': '공지',
   '/seed-money/reset': '시드머니 초기화',
 };
 
