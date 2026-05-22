@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PageContainer } from '../../components/common/PageContainer';
 import { ContestRankingList } from '../../components/user/ContestRankingList';
 import { ContestRankingSummaryCard } from '../../components/user/ContestRankingSummaryCard';
@@ -9,6 +9,9 @@ const RANKING_PAGE_SIZE = 20;
 
 export function ContestRankingPage() {
   const { contestId } = useParams();
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const [visibleCount, setVisibleCount] = useState(RANKING_PAGE_SIZE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -19,6 +22,7 @@ export function ContestRankingPage() {
     [rankingData.rankingList, visibleCount],
   );
   const hasMoreRanking = visibleCount < rankingData.rankingList.length;
+  const isMyContestRanking = pathname.startsWith('/my-contests/');
 
   useEffect(() => {
     setVisibleCount(RANKING_PAGE_SIZE);
@@ -58,6 +62,23 @@ export function ContestRankingPage() {
 
   return (
     <PageContainer className="min-h-full bg-[#F3F7FC] pb-0 pt-3">
+      {isMyContestRanking ? (
+        <header className="mb-4">
+          <button
+            className="flex items-center gap-1 text-base font-extrabold text-slate-950"
+            onClick={() =>
+              navigate(
+                `/my-contests${searchParams.get('fromTab') === 'ENDED' ? '?tab=ENDED' : ''}`,
+              )
+            }
+            type="button"
+          >
+            <span className="text-2xl leading-none text-[#1565C0]">‹</span>
+            대회 랭킹
+          </button>
+        </header>
+      ) : null}
+
       <section className="mb-3 rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-sm">
         <p className="text-sm font-extrabold text-slate-950">{rankingData.contestTitle}</p>
       </section>

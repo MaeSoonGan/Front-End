@@ -34,15 +34,21 @@ export const userMoreMock = {
   userName: '홍길동',
   email: 'hong****',
   menus: [
-    { title: '체결 이력', description: '주문과 체결 내역을 확인해요', icon: '📄', to: '/executions' },
+    { title: '공지', description: '서비스와 대회 공지를 확인해요', icon: '📢', to: '/notices' },
     {
       title: '참여 중인 대회',
       description: '내가 참여한 대회 현황을 확인해요',
       icon: '🏆',
       to: '/my-contests',
     },
-    { title: '알림', description: '가격과 대회 알림을 확인해요', icon: '🔔', to: '/notifications' },
-    { title: '정보 수정', description: '프로필과 계정 정보를 관리해요', icon: '⚙️', to: '/profile/edit' },
+    {
+      title: '알림',
+      description: '거래, 대회, 시장 알림을 설정해요',
+      icon: '🔔',
+      to: '/notifications/settings',
+    },
+  ],
+  accountMenus: [
     {
       title: '시드머니 초기화',
       description: '모의투자 시작 금액을 초기 상태로 되돌려요',
