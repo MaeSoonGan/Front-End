@@ -45,6 +45,48 @@ const MOCK_ALERTS: Alert[] = [
     memberId: 'user004',
     detail: '동일 종목 동일가 5회 반복 / 25.05.08 13:55',
   },
+  {
+    id: 'a3',
+    type: '비정상 수익률 탐지',
+    memberName: '최수상',
+    memberId: 'user011',
+    detail: '단일 거래 수익률 480% 초과 / 상한가 연속 매매 의심 / 25.05.08 13:40',
+  },
+  {
+    id: 'a4',
+    type: '대량 주문 탐지',
+    memberName: '김봇넷',
+    memberId: 'user022',
+    detail: '5분 내 120건 주문 / API 자동매매 의심 / 25.05.08 13:12',
+  },
+  {
+    id: 'a5',
+    type: '동시다발 로그인 탐지',
+    memberName: '정해킹',
+    memberId: 'user031',
+    detail: '상이한 IP 3곳에서 동시 접속 / 계정 탈취 의심 / 25.05.08 12:58',
+  },
+  {
+    id: 'a6',
+    type: '중복 주문 탐지',
+    memberName: '오반복',
+    memberId: 'user045',
+    detail: '삼성전자 65,400원 동일가 8회 반복 / 25.05.08 12:34',
+  },
+  {
+    id: 'a7',
+    type: '비정상 수익률 탐지',
+    memberName: '한이상',
+    memberId: 'user057',
+    detail: '30분 내 수익률 +230% / 선취매 의심 / 25.05.08 11:50',
+  },
+  {
+    id: 'a8',
+    type: '대량 주문 탐지',
+    memberName: '임테스터',
+    memberId: 'user062',
+    detail: '2분 내 80건 주문 / 체결 엔진 부하 유발 / 25.05.08 11:22',
+  },
 ];
 
 // GET /api/admin/monitoring/services
@@ -177,42 +219,44 @@ export function AdminMonitoringPage() {
               </h2>
             </div>
 
-            {alerts.length === 0 ? (
-              <p className="py-10 text-center text-sm text-slate-400">처리할 비정상 탐지 항목이 없습니다.</p>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {alerts.map(alert => (
-                  <div key={alert.id} className="flex items-start gap-4 border-l-4 border-rose-400 bg-rose-50 px-5 py-4">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-rose-700">
-                        {alert.type} — {alert.memberName} ({alert.memberId})
-                      </p>
-                      <p className="mt-0.5 text-xs text-slate-500">{alert.detail}</p>
+            <div className="h-72 overflow-y-auto scrollbar-none">
+              {alerts.length === 0 ? (
+                <p className="flex h-full items-center justify-center text-sm text-slate-400">처리할 비정상 탐지 항목이 없습니다.</p>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {alerts.map(alert => (
+                    <div key={alert.id} className="flex items-start gap-4 border-l-4 border-rose-400 bg-rose-50 px-5 py-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-rose-700">
+                          {alert.type} — {alert.memberName} ({alert.memberId})
+                        </p>
+                        <p className="mt-0.5 text-xs text-slate-500">{alert.detail}</p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <button
+                          onClick={() => setAlertConfirm({ id: alert.id, action: 'cancel' })}
+                          className="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          주문취소
+                        </button>
+                        <button
+                          onClick={() => setAlertConfirm({ id: alert.id, action: 'suspend' })}
+                          className="cursor-pointer rounded border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                        >
+                          계정정지
+                        </button>
+                        <button
+                          onClick={() => setAlertConfirm({ id: alert.id, action: 'dismiss' })}
+                          className="cursor-pointer rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-slate-50"
+                        >
+                          무시
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <button
-                        onClick={() => setAlertConfirm({ id: alert.id, action: 'cancel' })}
-                        className="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                      >
-                        주문취소
-                      </button>
-                      <button
-                        onClick={() => setAlertConfirm({ id: alert.id, action: 'suspend' })}
-                        className="cursor-pointer rounded border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
-                      >
-                        계정정지
-                      </button>
-                      <button
-                        onClick={() => setAlertConfirm({ id: alert.id, action: 'dismiss' })}
-                        className="cursor-pointer rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-slate-50"
-                      >
-                        무시
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </Card>
 
           {/* 점검 모드 설정 */}
