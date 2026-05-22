@@ -18,6 +18,7 @@ const pageTitles: Record<string, string> = {
   '/ranking': '대회 랭킹',
   '/notices': '공지',
   '/notifications/settings': '알림 설정',
+  '/profile/edit': '정보 수정',
   '/seed-money/reset': '시드머니 초기화',
 };
 
@@ -60,7 +61,8 @@ export function UserHeader() {
     pathname === '/balance' ||
     pathname === '/watchlist' ||
     pathname === '/contests' ||
-    titlePathname === '/notifications/settings';
+    titlePathname === '/notifications/settings' ||
+    titlePathname === '/profile/edit';
   const contestTitle = contest ? `${contest.startAt.slice(0, 4)}년 ${contest.title}` : '대회';
   const pageTitle =
     isContestMode && titlePathname === '/home' ? contestTitle : getTitle(titlePathname, search);
@@ -184,6 +186,15 @@ export function UserHeader() {
                   }
 
                   if (titlePathname === '/notifications/settings') {
+                    if (window.history.length > 1) {
+                      navigate(-1);
+                    } else {
+                      navigate(isContestMode ? getContestPath('/more') : '/more');
+                    }
+                    return;
+                  }
+
+                  if (titlePathname === '/profile/edit') {
                     if (window.history.length > 1) {
                       navigate(-1);
                     } else {
