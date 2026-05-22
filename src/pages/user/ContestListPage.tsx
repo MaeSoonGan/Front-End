@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { PageContainer } from '../../components/common/PageContainer';
 import { ContestCard } from '../../components/user/ContestCard';
-import { contestMocks } from '../../mocks/contestMock';
+import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
+import { contestMocks, loadContestPage } from '../../mocks/contestMock';
 import type { ContestStatus } from '../../types/contest';
 import { cn } from '../../utils/cn';
 
@@ -15,13 +16,18 @@ const CONTEST_FILTER_OPTIONS: Array<{ label: string; value: ContestFilter }> = [
   { label: '마감', value: 'ENDED' },
 ];
 
+const CONTEST_PAGE_SIZE = 4;
+
 export function ContestListPage() {
   const [contests, setContests] = useState(contestMocks);
   const [joiningContestId, setJoiningContestId] = useState<string | null>(null);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [activeFilter, setActiveFilter] = useState<ContestFilter>('ALL');
+  const [currentPage, setCurrentPage] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadMoreElement, setLoadMoreElement] = useState<HTMLDivElement | null>(null);
 
-  const filteredContests = contests.filter((contest) => {
+  const filteredContests = useMemo(() => contests.filter((contest) => {
     const keyword = searchKeyword.trim().toLowerCase();
     const isMatchedFilter = activeFilter === 'ALL' || contest.status === activeFilter;
 
@@ -40,7 +46,39 @@ export function ContestListPage() {
       contest.stockType.toLowerCase().includes(keyword) ||
       contestYear.includes(keyword)
     );
+  }), [activeFilter, contests, searchKeyword]);
+  const visibleContests = useMemo(
+    () =>
+      Array.from({ length: currentPage + 1 }).flatMap((_, page) =>
+        loadContestPage(page, CONTEST_PAGE_SIZE, filteredContests),
+      ),
+    [currentPage, filteredContests],
+  );
+  const hasMore = visibleContests.length < filteredContests.length;
+
+  const handleLoadMore = useCallback(() => {
+    if (!hasMore || isLoadingMore) {
+      return;
+    }
+
+    setIsLoadingMore(true);
+    window.setTimeout(() => {
+      setCurrentPage((page) => page + 1);
+      setIsLoadingMore(false);
+    }, 350);
+  }, [hasMore, isLoadingMore]);
+
+  useInfiniteScroll({
+    hasMore,
+    isLoading: isLoadingMore,
+    onLoadMore: handleLoadMore,
+    target: loadMoreElement,
   });
+
+  useEffect(() => {
+    setCurrentPage(0);
+    setIsLoadingMore(false);
+  }, [activeFilter, searchKeyword]);
 
   const handleJoinContest = (contestId: string) => {
     setJoiningContestId(contestId);
@@ -99,7 +137,7 @@ export function ContestListPage() {
 
       <section className="space-y-3">
         {filteredContests.length > 0 ? (
-          filteredContests.map((contest) => (
+          visibleContests.map((contest) => (
             <ContestCard
               contest={contest}
               isJoining={joiningContestId === contest.id}
@@ -116,6 +154,20 @@ export function ContestListPage() {
           </div>
         )}
       </section>
+
+      {filteredContests.length > 0 ? (
+        <div ref={setLoadMoreElement} className="py-5 text-center">
+          {isLoadingMore ? (
+            <p className="text-xs font-bold text-[#6C88A4]">대회를 불러오는 중...</p>
+          ) : hasMore ? (
+            <p className="text-xs font-bold text-[#6C88A4]">아래로 스크롤하면 더 불러와요</p>
+          ) : (
+            <p className="text-xs font-bold text-[#A3B4C6]">
+              더 이상 불러올 대회가 없어요
+            </p>
+          )}
+        </div>
+      ) : null}
     </PageContainer>
   );
 }
