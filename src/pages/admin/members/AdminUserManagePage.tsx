@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Download, UserPlus, Search } from 'lucide-react';
+import { Download, UserPlus, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
@@ -12,7 +12,8 @@ import type { StatusTone } from '../../../types/common';
 // ---- Types ----
 
 type MemberStatus = 'ACTIVE' | 'SUSPENDED';
-type FilterTab = 'ALL' | 'ACTIVE' | 'SUSPENDED' | 'TODAY';
+type SortField = 'joinedAt' | 'contestCount' | 'totalAsset' | 'profitRate' | 'loginFailCount';
+type SortDir = 'asc' | 'desc' | null;
 
 interface Member {
   id: string;
@@ -119,13 +120,7 @@ const STATUS_OPTIONS = [
   { value: '', label: '전체 상태' },
   { value: 'ACTIVE', label: '활성' },
   { value: 'SUSPENDED', label: '정지' },
-];
-
-const FILTER_TABS: { value: FilterTab; label: string }[] = [
-  { value: 'ALL', label: '전체' },
-  { value: 'ACTIVE', label: '활성' },
-  { value: 'SUSPENDED', label: '정지' },
-  { value: 'TODAY', label: '오늘가입' },
+  { value: 'TODAY', label: '오늘 가입' },
 ];
 
 const MEMBER_STATUS_TONE: Record<MemberStatus, StatusTone> = {
@@ -142,17 +137,31 @@ const MEMBER_STATUS_LABEL: Record<MemberStatus, string> = {
 
 function getPaginationPages(currentPage: number, totalPages: number): (number | '...')[] {
   const pages: (number | '...')[] = [1];
-
   if (currentPage > 3) pages.push('...');
-
   const start = Math.max(2, currentPage - 1);
   const end = Math.min(totalPages - 1, currentPage + 1);
   for (let i = start; i <= end; i++) pages.push(i);
-
   if (currentPage < totalPages - 2) pages.push('...');
   if (totalPages > 1) pages.push(totalPages);
-
   return pages;
+}
+
+function joinedAtToIso(joinedAt: string): string {
+  const [yy, mm, dd] = joinedAt.split('.');
+  return `20${yy}-${mm}-${dd}`;
+}
+
+function parseAsset(asset: string | null): number {
+  if (!asset) return -1;
+  const m = asset.match(/^([\d.]+)M원$/);
+  return m ? parseFloat(m[1]) : 0;
+}
+
+function SortIcon({ field, currentField, dir }: { field: SortField; currentField: SortField | null; dir: SortDir }) {
+  if (currentField !== field || !dir) return <ChevronsUpDown size={13} className="ml-1 inline opacity-30" />;
+  return dir === 'asc'
+    ? <ChevronUp size={13} className="ml-1 inline text-[#1565C0]" />
+    : <ChevronDown size={13} className="ml-1 inline text-[#1565C0]" />;
 }
 
 // ---- Page ----
@@ -161,28 +170,99 @@ export function AdminUserManagePage() {
   const [members, setMembers] = useState<Member[]>(INITIAL_MEMBERS);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchType, setSearchType] = useState<'all' | 'nickname' | 'email' | 'accountId'>('all');
   const [statusFilter, setStatusFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [activeTab, setActiveTab] = useState<FilterTab>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
-
-  const hasSelectedMembers = selectedIds.length > 0;
+  const [showSuspendConfirm, setShowSuspendConfirm] = useState(false);
+  const [sortField, setSortField] = useState<SortField | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>(null);
 
   const filteredMembers = useMemo(() => {
-    return members.filter(member => {
-      if (activeTab === 'ACTIVE') return member.memberStatus === 'ACTIVE';
-      if (activeTab === 'SUSPENDED') return member.memberStatus === 'SUSPENDED';
-      return true;
-    });
-  }, [members, activeTab]);
+    const today = new Date();
+    const todayStr = `${String(today.getFullYear()).slice(2)}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
+
+    let result = [...members];
+
+    if (statusFilter === 'ACTIVE') {
+      result = result.filter(m => m.memberStatus === 'ACTIVE');
+    } else if (statusFilter === 'SUSPENDED') {
+      result = result.filter(m => m.memberStatus === 'SUSPENDED');
+    } else if (statusFilter === 'TODAY') {
+      result = result.filter(m => m.joinedAt === todayStr);
+    }
+
+    if (dateFrom || dateTo) {
+      result = result.filter(m => {
+        const d = joinedAtToIso(m.joinedAt);
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo && d > dateTo) return false;
+        return true;
+      });
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(m => {
+        if (searchType === 'nickname') return m.nickname.toLowerCase().includes(q);
+        if (searchType === 'email') return m.email.toLowerCase().includes(q);
+        if (searchType === 'accountId') return m.accountId.toLowerCase().includes(q);
+        return (
+          m.nickname.toLowerCase().includes(q) ||
+          m.email.toLowerCase().includes(q) ||
+          m.accountId.toLowerCase().includes(q)
+        );
+      });
+    }
+
+    if (sortField && sortDir) {
+      result = [...result].sort((a, b) => {
+        const dir = sortDir === 'asc' ? 1 : -1;
+        switch (sortField) {
+          case 'joinedAt':
+            return dir * a.joinedAt.localeCompare(b.joinedAt);
+          case 'contestCount':
+            return dir * (a.contestCount - b.contestCount);
+          case 'totalAsset':
+            return dir * (parseAsset(a.totalAsset) - parseAsset(b.totalAsset));
+          case 'profitRate':
+            return dir * ((a.profitRate ?? -Infinity) - (b.profitRate ?? -Infinity));
+          case 'loginFailCount':
+            return dir * (a.loginFailCount - b.loginFailCount);
+          default:
+            return 0;
+        }
+      });
+    }
+
+    return result;
+  }, [members, searchQuery, searchType, statusFilter, dateFrom, dateTo, sortField, sortDir]);
+
+  const selectedMembers = members.filter(m => selectedIds.includes(m.id));
+  const hasSelectedMembers = selectedIds.length > 0;
+  const hasAnySelectedSuspended = selectedMembers.some(m => m.memberStatus === 'SUSPENDED');
+  const canBulkSuspend = hasSelectedMembers && !hasAnySelectedSuspended;
+  const canBulkSeed = hasSelectedMembers && !hasAnySelectedSuspended;
 
   const isAllSelected =
     filteredMembers.length > 0 && filteredMembers.every(m => selectedIds.includes(m.id));
   const isIndeterminate =
     !isAllSelected && filteredMembers.some(m => selectedIds.includes(m.id));
+
+  function handleSort(field: SortField) {
+    if (sortField !== field) {
+      setSortField(field);
+      setSortDir('asc');
+    } else if (sortDir === 'asc') {
+      setSortDir('desc');
+    } else {
+      setSortField(null);
+      setSortDir(null);
+    }
+  }
 
   function handleSelectAll() {
     if (isAllSelected) {
@@ -198,8 +278,23 @@ export function AdminUserManagePage() {
     );
   }
 
-  function handleSearch() {
-    // GET /api/admin/members?query={searchQuery}&status={statusFilter}&from={dateFrom}&to={dateTo}
+  function handleAddMember(data: { nickname: string; email: string; accountId: string }) {
+    const today = new Date();
+    const joinedAt = `${String(today.getFullYear()).slice(2)}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
+    const newMember: Member = {
+      id: `member-${Date.now()}`,
+      nickname: data.nickname,
+      email: data.email,
+      accountId: data.accountId,
+      joinedAt,
+      contestCount: 0,
+      totalAsset: null,
+      profitRate: null,
+      loginFailCount: 0,
+      memberStatus: 'ACTIVE',
+    };
+    setMembers(prev => [newMember, ...prev]);
+    setCurrentPage(1);
   }
 
   function handleCsvExport() {
@@ -216,27 +311,10 @@ export function AdminUserManagePage() {
     setSelectedIds([]);
   }
 
-  function handleSuspendMember(memberId: string) {
-    // POST /api/admin/members/{memberId}/suspend
-    setMembers(prev =>
-      prev.map(m => (m.id === memberId ? { ...m, memberStatus: 'SUSPENDED' as MemberStatus } : m)),
-    );
-  }
-
-  function handleUnsuspendMember(memberId: string) {
-    // PATCH /api/admin/members/{memberId}/unsuspend
-    setMembers(prev =>
-      prev.map(m => (m.id === memberId ? { ...m, memberStatus: 'ACTIVE' as MemberStatus } : m)),
-    );
-  }
-
-  function handleTabChange(tab: FilterTab) {
-    setActiveTab(tab);
-    setSelectedIds([]);
-    setCurrentPage(1);
-  }
-
-  const paginationPages = getPaginationPages(currentPage, TOTAL_PAGES);
+  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / ITEMS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const pagedMembers = filteredMembers.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
+  const paginationPages = getPaginationPages(safePage, totalPages);
 
   useAdminPageActions(
     <div className="flex items-center gap-2">
@@ -253,6 +331,22 @@ export function AdminUserManagePage() {
 
   return (
     <div className="space-y-6">
+      {/* 선택 계정 정지 재확인 모달 */}
+      {showSuspendConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-96 rounded-xl bg-white p-6 shadow-xl">
+            <h3 className="mb-1 text-base font-semibold text-slate-900">선택 계정 정지 확인</h3>
+            <p className="mb-4 text-sm text-slate-500">
+              선택된 <span className="font-semibold text-slate-900">{selectedIds.length}명</span>의 계정을 정지합니다. 정말 진행하시겠습니까?
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="danger" onClick={() => { handleSuspendSelected(); setShowSuspendConfirm(false); }}>정지</Button>
+              <Button variant="secondary" onClick={() => setShowSuspendConfirm(false)}>취소</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 통계 카드 — GET /api/admin/members/count */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card>
@@ -283,7 +377,7 @@ export function AdminUserManagePage() {
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-slate-700">
-              전체 회원 {MOCK_SUMMARY.total.toLocaleString()}명
+              전체 회원 {members.length.toLocaleString()}명
             </span>
             {hasSelectedMembers && (
               <span className="inline-flex items-center rounded-full bg-[#E8F0FE] px-2.5 py-0.5 text-xs font-medium text-[#1565C0]">
@@ -294,16 +388,16 @@ export function AdminUserManagePage() {
           <div className="flex items-center gap-2">
             <Button
               variant="secondary"
-              className="h-8 px-3 text-xs text-rose-600 border-rose-300 hover:bg-rose-50"
-              disabled={!hasSelectedMembers}
-              onClick={handleSuspendSelected}
+              className="h-8 cursor-pointer px-3 text-xs text-rose-600 border-rose-300 hover:bg-rose-50"
+              disabled={!canBulkSuspend}
+              onClick={() => setShowSuspendConfirm(true)}
             >
               선택 계정 정지
             </Button>
             <Button
               variant="secondary"
-              className="h-8 px-3 text-xs"
-              disabled={!hasSelectedMembers}
+              className="h-8 cursor-pointer px-3 text-xs"
+              disabled={!canBulkSeed}
               onClick={() => setIsSeedModalOpen(true)}
             >
               선택 시드 지급
@@ -313,131 +407,143 @@ export function AdminUserManagePage() {
 
         {/* 필터 행 */}
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-6 py-3">
-          <div className="relative min-w-48 flex-1">
-            <Search
-              size={15}
-              className="absolute inset-y-0 left-3 my-auto text-slate-400"
-            />
-            <input
-              type="text"
-              placeholder="닉네임 / 이메일 / 아이디 검색"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleSearch()}
-              className="h-9 w-full rounded-md border border-slate-300 pl-9 pr-3 text-sm focus:border-slate-500 focus:outline-none"
-            />
+          <div className="flex min-w-64 flex-1 overflow-hidden rounded-md border border-slate-300 focus-within:border-slate-500">
+            <select
+              value={searchType}
+              onChange={e => { setSearchType(e.target.value as typeof searchType); setCurrentPage(1); }}
+              className="h-9 cursor-pointer border-r border-slate-300 bg-slate-50 px-2 text-xs text-slate-600 focus:outline-none"
+            >
+              <option value="all">전체</option>
+              <option value="nickname">닉네임</option>
+              <option value="accountId">계정</option>
+              <option value="email">이메일</option>
+            </select>
+            <div className="relative flex-1">
+              <Search size={14} className="absolute inset-y-0 left-2.5 my-auto text-slate-400" />
+              <input
+                type="text"
+                placeholder={
+                  searchType === 'nickname' ? '닉네임 검색' :
+                  searchType === 'email' ? '이메일 검색' :
+                  searchType === 'accountId' ? '계정 검색' :
+                  '검색어 입력'
+                }
+                value={searchQuery}
+                onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                className="h-9 w-full pl-7 pr-3 text-sm focus:outline-none"
+              />
+            </div>
           </div>
 
           <select
             value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="h-9 rounded-md border border-slate-300 px-3 text-sm text-slate-700 focus:outline-none"
+            onChange={e => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+            className="h-9 cursor-pointer rounded-md border border-slate-300 px-3 text-sm text-slate-700 focus:outline-none"
           >
             {STATUS_OPTIONS.map(opt => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
 
           <input
             type="date"
             value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
-            className="h-9 rounded-md border border-slate-300 px-3 text-sm text-slate-700 focus:outline-none"
+            onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }}
+            className="h-9 cursor-pointer rounded-md border border-slate-300 px-3 text-sm text-slate-700 focus:outline-none"
           />
+          <span className="text-sm text-slate-400">~</span>
           <input
             type="date"
             value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
-            className="h-9 rounded-md border border-slate-300 px-3 text-sm text-slate-700 focus:outline-none"
+            onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }}
+            className="h-9 cursor-pointer rounded-md border border-slate-300 px-3 text-sm text-slate-700 focus:outline-none"
           />
 
-          <Button
-            className="h-9 bg-[#1565C0] px-5 text-sm hover:bg-[#0f55a5]"
-            onClick={handleSearch}
-          >
-            검색
-          </Button>
-
-          {/* 필터 탭 */}
-          <div className="ml-auto flex overflow-hidden rounded-md border border-slate-200">
-            {FILTER_TABS.map(tab => (
-              <button
-                key={tab.value}
-                onClick={() => handleTabChange(tab.value)}
-                className={cn(
-                  'border-r border-slate-200 px-3 py-1.5 text-sm font-medium transition-colors last:border-none',
-                  activeTab === tab.value
-                    ? 'bg-[#1565C0] text-white'
-                    : 'bg-white text-slate-600 hover:bg-slate-50',
-                )}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* 테이블 */}
-        <div className="overflow-x-auto">
+        <div className="h-84 overflow-hidden">
+          <div className="h-full overflow-x-auto overflow-y-hidden">
           <table className="min-w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-slate-500">
                 <th className="w-10 px-4 py-3">
                   <input
                     type="checkbox"
                     checked={isAllSelected}
-                    ref={el => {
-                      if (el) el.indeterminate = isIndeterminate;
-                    }}
+                    ref={el => { if (el) el.indeterminate = isIndeterminate; }}
                     onChange={handleSelectAll}
-                    className="h-4 w-4 rounded border-slate-300 accent-[#1565C0]"
+                    className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-[#1565C0]"
                   />
                 </th>
                 <th className="px-4 py-3 font-medium">닉네임</th>
                 <th className="px-4 py-3 text-center font-medium">계정</th>
                 <th className="px-4 py-3 text-center font-medium">이메일</th>
-                <th className="px-4 py-3 text-center font-medium">가입일</th>
-                <th className="px-4 py-3 text-center font-medium">참여 대회</th>
-                <th className="px-4 py-3 text-right font-medium">총 자산</th>
-                <th className="px-4 py-3 text-right font-medium">수익률</th>
-                <th className="px-4 py-3 text-center font-medium">로그인 실패</th>
+                <th
+                  className="cursor-pointer whitespace-nowrap px-4 py-3 text-center font-medium hover:text-slate-700"
+                  onClick={() => handleSort('joinedAt')}
+                >
+                  가입일<SortIcon field="joinedAt" currentField={sortField} dir={sortDir} />
+                </th>
+                <th
+                  className="cursor-pointer whitespace-nowrap px-4 py-3 text-center font-medium hover:text-slate-700"
+                  onClick={() => handleSort('contestCount')}
+                >
+                  참여 대회<SortIcon field="contestCount" currentField={sortField} dir={sortDir} />
+                </th>
+                <th
+                  className="cursor-pointer whitespace-nowrap px-4 py-3 text-right font-medium hover:text-slate-700"
+                  onClick={() => handleSort('totalAsset')}
+                >
+                  총 자산<SortIcon field="totalAsset" currentField={sortField} dir={sortDir} />
+                </th>
+                <th
+                  className="cursor-pointer whitespace-nowrap px-4 py-3 text-right font-medium hover:text-slate-700"
+                  onClick={() => handleSort('profitRate')}
+                >
+                  수익률<SortIcon field="profitRate" currentField={sortField} dir={sortDir} />
+                </th>
+                <th
+                  className="cursor-pointer whitespace-nowrap px-4 py-3 text-center font-medium hover:text-slate-700"
+                  onClick={() => handleSort('loginFailCount')}
+                >
+                  로그인 실패<SortIcon field="loginFailCount" currentField={sortField} dir={sortDir} />
+                </th>
                 <th className="px-4 py-3 text-center font-medium">상태</th>
-                <th className="px-4 py-3 text-center font-medium">관리</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredMembers.map(member => {
+            <tbody>
+              {pagedMembers.length === 0 && (
+                <tr className="h-10.25">
+                  <td colSpan={10} className="px-4 py-3 text-center text-sm text-slate-400">
+                    검색 결과가 없습니다.
+                  </td>
+                </tr>
+              )}
+              {pagedMembers.map(member => {
                 const isSelected = selectedIds.includes(member.id);
-                const isActive = member.memberStatus === 'ACTIVE';
-
                 return (
                   <tr
                     key={member.id}
                     className={cn(
-                      'transition-colors hover:bg-slate-50',
+                      'h-10.25 cursor-pointer border-t border-slate-100 transition-colors hover:bg-slate-50',
                       isSelected && 'bg-[#E8F0FE] hover:bg-[#dce8fd]',
                     )}
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => handleSelectOne(member.id)}
-                        className="h-4 w-4 rounded border-slate-300 accent-[#1565C0]"
+                        className="h-4 w-4 cursor-pointer rounded border-slate-300 accent-[#1565C0]"
                       />
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-900">{member.nickname}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-center text-slate-500">{member.accountId}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-center text-slate-600">{member.email}</td>
                     <td className="whitespace-nowrap px-4 py-3 text-center text-slate-600">{member.joinedAt}</td>
-                    <td className="px-4 py-3 text-center text-slate-600">
-                      {member.contestCount}개
-                    </td>
-                    <td className="px-4 py-3 text-right text-slate-600">
-                      {member.totalAsset ?? '—'}
-                    </td>
+                    <td className="px-4 py-3 text-center text-slate-600">{member.contestCount}개</td>
+                    <td className="px-4 py-3 text-right text-slate-600">{member.totalAsset ?? '—'}</td>
                     <td
                       className={cn(
                         'px-4 py-3 text-right font-medium',
@@ -452,9 +558,7 @@ export function AdminUserManagePage() {
                         ? '—'
                         : `${member.profitRate > 0 ? '+' : ''}${member.profitRate}%`}
                     </td>
-                    <td className="px-4 py-3 text-center text-slate-600">
-                      {member.loginFailCount}회
-                    </td>
+                    <td className="px-4 py-3 text-center text-slate-600">{member.loginFailCount}회</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-center">
                         <StatusBadge tone={MEMBER_STATUS_TONE[member.memberStatus]}>
@@ -462,63 +566,41 @@ export function AdminUserManagePage() {
                         </StatusBadge>
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-center items-center gap-1">
-                        <button className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50">
-                          상세
-                        </button>
-                        <button
-                          onClick={() =>
-                            isActive
-                              ? handleSuspendMember(member.id)
-                              : handleUnsuspendMember(member.id)
-                          }
-                          className={cn(
-                            'rounded border px-2 py-1 text-xs',
-                            isActive
-                              ? 'border-rose-200 text-rose-600 hover:bg-rose-50'
-                              : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50',
-                          )}
-                        >
-                          {isActive ? '정지' : '해제'}
-                        </button>
-                        <button className="rounded border border-[#bdd3f5] px-2 py-1 text-xs text-[#1565C0] hover:bg-[#E8F0FE]">
-                          시드
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 );
               })}
+              {Array.from({ length: ITEMS_PER_PAGE - Math.max(pagedMembers.length, pagedMembers.length === 0 ? 1 : 0) }).map((_, i) => (
+                <tr key={`ghost-${i}`}>
+                  <td colSpan={10} className="px-4 py-3">
+                    <span className="invisible select-none text-sm leading-6">x</span>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* 페이지네이션 */}
-        <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4">
-          <p className="text-sm text-slate-500">
-            총 {MOCK_SUMMARY.total.toLocaleString()}명 중 1~{filteredMembers.length}번 표시
-          </p>
+        <div className="flex items-center justify-center border-t border-slate-100 px-6 py-4">
           <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="rounded px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+              disabled={safePage === 1}
+              className="cursor-pointer rounded p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
             >
-              이전
+              <ChevronLeft size={16} />
             </button>
             {paginationPages.map((page, idx) =>
               page === '...' ? (
-                <span key={`ellipsis-${idx}`} className="px-2 py-1 text-sm text-slate-400">
-                  …
-                </span>
+                <span key={`ellipsis-${idx}`} className="px-2 py-1 text-sm text-slate-400">…</span>
               ) : (
                 <button
                   key={page}
                   onClick={() => setCurrentPage(page as number)}
                   className={cn(
-                    'min-w-8 rounded px-2 py-1 text-sm',
-                    currentPage === page
+                    'min-w-8 cursor-pointer rounded px-2 py-1 text-sm',
+                    safePage === page
                       ? 'bg-[#1565C0] text-white'
                       : 'text-slate-600 hover:bg-slate-100',
                   )}
@@ -528,17 +610,17 @@ export function AdminUserManagePage() {
               ),
             )}
             <button
-              onClick={() => setCurrentPage(p => Math.min(TOTAL_PAGES, p + 1))}
-              disabled={currentPage === TOTAL_PAGES}
-              className="rounded px-2 py-1 text-sm text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+              className="cursor-pointer rounded p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
             >
-              다음
+              <ChevronRight size={16} />
             </button>
           </div>
         </div>
       </Card>
 
-      <AddMemberModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />
+      <AddMemberModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddMember} />
       <SeedMoneyModal
         isOpen={isSeedModalOpen}
         targetCount={selectedIds.length}

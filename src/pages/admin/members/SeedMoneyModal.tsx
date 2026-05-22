@@ -14,9 +14,11 @@ export function SeedMoneyModal({ isOpen, targetCount, onClose }: SeedMoneyModalP
 
   if (!isOpen) return null;
 
+  const actualAmount = amount ? Number(amount) * 10000 : 0;
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // POST /api/admin/members/seed-money (batch)
+    // POST /api/admin/members/seed-money (batch) — amount in 원: actualAmount
     setAmount('');
     onClose();
   }
@@ -39,7 +41,7 @@ export function SeedMoneyModal({ isOpen, targetCount, onClose }: SeedMoneyModalP
           <h2 className="text-lg font-bold text-slate-900">시드머니 지급</h2>
           <button
             onClick={handleClose}
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="cursor-pointer rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
           >
             <X size={18} />
           </button>
@@ -51,21 +53,26 @@ export function SeedMoneyModal({ isOpen, targetCount, onClose }: SeedMoneyModalP
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <TextInput
-            label="지급 금액 (원)"
+            label="지급 금액 (만원)"
             type="number"
-            placeholder="예: 1000000"
+            placeholder="예: 100"
             value={amount}
             onChange={e => setAmount(e.target.value)}
             min="1"
             required
           />
+          {amount && (
+            <p className="text-xs text-slate-500">
+              실제 지급액: {actualAmount.toLocaleString()}원
+            </p>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" type="button" onClick={handleClose}>
-              취소
-            </Button>
             <Button variant="brand" type="submit">
               지급
+            </Button>
+            <Button variant="secondary" type="button" onClick={handleClose}>
+              취소
             </Button>
           </div>
         </form>
