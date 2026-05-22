@@ -332,7 +332,7 @@ export function AdminNoticeManagePage() {
 
             {/* 테이블 */}
             <div className="h-72 overflow-x-auto overflow-y-hidden">
-              <table className="w-full table-fixed text-sm">
+              <table className="w-full min-w-195 table-fixed text-sm">
                 <colgroup>
                   <col className="w-10" />
                   <col />
@@ -376,7 +376,7 @@ export function AdminNoticeManagePage() {
                       <td className="px-3 py-3 text-center">
                         {notice.isPinned && <Pin size={14} className="mx-auto text-rose-500" />}
                       </td>
-                      <td className="truncate px-3 py-3 text-center font-medium text-slate-900">{notice.title}</td>
+                      <td className="truncate px-3 py-3 text-center font-medium text-slate-900" title={notice.title}>{notice.title}</td>
                       <td className="px-3 py-3">
                         <div className="flex justify-center">
                           <StatusBadge status={notice.status} />

@@ -462,8 +462,8 @@ export function AdminUserManagePage() {
         </div>
 
         {/* 테이블 */}
-        <div className="h-80 overflow-hidden">
-          <div className="h-full overflow-x-auto">
+        <div className="h-84 overflow-hidden">
+          <div className="h-full overflow-x-auto overflow-y-hidden">
           <table className="min-w-full text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="border-b border-slate-100 bg-slate-50 text-left text-slate-500">
@@ -570,7 +570,11 @@ export function AdminUserManagePage() {
                 );
               })}
               {Array.from({ length: ITEMS_PER_PAGE - Math.max(pagedMembers.length, pagedMembers.length === 0 ? 1 : 0) }).map((_, i) => (
-                <tr key={`ghost-${i}`} className="h-10.25 border-t border-slate-100" />
+                <tr key={`ghost-${i}`}>
+                  <td colSpan={10} className="px-4 py-3">
+                    <span className="invisible select-none text-sm leading-6">x</span>
+                  </td>
+                </tr>
               ))}
             </tbody>
           </table>
