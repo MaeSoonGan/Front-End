@@ -68,7 +68,8 @@ export function UserHeader() {
     pathname === '/my-contests' ||
     pathname === '/contests' ||
     titlePathname === '/notifications/settings' ||
-    titlePathname === '/profile/edit';
+    titlePathname === '/profile/edit' ||
+    titlePathname === '/seed-money/reset';
   const contestTitle = contest ? `${contest.startAt.slice(0, 4)}년 ${contest.title}` : '대회';
   const pageTitle =
     isContestMode && titlePathname === '/home' ? contestTitle : getTitle(titlePathname, search);
@@ -212,6 +213,11 @@ export function UserHeader() {
                     } else {
                       navigate(isContestMode ? getContestPath('/more') : '/more');
                     }
+                    return;
+                  }
+
+                  if (titlePathname === '/seed-money/reset') {
+                    navigate(isContestMode ? getContestPath('/more') : '/more');
                     return;
                   }
 
