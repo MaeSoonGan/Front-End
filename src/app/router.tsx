@@ -44,7 +44,10 @@ import { ExecutionHistoryPage } from '../pages/user/ExecutionHistoryPage';
 import { HomePage } from '../pages/user/HomePage';
 import { MarketPage } from '../pages/user/MarketPage';
 import { MorePage } from '../pages/user/MorePage';
-import { NotificationPage } from '../pages/user/NotificationPage';
+import { MyContestsPage } from '../pages/user/MyContestsPage';
+import { NoticePage } from '../pages/user/NoticePage';
+import { NotificationListPage } from '../pages/user/NotificationListPage';
+import { NotificationSettingPage } from '../pages/user/NotificationSettingPage';
 import { OrderPage } from '../pages/user/OrderPage';
 import { ProfileEditPage } from '../pages/user/ProfileEditPage';
 import { SeedMoneyResetPage } from '../pages/user/SeedMoneyResetPage';
@@ -72,7 +75,8 @@ export const router = createBrowserRouter([
       { path: '/stocks/:stockCode', element: <StockDetailPage /> },
       { path: '/order', element: <OrderPage /> },
       { path: '/watchlist', element: <WatchlistPage /> },
-      { path: '/my-contests', element: <ContestListPage /> },
+      { path: '/my-contests', element: <MyContestsPage /> },
+      { path: '/my-contests/:contestId/ranking', element: <ContestRankingPage /> },
       { path: '/contests', element: <ContestListPage /> },
       { path: '/contests/:contestId', element: <ContestDetailPage /> },
       { path: '/contests/:contestId/home', element: <HomePage /> },
@@ -82,12 +86,16 @@ export const router = createBrowserRouter([
       { path: '/contests/:contestId/more', element: <MorePage /> },
       { path: '/contests/:contestId/ranking', element: <ContestRankingPage /> },
       { path: '/contests/:contestId/executions', element: <ExecutionHistoryPage /> },
-      { path: '/contests/:contestId/notifications', element: <NotificationPage /> },
+      { path: '/contests/:contestId/notices', element: <NoticePage /> },
+      { path: '/contests/:contestId/notifications', element: <NotificationListPage /> },
+      { path: '/contests/:contestId/notifications/settings', element: <NotificationSettingPage /> },
       { path: '/contests/:contestId/profile/edit', element: <ProfileEditPage /> },
       { path: '/contests/:contestId/seed-money/reset', element: <SeedMoneyResetPage /> },
       { path: '/more', element: <MorePage /> },
       { path: '/executions', element: <ExecutionHistoryPage /> },
-      { path: '/notifications', element: <NotificationPage /> },
+      { path: '/notices', element: <NoticePage /> },
+      { path: '/notifications', element: <NotificationListPage /> },
+      { path: '/notifications/settings', element: <NotificationSettingPage /> },
       { path: '/profile/edit', element: <ProfileEditPage /> },
       { path: '/seed-money/reset', element: <SeedMoneyResetPage /> },
     ],

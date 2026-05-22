@@ -31,3 +31,26 @@ export interface ContestRankingResponse {
   myRanking: ContestMyRanking;
   rankingList: ContestRankingItem[];
 }
+
+export type MyContestStatus = 'ACTIVE' | 'ENDED' | 'LEFT';
+
+export interface ContestTopRanker {
+  rank: number;
+  nickname: string;
+  profitRate: number;
+}
+
+export interface MyContestItem {
+  contestId: string;
+  title: string;
+  status: MyContestStatus;
+  startAt: string;
+  endAt: string;
+  seedMoney: number;
+  myRank: number;
+  totalParticipants: number;
+  profitRate: number;
+  profitAmount: number;
+  currentAsset: number;
+  topRankers: ContestTopRanker[];
+}

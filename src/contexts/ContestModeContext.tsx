@@ -17,7 +17,7 @@ const ContestModeContext = createContext<ContestModeContextValue | null>(null);
 
 function getContestId(pathname: string) {
   const matched = pathname.match(
-    /^\/contests\/([^/]+)(?:\/(home|balance|market|watchlist|more|ranking|order|stocks|executions|notifications|profile|seed-money)|$)/,
+    /^\/contests\/([^/]+)(?:\/(home|balance|market|watchlist|more|ranking|order|stocks|executions|notices|notifications|profile|seed-money)|$)/,
   );
 
   return matched?.[1] ?? null;
