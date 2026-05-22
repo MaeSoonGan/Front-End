@@ -62,6 +62,11 @@ export function UserHeader() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const isHome = pathname === '/' || pathname === '/home';
+  const canGoBackInContestMode =
+    isContestMode &&
+    (titlePathname === '/balance' ||
+      titlePathname === '/watchlist' ||
+      titlePathname === '/ranking');
   const canGoBack =
     pathname === '/more' ||
     pathname === '/market' ||
@@ -69,6 +74,8 @@ export function UserHeader() {
     pathname === '/watchlist' ||
     pathname === '/my-contests' ||
     pathname === '/contests' ||
+    canGoBackInContestMode ||
+    titlePathname === '/ranking' ||
     titlePathname === '/notices' ||
     titlePathname === '/notifications' ||
     titlePathname === '/notifications/settings' ||
@@ -78,7 +85,7 @@ export function UserHeader() {
   const pageTitle =
     isContestMode && titlePathname === '/home' ? contestTitle : getTitle(titlePathname, search);
   const isNotificationListPage = titlePathname === '/notifications';
-  const notificationBackPath =
+  const previousPath =
     typeof state === 'object' &&
     state !== null &&
     'from' in state &&
@@ -220,8 +227,8 @@ export function UserHeader() {
                   }
 
                   if (titlePathname === '/notifications') {
-                    if (notificationBackPath) {
-                      navigate(notificationBackPath);
+                    if (previousPath) {
+                      navigate(previousPath);
                     } else if (window.history.length > 1) {
                       navigate(-1);
                     } else {
@@ -232,6 +239,25 @@ export function UserHeader() {
 
                   if (titlePathname === '/notices') {
                     navigate(isContestMode ? getContestPath('/more') : '/more');
+                    return;
+                  }
+
+                  if (
+                    isContestMode &&
+                    (titlePathname === '/balance' || titlePathname === '/watchlist')
+                  ) {
+                    navigate(getContestPath('/home'));
+                    return;
+                  }
+
+                  if (titlePathname === '/ranking') {
+                    if (isContestMode) {
+                      navigate(getContestPath('/home'));
+                    } else if (window.history.length > 1) {
+                      navigate(-1);
+                    } else {
+                      navigate('/my-contests');
+                    }
                     return;
                   }
 
