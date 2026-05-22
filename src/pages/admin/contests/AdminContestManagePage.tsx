@@ -96,6 +96,8 @@ const EMPTY_FORM: FormState = {
   allowShortSelling: false,
 };
 
+const PAGE_SIZE = 10;
+
 function formatSeedMoney(amount: number): string {
   return `${(amount / 10000).toLocaleString('ko-KR')}만원`;
 }
@@ -116,8 +118,9 @@ function StatusBadge({ status }: { status: ContestStatus }) {
 }
 
 export function AdminContestManagePage() {
-  const [activeTab, setActiveTab] = useState<TabFilter>('ALL');
-  const [contests, setContests]   = useState<Contest[]>(MOCK_CONTESTS);
+  const [activeTab, setActiveTab]     = useState<TabFilter>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [contests, setContests]       = useState<Contest[]>(MOCK_CONTESTS);
 
   const [isFormOpen, setIsFormOpen]     = useState(false);
   const [editingId, setEditingId]       = useState<string | null>(null);
@@ -133,8 +136,14 @@ export function AdminContestManagePage() {
     });
   }, [contests, activeTab]);
 
+  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage    = Math.min(currentPage, totalPages);
+  const paginated   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const ghostCount  = PAGE_SIZE - Math.max(paginated.length, paginated.length === 0 ? 1 : 0);
+
   function handleTabChange(tab: TabFilter) {
     setActiveTab(tab);
+    setCurrentPage(1);
   }
 
   function handleNewContest() {
@@ -288,10 +297,10 @@ export function AdminContestManagePage() {
             </div>
 
             {/* 테이블 */}
-            <div className="flex-1 overflow-x-auto overflow-y-auto">
+            <div className="overflow-x-auto">
               <table className="w-full min-w-160 table-fixed text-sm">
                 <colgroup>
-                  <col />
+                  <col className="w-44" />
                   <col className="w-16" />
                   <col className="w-26" />
                   <col className="w-22" />
@@ -313,14 +322,14 @@ export function AdminContestManagePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filtered.length === 0 && (
+                  {paginated.length === 0 && (
                     <tr>
                       <td colSpan={8} className="px-3 py-3 text-center text-sm text-slate-400">
                         대회가 없습니다.
                       </td>
                     </tr>
                   )}
-                  {filtered.map(contest => {
+                  {paginated.map(contest => {
                       const remaining = contest.maxParticipants
                         ? (contest.maxParticipants - contest.participants) / contest.maxParticipants
                         : null;
@@ -371,12 +380,50 @@ export function AdminContestManagePage() {
                         </tr>
                       );
                     })}
+                  {Array.from({ length: ghostCount }).map((_, i) => (
+                    <tr key={`ghost-${i}`}>
+                      <td colSpan={8} className="px-3 py-3">
+                        <span className="invisible select-none text-sm leading-5">x</span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
 
-            <div className="border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
-              총 {filtered.length}건
+            {/* 페이지네이션 */}
+            <div className="flex items-center border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
+              <span className="flex-1">총 {filtered.length}건</span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`cursor-pointer min-w-7 rounded px-2 py-1 text-sm font-medium ${
+                      safePage === page
+                        ? 'bg-[#1565C0] text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+              <div className="flex-1" />
             </div>
           </Card>
         </div>
