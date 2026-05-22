@@ -44,6 +44,7 @@ import { ExecutionHistoryPage } from '../pages/user/ExecutionHistoryPage';
 import { HomePage } from '../pages/user/HomePage';
 import { MarketPage } from '../pages/user/MarketPage';
 import { MorePage } from '../pages/user/MorePage';
+import { MyContestsPage } from '../pages/user/MyContestsPage';
 import { NoticePage } from '../pages/user/NoticePage';
 import { NotificationPage } from '../pages/user/NotificationPage';
 import { NotificationSettingPage } from '../pages/user/NotificationSettingPage';
@@ -74,7 +75,8 @@ export const router = createBrowserRouter([
       { path: '/stocks/:stockCode', element: <StockDetailPage /> },
       { path: '/order', element: <OrderPage /> },
       { path: '/watchlist', element: <WatchlistPage /> },
-      { path: '/my-contests', element: <ContestListPage /> },
+      { path: '/my-contests', element: <MyContestsPage /> },
+      { path: '/my-contests/:contestId/ranking', element: <ContestRankingPage /> },
       { path: '/contests', element: <ContestListPage /> },
       { path: '/contests/:contestId', element: <ContestDetailPage /> },
       { path: '/contests/:contestId/home', element: <HomePage /> },

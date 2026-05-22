@@ -12,6 +12,7 @@ const pageTitles: Record<string, string> = {
   '/market': '시세',
   '/order': '주문',
   '/contests': '대회',
+  '/my-contests': '참여 중인 대회',
   '/more': '더보기',
   '/balance': '잔고',
   '/watchlist': '관심 종목',
@@ -40,6 +41,10 @@ function getTitle(pathname: string, search: string) {
     return '대회';
   }
 
+  if (pathname.startsWith('/my-contests')) {
+    return '참여 중인 대회';
+  }
+
   if (pathname.startsWith('/stocks')) {
     return '종목 상세';
   }
@@ -60,6 +65,7 @@ export function UserHeader() {
     pathname === '/market' ||
     pathname === '/balance' ||
     pathname === '/watchlist' ||
+    pathname === '/my-contests' ||
     pathname === '/contests' ||
     titlePathname === '/notifications/settings' ||
     titlePathname === '/profile/edit';
@@ -173,8 +179,14 @@ export function UserHeader() {
                     pathname === '/market' ||
                     pathname === '/balance' ||
                     pathname === '/watchlist' ||
+                    pathname === '/my-contests' ||
                     pathname === '/contests'
                   ) {
+                    if (pathname === '/my-contests') {
+                      navigate('/more');
+                      return;
+                    }
+
                     const searchParams = new URLSearchParams(search);
 
                     navigate(

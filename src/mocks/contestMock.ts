@@ -1,4 +1,4 @@
-import type { ContestListItem, ContestRankingResponse } from '../types/contest';
+import type { ContestListItem, ContestRankingResponse, MyContestItem } from '../types/contest';
 
 export const contestMocks: ContestListItem[] = [
   {
@@ -149,3 +149,60 @@ export const contestRankingMocks: Record<string, ContestRankingResponse> = {
     rankingList: defaultRankingList,
   },
 };
+
+export const myContestMocks: MyContestItem[] = [
+  {
+    contestId: 'may-regular-2026',
+    title: '5월 정기 대회',
+    status: 'ACTIVE',
+    startAt: '2026-05-01',
+    endAt: '2026-05-31',
+    seedMoney: 10000000,
+    myRank: 12,
+    totalParticipants: 234,
+    profitRate: 8.2,
+    profitAmount: 820000,
+    currentAsset: 10820000,
+    topRankers: [
+      { rank: 1, nickname: '투자고수', profitRate: 32.5 },
+      { rank: 2, nickname: '주식왕', profitRate: 28.3 },
+      { rank: 3, nickname: '황금손', profitRate: 25.1 },
+    ],
+  },
+  {
+    contestId: 'semiconductor-special-2026',
+    title: '반도체 특별전',
+    status: 'ACTIVE',
+    startAt: '2026-05-05',
+    endAt: '2026-05-20',
+    seedMoney: 5000000,
+    myRank: 5,
+    totalParticipants: 89,
+    profitRate: 15.3,
+    profitAmount: 765000,
+    currentAsset: 5765000,
+    topRankers: [
+      { rank: 1, nickname: '반도체고수', profitRate: 41.2 },
+      { rank: 2, nickname: '칩메이커', profitRate: 33.6 },
+      { rank: 3, nickname: '수급추적자', profitRate: 27.8 },
+    ],
+  },
+  {
+    contestId: 'april-regular-2026',
+    title: '4월 정기 대회',
+    status: 'ENDED',
+    startAt: '2026-04-01',
+    endAt: '2026-04-30',
+    seedMoney: 10000000,
+    myRank: 18,
+    totalParticipants: 312,
+    profitRate: 4.6,
+    profitAmount: 460000,
+    currentAsset: 10460000,
+    topRankers: [
+      { rank: 1, nickname: '4월우승자', profitRate: 48.1 },
+      { rank: 2, nickname: '봄날투자', profitRate: 36.4 },
+      { rank: 3, nickname: '상승랠리', profitRate: 31.9 },
+    ],
+  },
+];
