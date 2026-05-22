@@ -6,6 +6,7 @@ interface ModalProps {
   title: string;
   description?: string;
   confirmText?: string;
+  confirmVariant?: 'brand' | 'danger';
   cancelText?: string;
   onClose: () => void;
   onConfirm?: () => void;
@@ -16,6 +17,7 @@ export function Modal({
   title,
   description,
   confirmText = '확인',
+  confirmVariant = 'brand',
   cancelText,
   onClose,
   onConfirm,
@@ -62,7 +64,7 @@ export function Modal({
               {cancelText}
             </Button>
           ) : null}
-          <Button className="flex-1 rounded-xl" onClick={onConfirm ?? onClose} variant="brand">
+          <Button className="flex-1 rounded-xl" onClick={onConfirm ?? onClose} variant={confirmVariant}>
             {confirmText}
           </Button>
         </div>

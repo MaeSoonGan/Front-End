@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '../../components/common/Button';
+import { Modal } from '../../components/common/Modal';
 import { PageContainer } from '../../components/common/PageContainer';
 import { useContestMode } from '../../contexts/ContestModeContext';
 import { userHomeMock } from '../../mocks/userHomeMock';
@@ -18,9 +21,21 @@ function getChangeClass(changeRate: string) {
 export function HomePage() {
   const navigate = useNavigate();
   const { contest, getContestPath, isContestMode } = useContestMode();
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const { asset, marketStatus, watchlist, activeContest } = userHomeMock;
   const getPath = (path: string) => (isContestMode ? getContestPath(path) : path);
   const contestTitle = contest ? `${contest.startAt.slice(0, 4)}년 ${contest.title}` : '참여 대회';
+
+  const handleWithdrawContest = () => {
+    if (!contest) {
+      return;
+    }
+
+    // TODO: POST /api/contests/{contestId}/withdraw 연동 후 서버 응답 기준으로 참가 상태를 갱신합니다.
+    console.log('mock contest withdraw:', contest.id);
+    setIsWithdrawModalOpen(false);
+    navigate('/contests', { replace: true });
+  };
 
   return (
     <PageContainer>
@@ -152,6 +167,30 @@ export function HomePage() {
           </button>
         </section>
       ) : null}
+
+      {isContestMode ? (
+        <section className="mt-5">
+          <h2 className="mb-3 text-base font-extrabold text-slate-950">대회 관리</h2>
+          <Button
+            className="h-12 w-full rounded-xl bg-red-500 text-sm font-extrabold text-white shadow-sm hover:bg-red-600"
+            onClick={() => setIsWithdrawModalOpen(true)}
+            variant="danger"
+          >
+            대회 포기하기
+          </Button>
+        </section>
+      ) : null}
+
+      <Modal
+        cancelText="계속 참여"
+        confirmText="대회 포기"
+        confirmVariant="danger"
+        description="대회를 포기하면 현재 순위와 거래 기록은 더 이상 대회 랭킹에 반영되지 않습니다. 일반 화면으로 이동만 하려면 하단의 나가기를 사용해 주세요."
+        isOpen={isWithdrawModalOpen}
+        onClose={() => setIsWithdrawModalOpen(false)}
+        onConfirm={handleWithdrawContest}
+        title="대회를 포기할까요?"
+      />
     </PageContainer>
   );
 }
