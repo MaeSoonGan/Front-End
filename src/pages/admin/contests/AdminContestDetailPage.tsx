@@ -128,6 +128,7 @@ export function AdminContestDetailPage() {
   });
 
   const [search, setSearch] = useState('');
+  const [searchType, setSearchType] = useState<'all' | 'nickname' | 'email'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [confirmAction, setConfirmAction] = useState<'end' | 'cancel' | null>(null);
   const [confirmReason, setConfirmReason] = useState('');
@@ -151,10 +152,13 @@ export function AdminContestDetailPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return MOCK_PARTICIPANTS.filter(p =>
-      !q || p.nickname.toLowerCase().includes(q) || p.email.toLowerCase().includes(q),
-    );
-  }, [search]);
+    return MOCK_PARTICIPANTS.filter(p => {
+      if (!q) return true;
+      if (searchType === 'nickname') return p.nickname.toLowerCase().includes(q);
+      if (searchType === 'email') return p.email.toLowerCase().includes(q);
+      return p.nickname.toLowerCase().includes(q) || p.email.toLowerCase().includes(q);
+    });
+  }, [search, searchType]);
 
   const ranked = useMemo(() => {
     const normal = filtered.filter(p => p.status === 'NORMAL');
@@ -484,13 +488,24 @@ export function AdminContestDetailPage() {
         <div className="flex items-center justify-between border-b border-slate-200 p-4">
           <h2 className="text-base font-semibold text-slate-900">참가자 목록</h2>
           <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="닉네임/이메일로 검색"
-              value={search}
-              onChange={e => handleSearch(e.target.value)}
-              className="h-9 w-52 rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
-            />
+            <div className="flex overflow-hidden rounded-md border border-slate-300 focus-within:border-slate-500">
+              <select
+                value={searchType}
+                onChange={e => { setSearchType(e.target.value as typeof searchType); setCurrentPage(1); }}
+                className="h-9 cursor-pointer border-r border-slate-300 bg-slate-50 px-2 text-xs text-slate-600 focus:outline-none"
+              >
+                <option value="all">전체</option>
+                <option value="nickname">닉네임</option>
+                <option value="email">이메일</option>
+              </select>
+              <input
+                type="text"
+                placeholder={searchType === 'nickname' ? '닉네임 검색' : searchType === 'email' ? '이메일 검색' : '닉네임/이메일 검색'}
+                value={search}
+                onChange={e => handleSearch(e.target.value)}
+                className="h-9 w-44 px-3 text-sm focus:outline-none"
+              />
+            </div>
             <Button variant="secondary" className="h-9 gap-1.5 text-sm">
               <Download size={14} />
               CSV 내보내기
@@ -578,8 +593,7 @@ export function AdminContestDetailPage() {
         </div>
 
         {/* 페이지네이션 */}
-        <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
-          <span>전체 {ranked.length}명 중 {(currentPage - 1) * PAGE_SIZE + 1}~{Math.min(currentPage * PAGE_SIZE, ranked.length)}명</span>
+        <div className="flex items-center justify-center border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
           <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -635,10 +649,10 @@ export function AdminContestDetailPage() {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => { setConfirmAction(null); setConfirmReason(''); }}>취소하기</Button>
               <Button variant="danger" disabled={!confirmReason.trim()} onClick={handleConfirm}>
                 {confirmAction === 'end' ? '종료' : '취소'}
               </Button>
+              <Button variant="secondary" onClick={() => { setConfirmAction(null); setConfirmReason(''); }}>취소하기</Button>
             </div>
           </div>
         </div>
