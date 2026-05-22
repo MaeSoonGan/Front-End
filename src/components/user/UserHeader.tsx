@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import loginLogo from '../../assets/login-logo-transparent.png';
+import { useContestMode } from '../../contexts/ContestModeContext';
 import { stockMocks } from '../../mocks/stockMock';
 
 const pageTitles: Record<string, string> = {
@@ -14,8 +15,13 @@ const pageTitles: Record<string, string> = {
   '/more': '더보기',
   '/balance': '잔고',
   '/watchlist': '관심 종목',
+  '/ranking': '대회 랭킹',
   '/seed-money/reset': '시드머니 초기화',
 };
+
+function stripContestPrefix(pathname: string) {
+  return pathname.replace(/^\/contests\/[^/]+/, '') || '/home';
+}
 
 function getTitle(pathname: string, search: string) {
   if (pathname === '/market') {
@@ -41,12 +47,20 @@ function getTitle(pathname: string, search: string) {
 export function UserHeader() {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
+  const { contest, getContestPath, isContestMode } = useContestMode();
+  const titlePathname = isContestMode ? stripContestPrefix(pathname) : pathname;
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchKeyword, setSearchKeyword] = useState('');
   const isHome = pathname === '/' || pathname === '/home';
   const canGoBack =
-    pathname === '/more' || pathname === '/market' || pathname === '/balance' || pathname === '/watchlist';
-  const pageTitle = getTitle(pathname, search);
+    pathname === '/more' ||
+    pathname === '/market' ||
+    pathname === '/balance' ||
+    pathname === '/watchlist' ||
+    pathname === '/contests';
+  const contestTitle = contest ? `${contest.startAt.slice(0, 4)}년 ${contest.title}` : '대회';
+  const pageTitle =
+    isContestMode && titlePathname === '/home' ? contestTitle : getTitle(titlePathname, search);
   const searchResults = useMemo(() => {
     const keyword = searchKeyword.trim().toLowerCase();
 
@@ -78,17 +92,18 @@ export function UserHeader() {
     );
 
     setIsSearchOpen(false);
+    const marketPath = isContestMode ? getContestPath('/market') : '/market';
     navigate(
       exactStock
-        ? `/market?stockCode=${exactStock.summary.stockCode}`
-        : `/market?query=${encodeURIComponent(keyword)}`,
+        ? `${marketPath}?stockCode=${exactStock.summary.stockCode}`
+        : `${marketPath}?query=${encodeURIComponent(keyword)}`,
     );
   };
 
   const handleSelectStock = (stockCode: string) => {
     setSearchKeyword('');
     setIsSearchOpen(false);
-    navigate(`/market?stockCode=${stockCode}`);
+    navigate(`${isContestMode ? getContestPath('/market') : '/market'}?stockCode=${stockCode}`);
   };
 
   return (
@@ -149,7 +164,12 @@ export function UserHeader() {
                 aria-label="뒤로가기"
                 className="relative flex h-8 w-8 items-center justify-center rounded-full text-[#1565C0] hover:bg-[#F0F6FF]"
                 onClick={() => {
-                  if (pathname === '/market' || pathname === '/balance' || pathname === '/watchlist') {
+                  if (
+                    pathname === '/market' ||
+                    pathname === '/balance' ||
+                    pathname === '/watchlist' ||
+                    pathname === '/contests'
+                  ) {
                     const searchParams = new URLSearchParams(search);
 
                     navigate(
@@ -169,7 +189,10 @@ export function UserHeader() {
                 </span>
               </button>
             ) : null}
-            <Link className="flex min-w-0 items-center text-base font-extrabold text-[#1565C0]" to="/home">
+            <Link
+              className="flex min-w-0 items-center text-base font-extrabold text-[#1565C0]"
+              to={isContestMode ? getContestPath('/home') : '/home'}
+            >
               {isHome ? (
                 <img
                   alt="매순간 매도 먼저"
@@ -185,7 +208,7 @@ export function UserHeader() {
             <Link
               aria-label="알림"
               className="flex h-8 w-8 items-center justify-center rounded-full text-sm text-[#1565C0] hover:bg-[#F0F6FF]"
-              to="/notifications"
+              to={isContestMode ? getContestPath('/notifications') : '/notifications'}
             >
               🔔
             </Link>

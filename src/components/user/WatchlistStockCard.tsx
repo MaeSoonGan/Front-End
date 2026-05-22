@@ -1,5 +1,6 @@
 import { Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useContestMode } from '../../contexts/ContestModeContext';
 import type { WatchlistStockItem } from '../../types/watchlist';
 import { cn } from '../../utils/cn';
 
@@ -10,12 +11,14 @@ interface WatchlistStockCardProps {
 
 export function WatchlistStockCard({ onRemove, stock }: WatchlistStockCardProps) {
   const navigate = useNavigate();
+  const { getContestPath, isContestMode } = useContestMode();
   const isRise = stock.changeRate >= 0;
+  const marketPath = isContestMode ? getContestPath('/market') : '/market';
 
   return (
     <button
       className="flex w-full items-center justify-between rounded-xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]"
-      onClick={() => navigate(`/market?stockCode=${stock.stockCode}`)}
+      onClick={() => navigate(`${marketPath}?stockCode=${stock.stockCode}`)}
       type="button"
     >
       <div className="flex min-w-0 items-center gap-3">

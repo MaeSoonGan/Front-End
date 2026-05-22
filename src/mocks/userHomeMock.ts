@@ -20,7 +20,7 @@ export const userHomeMock = {
     { name: '카카오', code: '035720', price: '44,350', changeRate: '-1.1%' },
   ],
   activeContest: {
-    id: 'spring-league-2026',
+    id: 'may-regular-2026',
     type: '실전투자 리그',
     title: '5월 모의투자 챌린지',
     myAsset: '11,245,320원',

@@ -1,10 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import { PageContainer } from '../../components/common/PageContainer';
 import { MenuCard } from '../../components/user/MenuCard';
+import { useContestMode } from '../../contexts/ContestModeContext';
 import { userMoreMock } from '../../mocks/userHomeMock';
 
 export function MorePage() {
   const navigate = useNavigate();
+  const { getContestPath, isContestMode } = useContestMode();
+  const menus = isContestMode
+    ? userMoreMock.menus.filter((menu) => menu.to !== '/my-contests')
+    : userMoreMock.menus;
 
   const handleLogout = () => {
     // TODO: authStore/API 연동 후 실제 로그아웃과 토큰 정리를 처리합니다.
@@ -32,13 +37,13 @@ export function MorePage() {
       <section className="mt-5">
         <h2 className="mb-3 text-base font-extrabold text-slate-950">내 메뉴</h2>
         <div className="space-y-3">
-          {userMoreMock.menus.map((menu) => (
+          {menus.map((menu) => (
             <MenuCard
               description={menu.description}
               icon={menu.icon}
               key={menu.title}
               title={menu.title}
-              to={menu.to}
+              to={isContestMode ? getContestPath(menu.to) : menu.to}
             />
           ))}
         </div>
