@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Download, ChevronLeft, ChevronRight, AlertTriangle, Search } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Download, ChevronLeft, ChevronRight, AlertTriangle, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
-import { PageHeader } from '../../../components/common/PageHeader';
 import { Button } from '../../../components/common/Button';
 
 type PaymentType = '이벤트 당첨' | '보상' | '상금' | '기타';
+type SortField = 'amount' | 'paidAt' | null;
+type SortDir = 'asc' | 'desc' | null;
 
 interface MemberSearchResult {
   id: string;
@@ -51,7 +52,7 @@ const SUMMARY_STATS = {
   autoResetToday: 34,
 };
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 8;
 
 const TYPE_BADGE_CLASS: Record<PaymentType, string> = {
   '이벤트 당첨': 'bg-amber-100 text-amber-600',
@@ -68,13 +69,22 @@ function TypeBadge({ type }: { type: PaymentType }) {
   );
 }
 
-function formatAmount(amount: number) {
-  return amount.toLocaleString('ko-KR') + '원';
+function formatAmountMan(amount: number) {
+  return (amount / 10000).toLocaleString('ko-KR') + '만원';
+}
+
+function SortIcon({ field, currentField, dir }: { field: SortField; currentField: SortField; dir: SortDir }) {
+  if (currentField !== field || !dir) return <ChevronsUpDown size={13} className="ml-1 inline opacity-30" />;
+  return dir === 'asc'
+    ? <ChevronUp size={13} className="ml-1 inline text-[#1565C0]" />
+    : <ChevronDown size={13} className="ml-1 inline text-[#1565C0]" />;
 }
 
 export function AdminSeedMoneyPage() {
+  const [payments, setPayments] = useState<PaymentRecord[]>(MOCK_PAYMENTS);
   const [memberQuery, setMemberQuery] = useState('');
   const [foundMember, setFoundMember] = useState<MemberSearchResult | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const [amount, setAmount] = useState('');
   const [paymentType, setPaymentType] = useState<PaymentType>('이벤트 당첨');
@@ -82,15 +92,50 @@ export function AdminSeedMoneyPage() {
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortDir, setSortDir] = useState<SortDir>(null);
 
-  const totalPages = Math.max(1, Math.ceil(MOCK_PAYMENTS.length / PAGE_SIZE));
-  const paginated = MOCK_PAYMENTS.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const actualAmount = amount ? Number(amount) * 10000 : 0;
+
+  const sortedPayments = useMemo(() => {
+    if (!sortField || !sortDir) return payments;
+    return [...payments].sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      if (sortField === 'amount') return dir * (a.amount - b.amount);
+      if (sortField === 'paidAt') return dir * a.paidAt.localeCompare(b.paidAt);
+      return 0;
+    });
+  }, [payments, sortField, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedPayments.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginated = sortedPayments.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  function handleSort(field: SortField) {
+    if (sortField !== field) {
+      setSortField(field);
+      setSortDir('asc');
+    } else if (sortDir === 'asc') {
+      setSortDir('desc');
+    } else {
+      setSortField(null);
+      setSortDir(null);
+    }
+    setCurrentPage(1);
+  }
 
   function handleMemberSearch() {
     // GET /api/admin/members/search?q={memberQuery}
     if (memberQuery.trim()) {
       setFoundMember(MOCK_MEMBER);
+      setDropdownOpen(true);
     }
+  }
+
+  function handleMemberSelect(member: MemberSearchResult) {
+    setMemberQuery(member.nickname);
+    setFoundMember(member);
+    setDropdownOpen(false);
   }
 
   function handleMemberQueryKeyDown(e: React.KeyboardEvent) {
@@ -104,6 +149,20 @@ export function AdminSeedMoneyPage() {
 
   function handleConfirm() {
     // POST /api/admin/seed-money
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const paidAt = `${String(now.getFullYear()).slice(2)}.${pad(now.getMonth() + 1)}.${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    const newRecord: PaymentRecord = {
+      id: `p-${Date.now()}`,
+      recipientNickname: foundMember!.nickname,
+      amount: actualAmount,
+      type: paymentType,
+      reason,
+      adminName: 'admin',
+      paidAt,
+    };
+    setPayments(prev => [newRecord, ...prev]);
+    setCurrentPage(1);
     setIsConfirmOpen(false);
     handleReset();
   }
@@ -111,6 +170,7 @@ export function AdminSeedMoneyPage() {
   function handleReset() {
     setMemberQuery('');
     setFoundMember(null);
+    setDropdownOpen(false);
     setAmount('');
     setPaymentType('이벤트 당첨');
     setReason('');
@@ -137,7 +197,7 @@ export function AdminSeedMoneyPage() {
               <div className="flex gap-2">
                 <span className="w-24 shrink-0 text-slate-500">지급 금액</span>
                 <span className="font-semibold text-[#1565C0]">
-                  +{Number(amount).toLocaleString('ko-KR')}원
+                  +{Number(amount).toLocaleString('ko-KR')}만원 ({actualAmount.toLocaleString('ko-KR')}원)
                 </span>
               </div>
               <div className="flex gap-2">
@@ -154,18 +214,16 @@ export function AdminSeedMoneyPage() {
               <p>지급 즉시 회원 계좌에 반영됩니다. 지급 내역은 감사 로그에 자동 기록됩니다.</p>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" type="button" onClick={() => setIsConfirmOpen(false)}>
-                취소
-              </Button>
               <Button variant="brand" type="button" onClick={handleConfirm}>
                 확인 후 지급
+              </Button>
+              <Button variant="secondary" type="button" onClick={() => setIsConfirmOpen(false)}>
+                취소
               </Button>
             </div>
           </div>
         </div>
       )}
-
-      <PageHeader title="시드머니 지급" />
 
       {/* 요약 카드 */}
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -187,75 +245,178 @@ export function AdminSeedMoneyPage() {
       </div>
 
       {/* 메인 컨텐츠 */}
-      <div className="grid gap-6 lg:grid-cols-5">
-        {/* 왼쪽: 시드머니 수동 지급 폼 */}
-        <div className="lg:col-span-2">
-          <Card>
+      <div className="grid items-stretch gap-6 lg:grid-cols-5">
+        {/* 왼쪽: 최근 지급 이력 */}
+        <div className="flex flex-col lg:col-span-3">
+          <Card className="flex flex-1 flex-col">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-slate-900">최근 지급 이력</h2>
+              <button
+                onClick={() => {/* GET /api/admin/seed-money/export */}}
+                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                <Download size={13} />
+                내보내기
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-x-auto overflow-y-hidden">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-xs text-slate-500">
+                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">수령 회원</th>
+                    <th
+                      className="cursor-pointer whitespace-nowrap pb-2 pr-4 text-center font-medium hover:text-slate-700"
+                      onClick={() => handleSort('amount')}
+                    >
+                      금액<SortIcon field="amount" currentField={sortField} dir={sortDir} />
+                    </th>
+                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">유형</th>
+                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">사유</th>
+                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">지급 관리자</th>
+                    <th
+                      className="cursor-pointer whitespace-nowrap pb-2 text-center font-medium hover:text-slate-700"
+                      onClick={() => handleSort('paidAt')}
+                    >
+                      일시<SortIcon field="paidAt" currentField={sortField} dir={sortDir} />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginated.map(record => (
+                    <tr key={record.id} className="cursor-pointer hover:bg-slate-50">
+                      <td className="whitespace-nowrap py-3 pr-4 text-center font-medium text-slate-900">
+                        {record.recipientNickname}
+                      </td>
+                      <td className="whitespace-nowrap py-3 pr-4 text-center font-medium text-[#1565C0]">
+                        +{formatAmountMan(record.amount)}
+                      </td>
+                      <td className="py-3 pr-4 text-center">
+                        <TypeBadge type={record.type} />
+                      </td>
+                      <td className="py-3 pr-4 text-center text-slate-700">
+                        {record.reason}
+                      </td>
+                      <td className="whitespace-nowrap py-3 pr-4 text-center text-slate-500">{record.adminName}</td>
+                      <td className="whitespace-nowrap py-3 text-center text-xs text-slate-400">{record.paidAt}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 페이지네이션 */}
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-xs text-slate-500">총 {sortedPayments.length}건</p>
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={safePage === 1}
+                  onClick={() => setCurrentPage(p => p - 1)}
+                  className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
+                >
+                  <ChevronLeft size={15} />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`cursor-pointer rounded px-2.5 py-0.5 text-sm ${
+                      page === safePage
+                        ? 'bg-[#1565C0] text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button
+                  disabled={safePage === totalPages}
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
+                >
+                  <ChevronRight size={15} />
+                </button>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* 오른쪽: 시드머니 수동 지급 폼 */}
+        <div className="flex flex-col lg:col-span-2">
+          <Card className="flex flex-1 flex-col">
             <h2 className="mb-5 text-base font-semibold text-slate-900">시드머니 수동 지급</h2>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="flex flex-1 flex-col space-y-5">
               {/* 대상 회원 검색 */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
                   대상 회원
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="닉네임 또는 이메일 입력"
-                    value={memberQuery}
-                    onChange={e => setMemberQuery(e.target.value)}
-                    onKeyDown={handleMemberQueryKeyDown}
-                    className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleMemberSearch}
-                    className="flex items-center gap-1.5 rounded-md bg-[#1565C0] px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
-                  >
-                    <Search size={14} />
-                    회원 찾기
-                  </button>
-                </div>
-
-                {/* 검색 결과 카드 */}
-                {foundMember && (
-                  <div className="mt-2 flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-8 items-center justify-center rounded-full bg-[#1565C0] text-sm font-bold text-white">
-                        {foundMember.nickname[0]}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">
-                          {foundMember.nickname} ({foundMember.accountId})
-                        </p>
-                        <p className="text-xs text-slate-400">
-                          {foundMember.email} · 현재 잔고 {foundMember.balance.toLocaleString('ko-KR')}원
-                        </p>
-                      </div>
-                    </div>
-                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-600">
-                      {foundMember.status}
-                    </span>
+                <div className="relative">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="닉네임 또는 이메일 입력"
+                      value={memberQuery}
+                      onChange={e => setMemberQuery(e.target.value)}
+                      onKeyDown={handleMemberQueryKeyDown}
+                      className="flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleMemberSearch}
+                      className="flex cursor-pointer items-center gap-1.5 rounded-md bg-[#1565C0] px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
+                    >
+                      <Search size={14} />
+                      회원 찾기
+                    </button>
                   </div>
-                )}
+
+                  {/* 검색 결과 — absolute 드롭다운 */}
+                  {foundMember && dropdownOpen && (
+                    <div
+                      className="absolute left-0 right-0 top-full z-20 mt-1 flex cursor-pointer items-center justify-between rounded-md border border-slate-200 bg-white px-4 py-3 shadow-md hover:border-[#1565C0] hover:bg-[#E8F0FE]"
+                      onClick={() => handleMemberSelect(foundMember)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-8 items-center justify-center rounded-full bg-[#1565C0] text-sm font-bold text-white">
+                          {foundMember.nickname[0]}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {foundMember.nickname} ({foundMember.accountId})
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {foundMember.email} · 현재 잔고 {(foundMember.balance / 10000).toLocaleString('ko-KR')}만원
+                          </p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-600">
+                        {foundMember.status}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* 지급 금액 + 지급 유형 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    지급 금액 (원)
+                    지급 금액 (만원)
                   </label>
                   <input
                     type="number"
-                    placeholder="예) 1,000,000"
+                    placeholder="예) 100"
                     value={amount}
                     onChange={e => setAmount(e.target.value)}
                     min="1"
                     required
                     className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
                   />
+                  <p className={`mt-1 text-xs text-slate-400 ${amount ? 'visible' : 'invisible'}`}>
+                    실제 지급액: {actualAmount.toLocaleString('ko-KR')}원
+                  </p>
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -264,7 +425,7 @@ export function AdminSeedMoneyPage() {
                   <select
                     value={paymentType}
                     onChange={e => setPaymentType(e.target.value as PaymentType)}
-                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
+                    className="w-full cursor-pointer rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
                   >
                     <option value="이벤트 당첨">이벤트 당첨</option>
                     <option value="보상">보상</option>
@@ -300,7 +461,7 @@ export function AdminSeedMoneyPage() {
                 <Button
                   variant="brand"
                   type="submit"
-                  disabled={!foundMember}
+                  disabled={!foundMember || !amount.trim() || !reason.trim()}
                   className="flex-1"
                 >
                   지급하기
@@ -310,91 +471,6 @@ export function AdminSeedMoneyPage() {
                 </Button>
               </div>
             </form>
-          </Card>
-        </div>
-
-        {/* 오른쪽: 최근 지급 이력 */}
-        <div className="lg:col-span-3">
-          <Card>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-slate-900">최근 지급 이력</h2>
-              <button
-                onClick={() => {/* GET /api/admin/seed-money/export */}}
-                className="flex items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-              >
-                <Download size={13} />
-                내보내기
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200 text-xs text-slate-500">
-                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">수령 회원</th>
-                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">금액</th>
-                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">유형</th>
-                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">사유</th>
-                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">지급 관리자</th>
-                    <th className="whitespace-nowrap pb-2 text-center font-medium">일시</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {paginated.map(record => (
-                    <tr key={record.id} className="hover:bg-slate-50">
-                      <td className="whitespace-nowrap py-3 pr-4 text-center font-medium text-slate-900">
-                        {record.recipientNickname}
-                      </td>
-                      <td className="whitespace-nowrap py-3 pr-4 text-center font-medium text-[#1565C0]">
-                        +{formatAmount(record.amount)}
-                      </td>
-                      <td className="py-3 pr-4 text-center">
-                        <TypeBadge type={record.type} />
-                      </td>
-                      <td className="py-3 pr-4 text-center">
-                        {record.reason}
-                      </td>
-                      <td className="whitespace-nowrap py-3 pr-4 text-center text-slate-500">{record.adminName}</td>
-                      <td className="whitespace-nowrap py-3 text-center text-xs text-slate-400">{record.paidAt}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* 페이지네이션 */}
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-xs text-slate-500">총 {MOCK_PAYMENTS.length}건</p>
-              <div className="flex items-center gap-1">
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(p => p - 1)}
-                  className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`rounded px-2.5 py-0.5 text-sm ${
-                      page === currentPage
-                        ? 'bg-[#1565C0] text-white'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(p => p + 1)}
-                  className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
-                >
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-            </div>
           </Card>
         </div>
       </div>

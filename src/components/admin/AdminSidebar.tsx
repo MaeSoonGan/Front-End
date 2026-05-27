@@ -82,7 +82,7 @@ export function AdminSidebar({ isOpen }: AdminSidebarProps) {
   return (
     <aside
       className={cn(
-        'flex shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white transition-all duration-200',
+        'sticky top-0 flex h-screen shrink-0 flex-col overflow-hidden border-r border-slate-200 bg-white transition-all duration-200',
         isOpen ? 'w-60' : 'w-0 border-none',
       )}
     >

@@ -1,13 +1,14 @@
-import { useState } from 'react';
-import { Search, Download, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Search, Download, ChevronLeft, ChevronRight, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 import { TextInput } from '../../../components/common/TextInput';
 
 type SuspensionType = 'MANUAL' | 'AUTO';
 type SuspensionStatus = 'SUSPENDED' | 'RELEASED';
 type ProcessType = '계정 정지' | '계정 해제';
+type SortDir = 'asc' | 'desc' | null;
 
 interface SuspensionRecord {
   id: string;
@@ -81,7 +82,12 @@ const SUMMARY_STATS = {
   autoSuspended: 12,
 };
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 7;
+
+function processedAtToIso(processedAt: string): string {
+  const [yy, mm, dd] = processedAt.split('\n')[0].split('.');
+  return `20${yy}-${mm}-${dd}`;
+}
 
 function TypeBadge({ type }: { type: SuspensionType }) {
   if (type === 'MANUAL') {
@@ -113,37 +119,77 @@ function StatusBadge({ status }: { status: SuspensionStatus }) {
   );
 }
 
+function DateSortIcon({ dir }: { dir: SortDir }) {
+  if (!dir) return <ChevronsUpDown size={13} className="ml-1 inline opacity-30" />;
+  return dir === 'asc'
+    ? <ChevronUp size={13} className="ml-1 inline text-[#1565C0]" />
+    : <ChevronDown size={13} className="ml-1 inline text-[#1565C0]" />;
+}
+
 export function AdminSuspensionPage() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | SuspensionType>('ALL');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortDir, setSortDir] = useState<SortDir>(null);
 
   const [targetMember, setTargetMember] = useState('');
   const [processType, setProcessType] = useState<ProcessType>('계정 정지');
   const [reason, setReason] = useState('');
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
-  const filtered = MOCK_SUSPENSIONS.filter(r => {
-    const q = searchQuery || search;
-    const matchSearch =
-      !q || r.targetNickname.includes(q) || r.targetAccountId.includes(q) || r.adminName.includes(q);
-    const matchType = typeFilter === 'ALL' || r.type === typeFilter;
-    return matchSearch && matchType;
-  });
+  const filtered = useMemo(() => {
+    let result = [...MOCK_SUSPENSIONS];
 
-  const totalCount = SUMMARY_STATS.total;
+    if (search.trim()) {
+      const q = search.trim();
+      result = result.filter(r =>
+        r.targetNickname.includes(q) ||
+        r.targetAccountId.includes(q) ||
+        r.adminName.includes(q),
+      );
+    }
+
+    if (typeFilter !== 'ALL') {
+      result = result.filter(r => r.type === typeFilter);
+    }
+
+    if (dateFrom || dateTo) {
+      result = result.filter(r => {
+        const d = processedAtToIso(r.processedAt);
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo && d > dateTo) return false;
+        return true;
+      });
+    }
+
+    if (sortDir) {
+      result = [...result].sort((a, b) => {
+        const cmp = a.processedAt.localeCompare(b.processedAt);
+        return sortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+
+    return result;
+  }, [search, typeFilter, dateFrom, dateTo, sortDir]);
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const startIdx = (currentPage - 1) * PAGE_SIZE + 1;
-  const endIdx = Math.min(currentPage * PAGE_SIZE, filtered.length);
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const safePage = Math.min(currentPage, totalPages);
+  const startIdx = (safePage - 1) * PAGE_SIZE + 1;
+  const endIdx = Math.min(safePage * PAGE_SIZE, filtered.length);
+  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    setSearchQuery(search);
+  const isFormComplete = targetMember.trim() !== '' && reason.trim() !== '';
+
+  function handleDateSort() {
+    setSortDir(prev => (prev === null ? 'asc' : prev === 'asc' ? 'desc' : null));
     setCurrentPage(1);
+  }
+
+  function handleRowClick(record: SuspensionRecord) {
+    setTargetMember(record.targetNickname);
+    setProcessType(record.status === 'SUSPENDED' ? '계정 해제' : '계정 정지');
   }
 
   function handleProcessSubmit(e: React.FormEvent) {
@@ -163,25 +209,17 @@ export function AdminSuspensionPage() {
     setReason('');
   }
 
-  function handleReleaseRow(record: SuspensionRecord) {
-    // PATCH /api/admin/members/suspensions/:id/release
-    console.log('release', record.id);
-  }
-
-  function handleDetailRow(record: SuspensionRecord) {
-    // GET /api/admin/members/suspensions/:id
-    console.log('detail', record.id);
-  }
-
   const csvAction = (
     <button
       onClick={() => {/* GET /api/admin/members/suspensions/export */}}
-      className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+      className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
     >
       <Download size={15} />
       CSV 내보내기
     </button>
   );
+
+  useAdminPageActions(csvAction);
 
   return (
     <>
@@ -219,21 +257,16 @@ export function AdminSuspensionPage() {
               </div>
             )}
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" type="button" onClick={() => setIsConfirmOpen(false)}>
-                취소
-              </Button>
               <Button variant="brand" type="button" onClick={handleConfirm}>
                 확인 후 처리
+              </Button>
+              <Button variant="secondary" type="button" onClick={() => setIsConfirmOpen(false)}>
+                취소
               </Button>
             </div>
           </div>
         </div>
       )}
-
-      <PageHeader
-        title="계정 정지 이력"
-        actions={csvAction}
-      />
 
       {/* 요약 카드 */}
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -256,28 +289,28 @@ export function AdminSuspensionPage() {
       </div>
 
       {/* 메인 컨텐츠 */}
-      <div className="grid gap-6 lg:grid-cols-5">
+      <div className="grid items-stretch gap-6 lg:grid-cols-5">
         {/* 왼쪽: 정지 이력 목록 */}
-        <div className="lg:col-span-3">
-          <Card>
+        <div className="flex flex-col lg:col-span-3">
+          <Card className="flex flex-1 flex-col">
             <h2 className="mb-4 text-base font-semibold text-slate-900">정지 이력 목록</h2>
 
-            {/* 필터 - 1행 구조 */}
-            <form onSubmit={handleSearch} className="mb-4 flex flex-wrap gap-2">
+            {/* 필터 */}
+            <div className="mb-4 flex flex-wrap gap-2">
               <div className="relative min-w-36 flex-1">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   placeholder="닉네임 / 관리자 검색"
                   value={search}
-                  onChange={e => setSearch(e.target.value)}
+                  onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
                   className="w-full rounded-md border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
                 />
               </div>
               <select
                 value={typeFilter}
                 onChange={e => { setTypeFilter(e.target.value as 'ALL' | SuspensionType); setCurrentPage(1); }}
-                className="rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0]"
+                className="cursor-pointer rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0]"
               >
                 <option value="ALL">전체</option>
                 <option value="MANUAL">수동</option>
@@ -286,26 +319,20 @@ export function AdminSuspensionPage() {
               <input
                 type="date"
                 value={dateFrom}
-                onChange={e => setDateFrom(e.target.value)}
-                className="rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0]"
+                onChange={e => { setDateFrom(e.target.value); setCurrentPage(1); }}
+                className="cursor-pointer rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0]"
               />
               <span className="flex items-center text-sm text-slate-400">~</span>
               <input
                 type="date"
                 value={dateTo}
-                onChange={e => setDateTo(e.target.value)}
-                className="rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0]"
+                onChange={e => { setDateTo(e.target.value); setCurrentPage(1); }}
+                className="cursor-pointer rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0]"
               />
-              <button
-                type="submit"
-                className="rounded-md bg-[#1565C0] px-4 py-2 text-sm font-medium text-white hover:bg-blue-800"
-              >
-                검색
-              </button>
-            </form>
+            </div>
 
             {/* 테이블 */}
-            <div className="overflow-x-auto">
+            <div className="flex-1 overflow-x-auto overflow-y-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
@@ -313,21 +340,29 @@ export function AdminSuspensionPage() {
                     <th className="pb-2 pr-3 text-center font-medium">유형</th>
                     <th className="pb-2 pr-3 text-center font-medium">사유</th>
                     <th className="pb-2 pr-3 font-medium">처리 관리자</th>
-                    <th className="pb-2 pr-3 text-center font-medium">일시</th>
-                    <th className="pb-2 pr-3 text-center font-medium">상태</th>
-                    <th className="pb-2 text-center font-medium">관리</th>
+                    <th
+                      className="cursor-pointer whitespace-nowrap pb-2 pr-3 text-center font-medium hover:text-slate-700"
+                      onClick={handleDateSort}
+                    >
+                      일시<DateSortIcon dir={sortDir} />
+                    </th>
+                    <th className="pb-2 text-center font-medium">상태</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginated.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-slate-400">
+                      <td colSpan={6} className="py-8 text-center text-slate-400">
                         검색 결과가 없습니다.
                       </td>
                     </tr>
                   ) : (
                     paginated.map(record => (
-                      <tr key={record.id} className="hover:bg-slate-50">
+                      <tr
+                        key={record.id}
+                        className="cursor-pointer hover:bg-slate-50"
+                        onClick={() => handleRowClick(record)}
+                      >
                         <td className="py-3 pr-3 font-medium text-slate-900">
                           {record.targetNickname}
                         </td>
@@ -336,37 +371,18 @@ export function AdminSuspensionPage() {
                             <TypeBadge type={record.type} />
                           </div>
                         </td>
-                        <td className="py-3 pr-3 max-w-28 text-center">
+                        <td className="max-w-28 py-3 pr-3 text-center">
                           <p className="truncate text-slate-700" title={record.reason}>
                             {record.reason}
                           </p>
                         </td>
                         <td className="py-3 pr-3 text-slate-600">{record.adminName}</td>
-                        <td className="py-3 pr-3 text-center text-slate-500 whitespace-pre-line text-xs">
+                        <td className="whitespace-pre-line py-3 pr-3 text-center text-xs text-slate-500">
                           {record.processedAt}
-                        </td>
-                        <td className="py-3 pr-3">
-                          <div className="flex justify-center">
-                            <StatusBadge status={record.status} />
-                          </div>
                         </td>
                         <td className="py-3">
                           <div className="flex justify-center">
-                            {record.status === 'SUSPENDED' ? (
-                              <button
-                                onClick={() => handleReleaseRow(record)}
-                                className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-600 hover:bg-emerald-200"
-                              >
-                                해제
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => handleDetailRow(record)}
-                                className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 hover:bg-slate-200"
-                              >
-                                상세
-                              </button>
-                            )}
+                            <StatusBadge status={record.status} />
                           </div>
                         </td>
                       </tr>
@@ -379,13 +395,13 @@ export function AdminSuspensionPage() {
             {/* 페이지네이션 */}
             <div className="mt-4 flex items-center justify-between">
               <p className="text-xs text-slate-500">
-                총 {totalCount}건 중 {startIdx}-{endIdx}번
+                {filtered.length > 0 ? `${startIdx}-${endIdx} / 총 ${filtered.length}건` : '0건'}
               </p>
               <div className="flex items-center gap-1">
                 <button
-                  disabled={currentPage === 1}
+                  disabled={safePage === 1}
                   onClick={() => setCurrentPage(p => p - 1)}
-                  className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                  className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
                 >
                   <ChevronLeft size={16} />
                 </button>
@@ -393,8 +409,8 @@ export function AdminSuspensionPage() {
                   <button
                     key={page}
                     onClick={() => setCurrentPage(page)}
-                    className={`rounded px-2.5 py-0.5 text-sm ${
-                      page === currentPage
+                    className={`cursor-pointer rounded px-2.5 py-0.5 text-sm ${
+                      page === safePage
                         ? 'bg-[#1565C0] text-white'
                         : 'text-slate-600 hover:bg-slate-100'
                     }`}
@@ -403,9 +419,9 @@ export function AdminSuspensionPage() {
                   </button>
                 ))}
                 <button
-                  disabled={currentPage === totalPages}
+                  disabled={safePage === totalPages}
                   onClick={() => setCurrentPage(p => p + 1)}
-                  className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-40"
+                  className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -414,11 +430,11 @@ export function AdminSuspensionPage() {
           </Card>
         </div>
 
-        {/* 오른쪽: 계정 정지 처리 */}
-        <div className="lg:col-span-2">
-          <Card>
+        {/* 오른쪽: 계정 정지 관리 */}
+        <div className="flex flex-col lg:col-span-2">
+          <Card className="flex-1">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-slate-900">계정 정지 처리</h2>
+              <h2 className="text-base font-semibold text-slate-900">계정 정지 관리</h2>
               <span className="text-xs text-slate-400">직접 정지 / 해제</span>
             </div>
 
@@ -436,7 +452,7 @@ export function AdminSuspensionPage() {
                 <select
                   value={processType}
                   onChange={e => setProcessType(e.target.value as ProcessType)}
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
+                  className="w-full cursor-pointer rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
                 >
                   <option value="계정 정지">계정 정지</option>
                   <option value="계정 해제">계정 해제</option>
@@ -467,7 +483,7 @@ export function AdminSuspensionPage() {
               )}
 
               <div className="flex gap-2 pt-1">
-                <Button variant="brand" type="submit" className="flex-1">
+                <Button variant="brand" type="submit" className="flex-1" disabled={!isFormComplete}>
                   처리하기
                 </Button>
                 <Button variant="secondary" type="button" onClick={handleReset}>

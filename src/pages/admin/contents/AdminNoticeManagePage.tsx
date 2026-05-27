@@ -1,58 +1,63 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pin, Search, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pin, Search, Plus, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
-import { PageHeader } from '../../../components/common/PageHeader';
+import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 
-type NoticeStatus = 'PUBLISHED' | 'SCHEDULED' | 'HIDDEN';
+type NoticeStatus = 'PUBLISHED' | 'SCHEDULED' | 'HIDDEN' | 'DRAFT';
 type TabFilter = 'ALL' | NoticeStatus;
+type SortDir = 'asc' | 'desc' | null;
 
 interface Notice {
   id: string;
   isPinned: boolean;
   title: string;
   status: NoticeStatus;
-  startDate: string;      // "mm.dd"
-  endDate: string | null; // "mm.dd" or null
+  startDate: string;
+  endDate: string | null;
   authorName: string;
-  createdAt: string;      // "yy.mm.dd"
+  createdAt: string;
+  views: number;
 }
 
 interface FormState {
   title: string;
   content: string;
-  startDate: string; // HTML date input: "yyyy-mm-dd"
-  endDate: string;   // HTML date input: "yyyy-mm-dd"
-  displayStatus: '게시' | '숨김';
+  startDate: string;
+  endDate: string;
+  displayStatus: '게시' | '예약' | '숨김';
   isPinned: boolean;
 }
 
 // GET /api/admin/notices
 const MOCK_NOTICES: Notice[] = [
-  { id: 'n1', isPinned: true,  title: '[공지] 5월 대회 시작 안내',      status: 'PUBLISHED', startDate: '05.01', endDate: '05.31', authorName: 'admin01', createdAt: '25.04.28' },
-  { id: 'n2', isPinned: false, title: '[점검] 5/10시스템 점검 예정',    status: 'SCHEDULED', startDate: '05.09', endDate: '05.10', authorName: 'admin02', createdAt: '25.05.07' },
-  { id: 'n3', isPinned: false, title: '[업데이트] 차트 기능 개선',       status: 'PUBLISHED', startDate: '04.15', endDate: null,    authorName: 'admin01', createdAt: '25.04.15' },
-  { id: 'n4', isPinned: false, title: '[이벤트] 신규 가입 이벤트 종료', status: 'HIDDEN',    startDate: '04.01', endDate: '04.30', authorName: 'admin01', createdAt: '25.04.01' },
+  { id: 'n1', isPinned: true,  title: '[공지] 5월 대회 시작 안내',      status: 'PUBLISHED', startDate: '05.01', endDate: '05.31', authorName: 'admin01', createdAt: '25.04.28', views: 1284 },
+  { id: 'n2', isPinned: false, title: '[점검] 5/10시스템 점검 예정',    status: 'SCHEDULED', startDate: '05.09', endDate: '05.10', authorName: 'admin02', createdAt: '25.05.07', views: 342 },
+  { id: 'n3', isPinned: false, title: '[업데이트] 차트 기능 개선',       status: 'PUBLISHED', startDate: '04.15', endDate: null,    authorName: 'admin01', createdAt: '25.04.15', views: 876 },
+  { id: 'n4', isPinned: false, title: '[이벤트] 신규 가입 이벤트 종료', status: 'HIDDEN',    startDate: '04.01', endDate: '04.30', authorName: 'admin01', createdAt: '25.04.01', views: 531 },
 ];
 
 const STATUS_LABEL: Record<NoticeStatus, string> = {
   PUBLISHED: '게시중',
   SCHEDULED: '예약',
   HIDDEN:    '숨김',
+  DRAFT:     '임시저장',
 };
 
 const STATUS_BADGE_CLASS: Record<NoticeStatus, string> = {
   PUBLISHED: 'bg-emerald-100 text-emerald-600',
   SCHEDULED: 'bg-sky-100 text-sky-600',
   HIDDEN:    'bg-slate-100 text-slate-500',
+  DRAFT:     'bg-purple-100 text-purple-600',
 };
 
 const TAB_LIST: { label: string; value: TabFilter }[] = [
-  { label: '전체',   value: 'ALL'       },
-  { label: '게시중', value: 'PUBLISHED' },
-  { label: '예약',   value: 'SCHEDULED' },
-  { label: '숨김',   value: 'HIDDEN'    },
+  { label: '전체',     value: 'ALL'       },
+  { label: '게시중',   value: 'PUBLISHED' },
+  { label: '예약',     value: 'SCHEDULED' },
+  { label: '숨김',     value: 'HIDDEN'    },
+  { label: '임시저장', value: 'DRAFT'     },
 ];
 
 const EMPTY_FORM: FormState = {
@@ -66,14 +71,12 @@ const EMPTY_FORM: FormState = {
 
 const PAGE_SIZE = 5;
 
-// "mm.dd" → "2025-mm-dd"
 function toInputDate(d: string): string {
   if (!d) return '';
   const [m, day] = d.split('.');
   return `2025-${m}-${day}`;
 }
 
-// "2025-mm-dd" → "mm.dd"
 function toDisplayDate(d: string): string {
   if (!d) return '';
   const parts = d.split('-');
@@ -98,6 +101,13 @@ function StatusBadge({ status }: { status: NoticeStatus }) {
   );
 }
 
+function SortIcon({ dir }: { dir: SortDir }) {
+  if (!dir) return <ChevronsUpDown size={13} className="ml-1 inline opacity-30" />;
+  return dir === 'asc'
+    ? <ChevronUp size={13} className="ml-1 inline text-[#1565C0]" />
+    : <ChevronDown size={13} className="ml-1 inline text-[#1565C0]" />;
+}
+
 export function AdminNoticeManagePage() {
   const navigate = useNavigate();
   const [searchInput, setSearchInput]     = useState('');
@@ -105,63 +115,41 @@ export function AdminNoticeManagePage() {
   const [activeTab, setActiveTab]         = useState<TabFilter>('ALL');
   const [currentPage, setCurrentPage]     = useState(1);
   const [notices, setNotices]             = useState<Notice[]>(MOCK_NOTICES);
+  const [sortDir, setSortDir]             = useState<SortDir>(null);
 
-  const [isFormOpen, setIsFormOpen]             = useState(false);
-  const [editingId, setEditingId]               = useState<string | null>(null);
-  const [form, setForm]                         = useState<FormState>({ ...EMPTY_FORM });
-  const [deleteTargetId, setDeleteTargetId]     = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen]         = useState(false);
+  const [editingId, setEditingId]           = useState<string | null>(null);
+  const [form, setForm]                     = useState<FormState>({ ...EMPTY_FORM });
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
-  // 체크박스 선택 상태
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const allCheckRef = useRef<HTMLInputElement>(null);
-
-  // 핀 고정 공지를 항상 최상단에 정렬
   const filtered = useMemo(() => {
-    return notices
-      .filter(n => {
-        const matchesTab    = activeTab === 'ALL' || n.status === activeTab;
-        const matchesSearch = !appliedSearch || n.title.includes(appliedSearch);
-        return matchesTab && matchesSearch;
-      })
-      .sort((a, b) => Number(b.isPinned) - Number(a.isPinned));
-  }, [notices, activeTab, appliedSearch]);
+    let result = notices.filter(n => {
+      const matchesTab    = activeTab === 'ALL' || n.status === activeTab;
+      const matchesSearch = !appliedSearch || n.title.includes(appliedSearch);
+      return matchesTab && matchesSearch;
+    });
+
+    result = [...result].sort((a, b) => {
+      const pinOrder = Number(b.isPinned) - Number(a.isPinned);
+      if (pinOrder !== 0) return pinOrder;
+      if (sortDir) {
+        const cmp = a.createdAt.localeCompare(b.createdAt);
+        return sortDir === 'asc' ? cmp : -cmp;
+      }
+      return 0;
+    });
+
+    return result;
+  }, [notices, activeTab, appliedSearch, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const safePage   = Math.min(currentPage, totalPages);
+  const paginated  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const ghostCount = PAGE_SIZE - Math.max(paginated.length, paginated.length === 0 ? 1 : 0);
 
-  const selectedOnPage  = paginated.filter(n => selectedIds.has(n.id));
-  const isAllSelected   = paginated.length > 0 && selectedOnPage.length === paginated.length;
-  const isPartialSelect = selectedOnPage.length > 0 && !isAllSelected;
-
-  // 전체선택 체크박스 indeterminate 상태
-  useEffect(() => {
-    if (allCheckRef.current) {
-      allCheckRef.current.indeterminate = isPartialSelect;
-    }
-  }, [isPartialSelect]);
-
-  function handleAllCheck() {
-    if (isAllSelected) {
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        paginated.forEach(n => next.delete(n.id));
-        return next;
-      });
-    } else {
-      setSelectedIds(prev => {
-        const next = new Set(prev);
-        paginated.forEach(n => next.add(n.id));
-        return next;
-      });
-    }
-  }
-
-  function handleRowCheck(id: string) {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  function handleSort() {
+    setSortDir(prev => (prev === null ? 'asc' : prev === 'asc' ? 'desc' : null));
+    setCurrentPage(1);
   }
 
   function handleSearch() {
@@ -175,11 +163,12 @@ export function AdminNoticeManagePage() {
   }
 
   function handleNewNotice() {
-    if (isFormOpen && editingId === null) {
+    if (isFormOpen) {
+      setEditingId(null);
+      setForm({ ...EMPTY_FORM });
       setIsFormOpen(false);
       return;
     }
-    setEditingId(null);
     setForm({ ...EMPTY_FORM });
     setIsFormOpen(true);
   }
@@ -191,7 +180,7 @@ export function AdminNoticeManagePage() {
       content:       '',
       startDate:     toInputDate(notice.startDate),
       endDate:       notice.endDate ? toInputDate(notice.endDate) : '',
-      displayStatus: notice.status === 'HIDDEN' ? '숨김' : '게시',
+      displayStatus: notice.status === 'HIDDEN' ? '숨김' : notice.status === 'SCHEDULED' ? '예약' : '게시',
       isPinned:      notice.isPinned,
     });
     setIsFormOpen(true);
@@ -199,6 +188,7 @@ export function AdminNoticeManagePage() {
 
   function resolveStatus(): NoticeStatus {
     if (form.displayStatus === '숨김') return 'HIDDEN';
+    if (form.displayStatus === '예약') return 'SCHEDULED';
     if (!form.startDate) return 'PUBLISHED';
     return new Date(form.startDate) > new Date() ? 'SCHEDULED' : 'PUBLISHED';
   }
@@ -213,6 +203,7 @@ export function AdminNoticeManagePage() {
       endDate:    form.endDate ? toDisplayDate(form.endDate) : null,
       authorName: 'admin01',
       createdAt:  todayStr(),
+      views:      editingId ? (notices.find(n => n.id === editingId)?.views ?? 0) : 0,
     };
   }
 
@@ -233,7 +224,7 @@ export function AdminNoticeManagePage() {
   }
 
   function handleTempSave() {
-    applyNotice(buildNotice('HIDDEN'));
+    applyNotice(buildNotice('DRAFT'));
   }
 
   function handleCancel() {
@@ -260,6 +251,18 @@ export function AdminNoticeManagePage() {
     return end ? `${start} ~ ${end}` : `${start} ~`;
   }, [form.startDate, form.endDate]);
 
+  const handleNewNoticeRef = useRef(handleNewNotice);
+  useEffect(() => {
+    handleNewNoticeRef.current = handleNewNotice;
+  });
+
+  useAdminPageActions(
+    <Button variant="brand" onClick={() => handleNewNoticeRef.current()} className="cursor-pointer">
+      <Plus size={16} className="mr-1.5" />
+      공지 등록
+    </Button>
+  );
+
   return (
     <>
       {/* 삭제 확인 모달 */}
@@ -277,34 +280,21 @@ export function AdminNoticeManagePage() {
               해당 공지사항을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => setDeleteTargetId(null)}>
+              <Button variant="danger" onClick={confirmDelete} className="cursor-pointer">
+                삭제
+              </Button>
+              <Button variant="secondary" onClick={() => setDeleteTargetId(null)} className="cursor-pointer">
                 취소
               </Button>
-              <button
-                onClick={confirmDelete}
-                className="inline-flex h-10 items-center justify-center rounded-md bg-rose-600 px-4 text-sm font-medium text-white transition hover:bg-rose-700"
-              >
-                삭제
-              </button>
             </div>
           </div>
         </div>
       )}
 
-      <PageHeader
-        title="공지사항 관리"
-        actions={
-          <Button variant="brand" onClick={handleNewNotice}>
-            <Plus size={16} className="mr-1.5" />
-            공지 등록
-          </Button>
-        }
-      />
-
-      <div className={`grid gap-6 ${isFormOpen ? 'lg:grid-cols-5' : 'lg:grid-cols-1'}`}>
+      <div className={`grid gap-6 ${isFormOpen ? 'items-stretch lg:grid-cols-5' : 'lg:grid-cols-1'}`}>
         {/* 왼쪽: 공지 목록 */}
-        <div className={isFormOpen ? 'lg:col-span-3' : ''}>
-          <Card className="p-0">
+        <div className={isFormOpen ? 'flex flex-col lg:col-span-3' : ''}>
+          <Card className={`flex flex-col p-0 min-h-145 ${isFormOpen ? 'flex-1' : ''}`}>
             <div className="border-b border-slate-200 p-4">
               <h2 className="mb-3 text-base font-semibold text-slate-900">공지 목록</h2>
 
@@ -321,7 +311,7 @@ export function AdminNoticeManagePage() {
                     className="h-9 w-full rounded-md border border-slate-300 pl-9 pr-3 text-sm focus:border-[#1565C0] focus:outline-none"
                   />
                 </div>
-                <Button variant="brand" className="h-9 px-4 text-sm" onClick={handleSearch}>
+                <Button variant="brand" className="h-9 cursor-pointer px-4 text-sm" onClick={handleSearch}>
                   검색
                 </Button>
               </div>
@@ -332,7 +322,7 @@ export function AdminNoticeManagePage() {
                   <button
                     key={tab.value}
                     onClick={() => handleTabChange(tab.value)}
-                    className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                    className={`cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition ${
                       activeTab === tab.value
                         ? 'bg-[#1565C0] text-white'
                         : 'text-slate-600 hover:bg-slate-100'
@@ -345,95 +335,106 @@ export function AdminNoticeManagePage() {
             </div>
 
             {/* 테이블 */}
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
+            <div className="h-72 overflow-x-auto overflow-y-hidden">
+              <table className="w-full min-w-195 table-fixed text-sm">
+                <colgroup>
+                  <col className="w-10" />
+                  <col />
+                  <col className="w-26" />
+                  <col className="w-36" />
+                  <col className="w-22" />
+                  <col className="w-22" />
+                  <col className="w-28" />
+                  <col className="w-28" />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="w-8 py-3 pl-4 pr-2">
-                      <input
-                        ref={allCheckRef}
-                        type="checkbox"
-                        className="rounded"
-                        checked={isAllSelected}
-                        onChange={handleAllCheck}
-                      />
+                    <th className="whitespace-nowrap px-3 py-3 text-center font-medium">고정</th>
+                    <th className="px-3 py-3 text-center font-medium">제목</th>
+                    <th className="px-3 py-3 text-center font-medium">상태</th>
+                    <th className="px-3 py-3 text-center font-medium">노출 기간</th>
+                    <th className="px-3 py-3 text-center font-medium">작성자</th>
+                    <th className="px-3 py-3 text-center font-medium">조회수</th>
+                    <th
+                      className="cursor-pointer px-3 py-3 text-center font-medium hover:text-slate-700"
+                      onClick={handleSort}
+                    >
+                      작성일<SortIcon dir={sortDir} />
                     </th>
-                    <th className="whitespace-nowrap px-2 py-3 text-center font-medium">고정</th>
-                    <th className="px-2 py-3 text-center font-medium">제목</th>
-                    <th className="whitespace-nowrap px-2 py-3 text-center font-medium">상태</th>
-                    <th className="whitespace-nowrap px-2 py-3 text-center font-medium">노출 기간</th>
-                    <th className="whitespace-nowrap px-2 py-3 text-center font-medium">작성자</th>
-                    <th className="whitespace-nowrap px-2 py-3 text-center font-medium">작성일</th>
-                    <th className="whitespace-nowrap px-2 py-3 text-center font-medium">관리</th>
+                    <th className="px-3 py-3 text-center font-medium">관리</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {paginated.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="py-10 text-center text-slate-400">
+                <tbody>
+                  {paginated.length === 0 && (
+                    <tr className="h-10.25 border-t border-slate-100">
+                      <td colSpan={8} className="px-3 py-3 text-center text-slate-400">
                         공지사항이 없습니다.
                       </td>
                     </tr>
-                  ) : (
-                    paginated.map(notice => (
-                      <tr key={notice.id} className="hover:bg-slate-50">
-                        <td className="py-3 pl-4 pr-2">
-                          <input
-                            type="checkbox"
-                            className="rounded"
-                            checked={selectedIds.has(notice.id)}
-                            onChange={() => handleRowCheck(notice.id)}
-                          />
-                        </td>
-                        <td className="px-2 py-3 text-center">
-                          {notice.isPinned && (
-                            <Pin size={14} className="mx-auto text-rose-500" />
-                          )}
-                        </td>
-                        <td className="px-2 py-3 text-center font-medium text-slate-900">
-                          <button
-                            onClick={() => navigate(`/admin/notices/${notice.id}`)}
-                            className="cursor-pointer text-left hover:text-[#1565C0] hover:underline"
-                          >
-                            {notice.title}
-                          </button>
-                        </td>
-                        <td className="px-2 py-3">
-                          <div className="flex justify-center">
-                            <StatusBadge status={notice.status} />
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-2 py-3 text-center text-slate-600">
-                          {formatDateRange(notice.startDate, notice.endDate)}
-                        </td>
-                        <td className="whitespace-nowrap px-2 py-3 text-center text-slate-600">
-                          {notice.authorName}
-                        </td>
-                        <td className="whitespace-nowrap px-2 py-3 text-center text-slate-600">
-                          {notice.createdAt}
-                        </td>
-                        <td className="px-2 py-3">
-                          <div className="flex justify-center gap-1">
-                            <button
-                              onClick={() => handleEdit(notice)}
-                              className="rounded px-2 py-1 text-xs font-medium text-[#1565C0] hover:bg-[#E8F0FE]"
-                            >
-                              수정
-                            </button>
-                            <button
-                              onClick={() => setDeleteTargetId(notice.id)}
-                              className="rounded px-2 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
-                            >
-                              삭제
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
                   )}
+                  {paginated.map(notice => (
+                    <tr
+                      key={notice.id}
+                      className="h-10.25 cursor-pointer border-t border-slate-100 hover:bg-slate-50"
+                    >
+                      <td className="px-3 py-3 text-center">
+                        {notice.isPinned && <Pin size={14} className="mx-auto text-rose-500" />}
+                      </td>
+                      <td className="truncate px-3 py-3 text-center font-medium text-slate-900" title={notice.title}>
+                        <button
+                          onClick={() => navigate(`/admin/notices/${notice.id}`)}
+                          className="cursor-pointer hover:text-[#1565C0] hover:underline"
+                        >
+                          {notice.title}
+                        </button>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex justify-center">
+                          <StatusBadge status={notice.status} />
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">
+                        {formatDateRange(notice.startDate, notice.endDate)}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">
+                        {notice.authorName}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">
+                        {notice.views.toLocaleString('ko-KR')}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">
+                        {notice.createdAt}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex justify-center gap-1">
+                          <button
+                            onClick={() => handleEdit(notice)}
+                            className="cursor-pointer rounded px-2 py-1 text-xs font-medium text-[#1565C0] hover:bg-[#E8F0FE]"
+                          >
+                            수정
+                          </button>
+                          <button
+                            onClick={() => setDeleteTargetId(notice.id)}
+                            className="cursor-pointer rounded px-2 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {Array.from({ length: ghostCount }).map((_, i) => (
+                    <tr key={`ghost-${i}`}>
+                      <td colSpan={8} className="px-3 py-3">
+                        <span className="invisible select-none text-sm leading-6">x</span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
+
+            <div className="flex-1" />
 
             {/* 페이지네이션 */}
             <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
@@ -441,8 +442,8 @@ export function AdminNoticeManagePage() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="rounded p-1 hover:bg-slate-100 disabled:opacity-40"
+                  disabled={safePage === 1}
+                  className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
                 >
                   <ChevronLeft size={16} />
                 </button>
@@ -450,8 +451,8 @@ export function AdminNoticeManagePage() {
                   <button
                     key={page}
                     onClick={() => setCurrentPage(page)}
-                    className={`min-w-7 rounded px-2 py-1 text-sm font-medium ${
-                      currentPage === page
+                    className={`cursor-pointer min-w-7 rounded px-2 py-1 text-sm font-medium ${
+                      safePage === page
                         ? 'bg-[#1565C0] text-white'
                         : 'text-slate-600 hover:bg-slate-100'
                     }`}
@@ -461,8 +462,8 @@ export function AdminNoticeManagePage() {
                 ))}
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="rounded p-1 hover:bg-slate-100 disabled:opacity-40"
+                  disabled={safePage === totalPages}
+                  className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -471,10 +472,10 @@ export function AdminNoticeManagePage() {
           </Card>
         </div>
 
-        {/* 오른쪽: 등록/수정 폼 — 공지 등록 또는 수정 클릭 시에만 표시 */}
+        {/* 오른쪽: 등록/수정 폼 */}
         {isFormOpen && (
-          <div className="lg:col-span-2">
-            <Card>
+          <div className="flex flex-col lg:col-span-2">
+            <Card className="flex-1">
               <h2 className="mb-4 text-base font-semibold text-slate-900">공지 등록 / 수정</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* 제목 */}
@@ -509,7 +510,7 @@ export function AdminNoticeManagePage() {
                       type="date"
                       value={form.startDate}
                       onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
+                      className="h-10 w-full cursor-pointer rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -521,7 +522,7 @@ export function AdminNoticeManagePage() {
                       type="date"
                       value={form.endDate}
                       onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))}
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
+                      className="h-10 w-full cursor-pointer rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -529,13 +530,14 @@ export function AdminNoticeManagePage() {
                 {/* 노출 상태 + 상단 고정 */}
                 <div className="flex items-end gap-4">
                   <div className="flex-1">
-                    <label className="mb-1 block text-sm font-medium text-slate-700">노출 상태</label>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">게시 상태</label>
                     <select
                       value={form.displayStatus}
-                      onChange={e => setForm(f => ({ ...f, displayStatus: e.target.value as '게시' | '숨김' }))}
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
+                      onChange={e => setForm(f => ({ ...f, displayStatus: e.target.value as '게시' | '예약' | '숨김' }))}
+                      className="h-10 w-full cursor-pointer rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
                     >
                       <option value="게시">게시</option>
+                      <option value="예약">예약</option>
                       <option value="숨김">숨김</option>
                     </select>
                   </div>
@@ -545,7 +547,7 @@ export function AdminNoticeManagePage() {
                       type="checkbox"
                       checked={form.isPinned}
                       onChange={e => setForm(f => ({ ...f, isPinned: e.target.checked }))}
-                      className="h-4 w-4 rounded"
+                      className="h-4 w-4 cursor-pointer rounded"
                     />
                     <label htmlFor="isPinned" className="cursor-pointer text-sm font-medium text-slate-700">
                       상단 고정 (중요 공지)
@@ -572,15 +574,15 @@ export function AdminNoticeManagePage() {
                   <Button
                     variant="brand"
                     type="submit"
-                    className="flex-1"
+                    className="flex-1 cursor-pointer"
                     disabled={!form.title.trim()}
                   >
                     {editingId ? '수정' : '등록'}
                   </Button>
-                  <Button variant="secondary" type="button" onClick={handleTempSave}>
+                  <Button variant="secondary" type="button" className="cursor-pointer" onClick={handleTempSave}>
                     임시 저장
                   </Button>
-                  <Button variant="ghost" type="button" onClick={handleCancel}>
+                  <Button variant="ghost" type="button" className="cursor-pointer" onClick={handleCancel}>
                     취소
                   </Button>
                 </div>
