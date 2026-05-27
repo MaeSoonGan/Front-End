@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Download, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
@@ -92,6 +93,7 @@ function logDateKey(createdAt: string): string {
 }
 
 export function AdminAuditLogPage() {
+  const navigate = useNavigate();
   const [keyword, setKeyword]         = useState('');
   const [searchType, setSearchType]   = useState<SearchType>('all');
   const [startDate, setStartDate]     = useState('');
@@ -287,7 +289,7 @@ export function AdminAuditLogPage() {
                 </tr>
               ) : (
                 paginated.map(log => (
-                  <tr key={log.id} className="h-11 hover:bg-slate-50">
+                  <tr key={log.id} className="h-11 cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/admin/audit-log/${log.id}`)}>
                     <td className="px-3 text-center text-slate-400">{log.id}</td>
                     <td className="px-3 text-center">
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${TYPE_BADGE[log.type]}`}>
