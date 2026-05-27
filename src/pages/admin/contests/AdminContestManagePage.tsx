@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
@@ -96,7 +96,7 @@ const EMPTY_FORM: FormState = {
   allowShortSelling: false,
 };
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
 function formatSeedMoney(amount: number): string {
   return `${(amount / 10000).toLocaleString('ko-KR')}만원`;
@@ -122,9 +122,10 @@ export function AdminContestManagePage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [contests, setContests]       = useState<Contest[]>(MOCK_CONTESTS);
 
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingId, setEditingId]   = useState<string | null>(null);
-  const [form, setForm]             = useState<FormState>({ ...EMPTY_FORM });
+  const [isFormOpen, setIsFormOpen]     = useState(false);
+  const [editingId, setEditingId]       = useState<string | null>(null);
+  const [form, setForm]                 = useState<FormState>({ ...EMPTY_FORM });
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const filtered = useMemo(() => {
     return contests.filter(c => {
@@ -135,8 +136,10 @@ export function AdminContestManagePage() {
     });
   }, [contests, activeTab]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage    = Math.min(currentPage, totalPages);
+  const paginated   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const ghostCount  = PAGE_SIZE - Math.max(paginated.length, paginated.length === 0 ? 1 : 0);
 
   function handleTabChange(tab: TabFilter) {
     setActiveTab(tab);
@@ -155,6 +158,10 @@ export function AdminContestManagePage() {
 
   function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault();
+    setIsConfirmOpen(true);
+  }
+
+  function handleConfirm() {
     const now = new Date();
     const start = form.startDate ? new Date(form.startDate) : now;
     const resolvedStatus: ContestStatus = start > now ? 'SCHEDULED' : 'ONGOING';
@@ -180,7 +187,7 @@ export function AdminContestManagePage() {
     );
     setEditingId(null);
     setForm({ ...EMPTY_FORM });
-    setIsFormOpen(false);
+    setIsConfirmOpen(false);
   }
 
   const isFormValid =
@@ -195,8 +202,11 @@ export function AdminContestManagePage() {
     setIsFormOpen(false);
   }
 
+  const handleNewContestRef = useRef(handleNewContest);
+  handleNewContestRef.current = handleNewContest;
+
   useAdminPageActions(
-    <Button variant="brand" onClick={handleNewContest}>
+    <Button variant="brand" onClick={() => handleNewContestRef.current()} className="cursor-pointer">
       <Plus size={16} className="mr-1.5" />
       새 대회 생성
     </Button>
@@ -204,6 +214,46 @@ export function AdminContestManagePage() {
 
   return (
     <>
+      {/* 생성/수정 확인 모달 */}
+      {isConfirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+          onClick={() => setIsConfirmOpen(false)}
+        >
+          <div
+            className="w-96 rounded-lg bg-white p-6 shadow-xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <h3 className="mb-4 text-base font-bold text-slate-900">
+              {editingId ? '대회 수정 확인' : '대회 생성 확인'}
+            </h3>
+            <div className="mb-5 space-y-2.5 rounded-md bg-slate-50 p-4 text-sm">
+              {[
+                { label: '대회명',    value: form.name },
+                { label: '종목',      value: form.category === '전체' ? '전체 종목' : form.category },
+                { label: '기간',      value: `${toDisplayDate(form.startDate)} ~ ${toDisplayDate(form.endDate)}` },
+                { label: '시드머니',  value: `${Number(form.seedMoney).toLocaleString('ko-KR')}만원` },
+                { label: '최대 인원', value: form.maxParticipants ? `${form.maxParticipants}명` : '무제한' },
+                { label: '수익 기준', value: form.profitStandard },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex gap-2">
+                  <span className="w-20 shrink-0 text-slate-500">{label}</span>
+                  <span className="font-medium text-slate-900">{value}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="brand" onClick={handleConfirm} className="cursor-pointer">
+                {editingId ? '수정' : '생성'}
+              </Button>
+              <Button variant="secondary" onClick={() => setIsConfirmOpen(false)} className="cursor-pointer">
+                취소
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 요약 카드 */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="py-6">
@@ -224,9 +274,9 @@ export function AdminContestManagePage() {
         </Card>
       </div>
 
-      <div className={`grid gap-6 ${isFormOpen ? 'lg:grid-cols-5' : ''}`}>
-        <div className={isFormOpen ? 'lg:col-span-3' : ''}>
-          <Card className="p-0">
+      <div className={`grid gap-6 ${isFormOpen ? 'items-stretch lg:grid-cols-5' : ''}`}>
+        <div className={isFormOpen ? 'flex flex-col lg:col-span-3' : ''}>
+          <Card className={`flex flex-col p-0 ${isFormOpen ? 'flex-1' : ''}`}>
             {/* 탭 필터 */}
             <div className="border-b border-slate-200 px-4 pt-4">
               <div className="flex gap-1">
@@ -248,7 +298,17 @@ export function AdminContestManagePage() {
 
             {/* 테이블 */}
             <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
+              <table className="w-full min-w-160 table-fixed text-sm">
+                <colgroup>
+                  <col className="w-44" />
+                  <col className="w-16" />
+                  <col className="w-26" />
+                  <col className="w-22" />
+                  <col className="w-24" />
+                  <col className="w-20" />
+                  <col className="w-22" />
+                  <col className="w-20" />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-500">
                     <th className="whitespace-nowrap px-3 py-3 text-center font-medium">대회명</th>
@@ -262,14 +322,14 @@ export function AdminContestManagePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {paginated.length === 0 ? (
+                  {paginated.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-sm text-slate-400">
+                      <td colSpan={8} className="px-3 py-3 text-center text-sm text-slate-400">
                         대회가 없습니다.
                       </td>
                     </tr>
-                  ) : (
-                    paginated.map(contest => {
+                  )}
+                  {paginated.map(contest => {
                       const remaining = contest.maxParticipants
                         ? (contest.maxParticipants - contest.participants) / contest.maxParticipants
                         : null;
@@ -281,7 +341,7 @@ export function AdminContestManagePage() {
 
                       return (
                         <tr key={contest.id} className="hover:bg-slate-50">
-                          <td className="whitespace-nowrap px-3 py-3 text-center font-medium text-slate-900">
+                          <td className="truncate px-3 py-3 text-center font-medium text-slate-900" title={contest.name}>
                             <Link
                               to={`/admin/contests/${contest.id}`}
                               className="hover:text-[#1565C0] hover:underline"
@@ -313,25 +373,31 @@ export function AdminContestManagePage() {
                             {contest.profitStandard}
                           </td>
                           <td className="px-3 py-3">
-                            <div className="flex justify-center">
+                            <div className="flex justify-center whitespace-nowrap">
                               <StatusBadge status={contest.status} />
                             </div>
                           </td>
                         </tr>
                       );
-                    })
-                  )}
+                    })}
+                  {Array.from({ length: ghostCount }).map((_, i) => (
+                    <tr key={`ghost-${i}`}>
+                      <td colSpan={8} className="px-3 py-3">
+                        <span className="invisible select-none text-sm leading-5">x</span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
 
             {/* 페이지네이션 */}
-            <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
-              <span>총 {filtered.length}건</span>
+            <div className="flex items-center border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
+              <span className="flex-1">총 {filtered.length}건</span>
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
+                  disabled={safePage === 1}
                   className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <ChevronLeft size={16} />
@@ -341,7 +407,7 @@ export function AdminContestManagePage() {
                     key={page}
                     onClick={() => setCurrentPage(page)}
                     className={`cursor-pointer min-w-7 rounded px-2 py-1 text-sm font-medium ${
-                      currentPage === page
+                      safePage === page
                         ? 'bg-[#1565C0] text-white'
                         : 'text-slate-600 hover:bg-slate-100'
                     }`}
@@ -351,20 +417,21 @@ export function AdminContestManagePage() {
                 ))}
                 <button
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
+                  disabled={safePage === totalPages}
                   className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   <ChevronRight size={16} />
                 </button>
               </div>
+              <div className="flex-1" />
             </div>
           </Card>
         </div>
 
         {/* 새 대회 생성 / 수정 폼 */}
         {isFormOpen && (
-          <div className="lg:col-span-2">
-            <Card>
+          <div className="flex flex-col lg:col-span-2">
+            <Card className="flex-1">
               <h2 className="mb-4 text-base font-semibold text-slate-900">
                 {editingId ? '대회 수정' : '새 대회 생성'}
               </h2>
