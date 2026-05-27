@@ -19,6 +19,7 @@ import { AdminRankingPage } from '../pages/admin/contests/AdminRankingPage';
 
 // admin - contents
 import { AdminNoticeManagePage } from '../pages/admin/contents/AdminNoticeManagePage';
+import { AdminNoticeDetailPage } from '../pages/admin/contents/AdminNoticeDetailPage';
 
 // admin - system
 import { AdminMonitoringPage } from '../pages/admin/system/AdminMonitoringPage';
@@ -96,6 +97,7 @@ export const router = createBrowserRouter([
       { path: 'contests/:contestId', element: <AdminContestDetailPage /> },
       { path: 'rankings', element: <AdminRankingPage /> },
       { path: 'notices', element: <AdminNoticeManagePage /> },
+      { path: 'notices/:noticeId', element: <AdminNoticeDetailPage /> },
       { path: 'monitoring', element: <AdminMonitoringPage /> },
       { path: 'audit-log', element: <AdminAuditLogPage /> },
       { path: 'system', element: <AdminSystemManagePage /> },

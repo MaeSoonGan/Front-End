@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Pin, Search, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
 import { PageHeader } from '../../../components/common/PageHeader';
@@ -98,6 +99,7 @@ function StatusBadge({ status }: { status: NoticeStatus }) {
 }
 
 export function AdminNoticeManagePage() {
+  const navigate = useNavigate();
   const [searchInput, setSearchInput]     = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [activeTab, setActiveTab]         = useState<TabFilter>('ALL');
@@ -388,7 +390,14 @@ export function AdminNoticeManagePage() {
                             <Pin size={14} className="mx-auto text-rose-500" />
                           )}
                         </td>
-                        <td className="px-2 py-3 text-center font-medium text-slate-900">{notice.title}</td>
+                        <td className="px-2 py-3 text-center font-medium text-slate-900">
+                          <button
+                            onClick={() => navigate(`/admin/notices/${notice.id}`)}
+                            className="cursor-pointer text-left hover:text-[#1565C0] hover:underline"
+                          >
+                            {notice.title}
+                          </button>
+                        </td>
                         <td className="px-2 py-3">
                           <div className="flex justify-center">
                             <StatusBadge status={notice.status} />
