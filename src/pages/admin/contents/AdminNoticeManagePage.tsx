@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Pin, Search, Plus, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
@@ -108,6 +109,7 @@ function SortIcon({ dir }: { dir: SortDir }) {
 }
 
 export function AdminNoticeManagePage() {
+  const navigate = useNavigate();
   const [searchInput, setSearchInput]     = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [activeTab, setActiveTab]         = useState<TabFilter>('ALL');
@@ -250,7 +252,9 @@ export function AdminNoticeManagePage() {
   }, [form.startDate, form.endDate]);
 
   const handleNewNoticeRef = useRef(handleNewNotice);
-  handleNewNoticeRef.current = handleNewNotice;
+  useEffect(() => {
+    handleNewNoticeRef.current = handleNewNotice;
+  });
 
   useAdminPageActions(
     <Button variant="brand" onClick={() => handleNewNoticeRef.current()} className="cursor-pointer">
@@ -376,7 +380,14 @@ export function AdminNoticeManagePage() {
                       <td className="px-3 py-3 text-center">
                         {notice.isPinned && <Pin size={14} className="mx-auto text-rose-500" />}
                       </td>
-                      <td className="truncate px-3 py-3 text-center font-medium text-slate-900" title={notice.title}>{notice.title}</td>
+                      <td className="truncate px-3 py-3 text-center font-medium text-slate-900" title={notice.title}>
+                        <button
+                          onClick={() => navigate(`/admin/notices/${notice.id}`)}
+                          className="cursor-pointer hover:text-[#1565C0] hover:underline"
+                        >
+                          {notice.title}
+                        </button>
+                      </td>
                       <td className="px-3 py-3">
                         <div className="flex justify-center">
                           <StatusBadge status={notice.status} />
