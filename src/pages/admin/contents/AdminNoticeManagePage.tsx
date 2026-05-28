@@ -437,8 +437,7 @@ export function AdminNoticeManagePage() {
             <div className="flex-1" />
 
             {/* 페이지네이션 */}
-            <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
-              <span>총 {filtered.length}건</span>
+            <div className="flex items-center justify-center border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -476,7 +475,7 @@ export function AdminNoticeManagePage() {
         {isFormOpen && (
           <div className="flex flex-col lg:col-span-2">
             <Card className="flex-1">
-              <h2 className="mb-4 text-base font-semibold text-slate-900">공지 등록 / 수정</h2>
+              <h2 className="mb-4 text-base font-semibold text-slate-900">{editingId ? '공지 수정' : '공지 등록'}</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
                 {/* 제목 */}
                 <div>
