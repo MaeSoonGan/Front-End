@@ -24,6 +24,7 @@ import { AdminNoticeDetailPage } from '../pages/admin/contents/AdminNoticeDetail
 // admin - system
 import { AdminMonitoringPage } from '../pages/admin/system/AdminMonitoringPage';
 import { AdminAuditLogPage } from '../pages/admin/system/AdminAuditLogPage';
+import { AdminAuditLogDetailPage } from '../pages/admin/system/AdminAuditLogDetailPage';
 import { AdminSystemManagePage } from '../pages/admin/system/AdminSystemManagePage';
 
 // auth
@@ -117,6 +118,7 @@ export const router = createBrowserRouter([
       { path: 'notices/:noticeId', element: <AdminNoticeDetailPage /> },
       { path: 'monitoring', element: <AdminMonitoringPage /> },
       { path: 'audit-log', element: <AdminAuditLogPage /> },
+      { path: 'audit-log/:logId', element: <AdminAuditLogDetailPage /> },
       { path: 'system', element: <AdminSystemManagePage /> },
     ],
   },
