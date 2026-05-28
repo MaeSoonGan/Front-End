@@ -178,7 +178,7 @@ export function AdminRankingPage() {
       <HeaderRefreshTime initial={LAST_REFRESH_TIME} />
       <Button variant="secondary" className="h-9 gap-1.5 text-sm">
         <Download size={14} />
-        랭킹 CSV 내보내기
+        CSV 내보내기
       </Button>
       <Button variant="brand" className="h-9 gap-1.5 text-sm" onClick={() => handleRefreshRef.current()}>
         <RefreshCw size={14} />

@@ -393,10 +393,7 @@ export function AdminSuspensionPage() {
             </div>
 
             {/* 페이지네이션 */}
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-xs text-slate-500">
-                {filtered.length > 0 ? `${startIdx}-${endIdx} / 총 ${filtered.length}건` : '0건'}
-              </p>
+            <div className="mt-4 flex items-center justify-center">
               <div className="flex items-center gap-1">
                 <button
                   disabled={safePage === 1}

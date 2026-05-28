@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Download, ChevronLeft, ChevronRight, AlertTriangle, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
+import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 
 type PaymentType = '이벤트 당첨' | '보상' | '상금' | '기타';
 type SortField = 'amount' | 'paidAt' | null;
@@ -81,6 +82,13 @@ function SortIcon({ field, currentField, dir }: { field: SortField; currentField
 }
 
 export function AdminSeedMoneyPage() {
+  useAdminPageActions(
+    <Button variant="secondary" className="h-9 gap-1.5 text-sm" onClick={() => {/* GET /api/admin/seed-money/export */}}>
+      <Download size={14} />
+      CSV 내보내기
+    </Button>
+  );
+
   const [payments, setPayments] = useState<PaymentRecord[]>(MOCK_PAYMENTS);
   const [memberQuery, setMemberQuery] = useState('');
   const [foundMember, setFoundMember] = useState<MemberSearchResult | null>(null);
@@ -251,13 +259,6 @@ export function AdminSeedMoneyPage() {
           <Card className="flex flex-1 flex-col">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-900">최근 지급 이력</h2>
-              <button
-                onClick={() => {/* GET /api/admin/seed-money/export */}}
-                className="flex cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-              >
-                <Download size={13} />
-                내보내기
-              </button>
             </div>
 
             <div className="flex-1 overflow-x-auto overflow-y-hidden">
@@ -306,8 +307,7 @@ export function AdminSeedMoneyPage() {
             </div>
 
             {/* 페이지네이션 */}
-            <div className="mt-4 flex items-center justify-between">
-              <p className="text-xs text-slate-500">총 {sortedPayments.length}건</p>
+            <div className="mt-4 flex items-center justify-center">
               <div className="flex items-center gap-1">
                 <button
                   disabled={safePage === 1}
