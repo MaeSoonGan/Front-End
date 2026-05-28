@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Download, ChevronLeft, ChevronRight, AlertTriangle, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
+import { membersApi } from '../../../api/admin/members';
 
 type PaymentType = '이벤트 당첨' | '보상' | '상금' | '기타';
 type SortField = 'amount' | 'paidAt' | null;
@@ -27,31 +28,12 @@ interface PaymentRecord {
   paidAt: string;
 }
 
-const MOCK_MEMBER: MemberSearchResult = {
-  id: 'm1',
-  nickname: '홍길동',
-  accountId: 'user001',
-  email: 'hong**@naver.com',
-  status: '활성',
-  balance: 11245320,
-};
-
-// GET /api/admin/seed-money/history
-const MOCK_PAYMENTS: PaymentRecord[] = [
-  { id: 'p1', recipientNickname: '홍길동', amount: 1000000, type: '이벤트 당첨', reason: '이벤트 당첨', adminName: 'admin01', paidAt: '25.05.07 11:15' },
-  { id: 'p2', recipientNickname: '김철수', amount: 500000, type: '보상', reason: '서비스 오류 보상', adminName: 'admin02', paidAt: '25.05.03 14:22' },
-  { id: 'p3', recipientNickname: '최수진', amount: 2000000, type: '상금', reason: '4월 대회 우승 상금', adminName: 'admin01', paidAt: '25.04.30 17:00' },
-  { id: 'p4', recipientNickname: '박민준', amount: 500000, type: '보상', reason: '주문 오류 보상', adminName: 'admin01', paidAt: '25.04.20 10:30' },
-  { id: 'p5', recipientNickname: '정재현', amount: 1500000, type: '이벤트 당첨', reason: '신규 이벤트 당첨', adminName: 'admin02', paidAt: '25.04.15 09:00' },
-];
-
-const SUMMARY_STATS = {
-  thisMonthCount: 8,
-  thisMonthTotal: 14500000,
-  todayCount: 2,
-  todayTotal: 1500000,
-  autoResetToday: 34,
-};
+function isoToPaidAt(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 const PAGE_SIZE = 8;
 
@@ -82,26 +64,69 @@ function SortIcon({ field, currentField, dir }: { field: SortField; currentField
 }
 
 export function AdminSeedMoneyPage() {
+  const [payments, setPayments]   = useState<PaymentRecord[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [summary, setSummary]     = useState({ thisMonthCount: 0, thisMonthTotal: 0, todayCount: 0, todayTotal: 0, autoResetToday: 0 });
+  const [memberQuery, setMemberQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<MemberSearchResult[]>([]);
+  const [foundMember, setFoundMember] = useState<MemberSearchResult | null>(null);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const [amount, setAmount]         = useState('');
+  const [paymentType, setPaymentType] = useState<PaymentType>('이벤트 당첨');
+  const [reason, setReason]         = useState('');
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField]   = useState<SortField>(null);
+  const [sortDir, setSortDir]       = useState<SortDir>(null);
+
+  const fetchPayments = useCallback(async () => {
+    try {
+      const data = await membersApi.getSeedPayments({ page: currentPage - 1, size: PAGE_SIZE });
+      setPayments(
+        (data.content ?? []).map((p: any) => ({
+          id:                String(p.seedHistoryId),
+          recipientNickname: p.nickname ?? '',
+          amount:            p.amount ?? 0,
+          type:              '기타' as PaymentType,
+          reason:            p.reason ?? '',
+          adminName:         p.adminName ?? '',
+          paidAt:            isoToPaidAt(p.createdAt),
+        }))
+      );
+      setTotalPages(data.totalPages ?? 1);
+    } catch (e) { console.error(e); }
+  }, [currentPage]);
+
+  useEffect(() => { fetchPayments(); }, [fetchPayments]);
+
+  useEffect(() => {
+    membersApi.getSeedPaymentSummary()
+      .then(data => setSummary({
+        thisMonthCount: data.totalPaymentCount ?? 0,
+        thisMonthTotal: data.totalPaymentAmount ?? 0,
+        todayCount:     data.todayPaymentCount ?? 0,
+        todayTotal:     data.todayPaymentAmount ?? 0,
+        autoResetToday: 0,
+      }))
+      .catch(console.error);
+  }, []);
+
+  async function handleCsvExport() {
+    try {
+      const blob = await membersApi.exportSeedPayments();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'seed-payments.csv'; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { console.error(e); }
+  }
+
   useAdminPageActions(
-    <Button variant="secondary" className="h-9 gap-1.5 text-sm" onClick={() => {/* GET /api/admin/seed-money/export */}}>
+    <Button variant="secondary" className="h-9 gap-1.5 text-sm" onClick={handleCsvExport}>
       <Download size={14} />
       CSV 내보내기
     </Button>
   );
-
-  const [payments, setPayments] = useState<PaymentRecord[]>(MOCK_PAYMENTS);
-  const [memberQuery, setMemberQuery] = useState('');
-  const [foundMember, setFoundMember] = useState<MemberSearchResult | null>(null);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-
-  const [amount, setAmount] = useState('');
-  const [paymentType, setPaymentType] = useState<PaymentType>('이벤트 당첨');
-  const [reason, setReason] = useState('');
-
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortField, setSortField] = useState<SortField>(null);
-  const [sortDir, setSortDir] = useState<SortDir>(null);
 
   const actualAmount = amount ? Number(amount) * 10000 : 0;
 
@@ -115,29 +140,31 @@ export function AdminSeedMoneyPage() {
     });
   }, [payments, sortField, sortDir]);
 
-  const totalPages = Math.max(1, Math.ceil(sortedPayments.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
-  const paginated = sortedPayments.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const paginated = sortedPayments;
 
   function handleSort(field: SortField) {
-    if (sortField !== field) {
-      setSortField(field);
-      setSortDir('asc');
-    } else if (sortDir === 'asc') {
-      setSortDir('desc');
-    } else {
-      setSortField(null);
-      setSortDir(null);
-    }
+    if (sortField !== field) { setSortField(field); setSortDir('asc'); }
+    else if (sortDir === 'asc') { setSortDir('desc'); }
+    else { setSortField(null); setSortDir(null); }
     setCurrentPage(1);
   }
 
-  function handleMemberSearch() {
-    // GET /api/admin/members/search?q={memberQuery}
-    if (memberQuery.trim()) {
-      setFoundMember(MOCK_MEMBER);
-      setDropdownOpen(true);
-    }
+  async function handleMemberSearch() {
+    if (!memberQuery.trim()) return;
+    try {
+      const data = await membersApi.searchMembers({ keyword: memberQuery, limit: 5 });
+      const results: MemberSearchResult[] = (data ?? []).map((m: any) => ({
+        id:       String(m.memberId),
+        nickname: m.nickname ?? '',
+        accountId: m.accountId ?? '',
+        email:    m.email ?? '',
+        status:   m.status === 'ACTIVE' ? '활성' : '정지',
+        balance:  0,
+      }));
+      setSearchResults(results);
+      setDropdownOpen(results.length > 0);
+    } catch (e) { console.error(e); }
   }
 
   function handleMemberSelect(member: MemberSearchResult) {
@@ -155,29 +182,25 @@ export function AdminSeedMoneyPage() {
     setIsConfirmOpen(true);
   }
 
-  function handleConfirm() {
-    // POST /api/admin/seed-money
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const paidAt = `${String(now.getFullYear()).slice(2)}.${pad(now.getMonth() + 1)}.${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-    const newRecord: PaymentRecord = {
-      id: `p-${Date.now()}`,
-      recipientNickname: foundMember!.nickname,
-      amount: actualAmount,
-      type: paymentType,
-      reason,
-      adminName: 'admin',
-      paidAt,
-    };
-    setPayments(prev => [newRecord, ...prev]);
-    setCurrentPage(1);
-    setIsConfirmOpen(false);
-    handleReset();
+  async function handleConfirm() {
+    if (!foundMember) return;
+    try {
+      await membersApi.paySeedMoney({
+        memberIds: [Number(foundMember.id)],
+        contestId: 0,
+        amount:    actualAmount,
+        reason,
+      });
+      setIsConfirmOpen(false);
+      handleReset();
+      fetchPayments();
+    } catch (e) { console.error(e); }
   }
 
   function handleReset() {
     setMemberQuery('');
     setFoundMember(null);
+    setSearchResults([]);
     setDropdownOpen(false);
     setAmount('');
     setPaymentType('이벤트 당첨');
@@ -236,18 +259,18 @@ export function AdminSeedMoneyPage() {
       {/* 요약 카드 */}
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card>
-          <p className="text-sm text-slate-500">이번 달 총 지급</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{SUMMARY_STATS.thisMonthCount}건</p>
-          <p className="mt-0.5 text-xs text-slate-400">총 {(SUMMARY_STATS.thisMonthTotal / 10000).toLocaleString('ko-KR')}만원</p>
+          <p className="text-sm text-slate-500">전체 총 지급</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{summary.thisMonthCount}건</p>
+          <p className="mt-0.5 text-xs text-slate-400">총 {(summary.thisMonthTotal / 10000).toLocaleString('ko-KR')}만원</p>
         </Card>
         <Card>
           <p className="text-sm text-slate-500">오늘 지급</p>
-          <p className="mt-1 text-2xl font-bold text-[#1565C0]">{SUMMARY_STATS.todayCount}건</p>
-          <p className="mt-0.5 text-xs text-slate-400">총 {(SUMMARY_STATS.todayTotal / 10000).toLocaleString('ko-KR')}만원</p>
+          <p className="mt-1 text-2xl font-bold text-[#1565C0]">{summary.todayCount}건</p>
+          <p className="mt-0.5 text-xs text-slate-400">총 {(summary.todayTotal / 10000).toLocaleString('ko-KR')}만원</p>
         </Card>
         <Card>
           <p className="text-sm text-slate-500">자동 초기화 건수 (오늘)</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{SUMMARY_STATS.autoResetToday}건</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{summary.autoResetToday}건</p>
           <p className="mt-0.5 text-xs text-slate-400">회원 자동 초기화</p>
         </Card>
       </div>
@@ -373,27 +396,20 @@ export function AdminSeedMoneyPage() {
                   </div>
 
                   {/* 검색 결과 — absolute 드롭다운 */}
-                  {foundMember && dropdownOpen && (
-                    <div
-                      className="absolute left-0 right-0 top-full z-20 mt-1 flex cursor-pointer items-center justify-between rounded-md border border-slate-200 bg-white px-4 py-3 shadow-md hover:border-[#1565C0] hover:bg-[#E8F0FE]"
-                      onClick={() => handleMemberSelect(foundMember)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-8 items-center justify-center rounded-full bg-[#1565C0] text-sm font-bold text-white">
-                          {foundMember.nickname[0]}
+                  {dropdownOpen && searchResults.length > 0 && (
+                    <div className="absolute left-0 right-0 top-full z-20 mt-1 rounded-md border border-slate-200 bg-white shadow-md">
+                      {searchResults.map(m => (
+                        <div key={m.id} className="flex cursor-pointer items-center justify-between px-4 py-3 hover:border-[#1565C0] hover:bg-[#E8F0FE]" onClick={() => handleMemberSelect(m)}>
+                          <div className="flex items-center gap-3">
+                            <div className="flex size-8 items-center justify-center rounded-full bg-[#1565C0] text-sm font-bold text-white">{m.nickname[0]}</div>
+                            <div>
+                              <p className="text-sm font-semibold text-slate-900">{m.nickname} ({m.accountId})</p>
+                              <p className="text-xs text-slate-400">{m.email}</p>
+                            </div>
+                          </div>
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${m.status === '활성' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>{m.status}</span>
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {foundMember.nickname} ({foundMember.accountId})
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            {foundMember.email} · 현재 잔고 {(foundMember.balance / 10000).toLocaleString('ko-KR')}만원
-                          </p>
-                        </div>
-                      </div>
-                      <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-600">
-                        {foundMember.status}
-                      </span>
+                      ))}
                     </div>
                   )}
                 </div>

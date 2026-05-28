@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 import { useAlertCount } from '../../../contexts/AlertCountContext';
+import { systemApi } from '../../../api/admin/system';
+import { membersApi } from '../../../api/admin/members';
 
 type ServiceStatus = 'NORMAL' | 'STANDBY' | 'ERROR' | 'WARNING';
 
@@ -22,72 +24,6 @@ interface ServiceItem {
   badge?: string;
 }
 
-// GET /api/admin/orders/today
-const STATS = {
-  todayOrders:    4821,
-  settledOrders:  3214,
-  activeUsers:    142,
-};
-
-// GET /api/admin/monitoring/alerts
-const MOCK_ALERTS: Alert[] = [
-  {
-    id: 'a1',
-    type: '대량 주문 탐지',
-    memberName: '이영희',
-    memberId: 'user003',
-    detail: '3분 내 50건 주문 / 일계치 30건 초과 / 25.05.08 14:28',
-  },
-  {
-    id: 'a2',
-    type: '중복 주문 탐지',
-    memberName: '박민준',
-    memberId: 'user004',
-    detail: '동일 종목 동일가 5회 반복 / 25.05.08 13:55',
-  },
-  {
-    id: 'a3',
-    type: '비정상 수익률 탐지',
-    memberName: '최수상',
-    memberId: 'user011',
-    detail: '단일 거래 수익률 480% 초과 / 상한가 연속 매매 의심 / 25.05.08 13:40',
-  },
-  {
-    id: 'a4',
-    type: '대량 주문 탐지',
-    memberName: '김봇넷',
-    memberId: 'user022',
-    detail: '5분 내 120건 주문 / API 자동매매 의심 / 25.05.08 13:12',
-  },
-  {
-    id: 'a5',
-    type: '동시다발 로그인 탐지',
-    memberName: '정해킹',
-    memberId: 'user031',
-    detail: '상이한 IP 3곳에서 동시 접속 / 계정 탈취 의심 / 25.05.08 12:58',
-  },
-  {
-    id: 'a6',
-    type: '중복 주문 탐지',
-    memberName: '오반복',
-    memberId: 'user045',
-    detail: '삼성전자 65,400원 동일가 8회 반복 / 25.05.08 12:34',
-  },
-  {
-    id: 'a7',
-    type: '비정상 수익률 탐지',
-    memberName: '한이상',
-    memberId: 'user057',
-    detail: '30분 내 수익률 +230% / 선취매 의심 / 25.05.08 11:50',
-  },
-  {
-    id: 'a8',
-    type: '대량 주문 탐지',
-    memberName: '임테스터',
-    memberId: 'user062',
-    detail: '2분 내 80건 주문 / 체결 엔진 부하 유발 / 25.05.08 11:22',
-  },
-];
 
 // GET /api/admin/monitoring/services
 const SERVICES: ServiceItem[] = [
@@ -125,27 +61,60 @@ const BADGE_LABEL: Record<ServiceStatus, string> = {
 
 export function AdminMonitoringPage() {
   const { setAlertCount } = useAlertCount();
-  const [alerts, setAlerts]               = useState<Alert[]>(MOCK_ALERTS);
+  const [alerts, setAlerts]               = useState<Alert[]>([]);
+  const [stats, setStats]                 = useState({ todayOrders: 0, settledOrders: 0, activeUsers: 0 });
   const [maintenanceOn, setMaintenanceOn] = useState(false);
   const [confirmModal, setConfirmModal]   = useState<'on' | 'off' | null>(null);
-  const [alertConfirm, setAlertConfirm]   = useState<{ id: string; action: 'cancel' | 'suspend' | 'dismiss' } | null>(null);
+  const [alertConfirm, setAlertConfirm]   = useState<{ id: string; action: 'cancel' | 'suspend' | 'dismiss'; memberId: string } | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [monitoring, maintenance] = await Promise.all([
+        systemApi.getMonitoring(),
+        systemApi.getMaintenance(),
+      ]);
+      setStats({
+        todayOrders:   monitoring.todayOrders ?? 0,
+        settledOrders: monitoring.todayCompletedOrders ?? 0,
+        activeUsers:   monitoring.activeUsers ?? 0,
+      });
+      setAlerts(
+        (monitoring.alerts ?? []).map((a: any) => ({
+          id:         String(a.alertId),
+          type:       a.type ?? '',
+          memberName: a.memberName ?? '',
+          memberId:   String(a.memberId ?? ''),
+          detail:     a.content ?? '',
+        }))
+      );
+      setMaintenanceOn(maintenance.enabled ?? false);
+    } catch (e) { console.error(e); }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
     setAlertCount(alerts.length);
   }, [alerts, setAlertCount]);
 
-  function handleDismiss(id: string) {
-    setAlerts(prev => prev.filter(a => a.id !== id));
+  async function handleDismiss(id: string) {
+    try {
+      await systemApi.ignoreAlert(Number(id));
+      setAlerts(prev => prev.filter(a => a.id !== id));
+    } catch (e) {
+      setAlerts(prev => prev.filter(a => a.id !== id));
+    }
   }
 
   function handleCancelOrder(id: string) {
-    // POST /api/admin/orders/{orderId}/cancel
     setAlerts(prev => prev.filter(a => a.id !== id));
   }
 
-  function handleSuspend(id: string) {
-    // POST /api/admin/members/{memberId}/suspend
-    setAlerts(prev => prev.filter(a => a.id !== id));
+  async function handleSuspend(id: string, memberId: string) {
+    try {
+      await membersApi.suspendMembers({ memberIds: [Number(memberId)], reason: '비정상 탐지 — 즉시 정지' });
+      setAlerts(prev => prev.filter(a => a.id !== id));
+    } catch (e) { console.error(e); }
   }
 
   useAdminPageActions(
@@ -154,7 +123,7 @@ export function AdminMonitoringPage() {
         <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
         시스템 정상 운영 중
       </span>
-      <Button variant="secondary" className="h-9 gap-1.5 text-sm">
+      <Button variant="secondary" className="h-9 gap-1.5 text-sm" onClick={() => fetchData()}>
         <RefreshCw size={14} />
         새로고침
       </Button>
@@ -168,18 +137,14 @@ export function AdminMonitoringPage() {
         {/* 오늘 주문 */}
         <Card>
           <p className="text-xs font-medium text-slate-500">오늘 주문</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
-            {STATS.todayOrders.toLocaleString('ko-KR')}건
-          </p>
-          <p className="mt-1 text-xs text-slate-400">체결 {STATS.settledOrders.toLocaleString('ko-KR')}건</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{stats.todayOrders.toLocaleString('ko-KR')}건</p>
+          <p className="mt-1 text-xs text-slate-400">체결 {stats.settledOrders.toLocaleString('ko-KR')}건</p>
         </Card>
 
         {/* 현재 접속자 */}
         <Card>
           <p className="text-xs font-medium text-slate-500">현재 접속자</p>
-          <p className="mt-2 text-2xl font-bold text-[#1565C0]">
-            {STATS.activeUsers}명
-          </p>
+          <p className="mt-2 text-2xl font-bold text-[#1565C0]">{stats.activeUsers}명</p>
         </Card>
 
         {/* 비정상 탐지 */}
@@ -233,24 +198,9 @@ export function AdminMonitoringPage() {
                         <p className="mt-0.5 text-xs text-slate-500">{alert.detail}</p>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
-                        <button
-                          onClick={() => setAlertConfirm({ id: alert.id, action: 'cancel' })}
-                          className="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        >
-                          주문취소
-                        </button>
-                        <button
-                          onClick={() => setAlertConfirm({ id: alert.id, action: 'suspend' })}
-                          className="cursor-pointer rounded border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
-                        >
-                          계정정지
-                        </button>
-                        <button
-                          onClick={() => setAlertConfirm({ id: alert.id, action: 'dismiss' })}
-                          className="cursor-pointer rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-slate-50"
-                        >
-                          무시
-                        </button>
+                        <button onClick={() => setAlertConfirm({ id: alert.id, action: 'cancel', memberId: alert.memberId })} className="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">주문취소</button>
+                        <button onClick={() => setAlertConfirm({ id: alert.id, action: 'suspend', memberId: alert.memberId })} className="cursor-pointer rounded border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50">계정정지</button>
+                        <button onClick={() => setAlertConfirm({ id: alert.id, action: 'dismiss', memberId: alert.memberId })} className="cursor-pointer rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-slate-50">무시</button>
                       </div>
                     </div>
                   ))}
@@ -347,10 +297,10 @@ export function AdminMonitoringPage() {
         };
         const meta = ACTION_META[alertConfirm.action];
 
-        function handleConfirm() {
+        async function handleConfirm() {
           if (alertConfirm!.action === 'cancel')  handleCancelOrder(alertConfirm!.id);
-          if (alertConfirm!.action === 'suspend') handleSuspend(alertConfirm!.id);
-          if (alertConfirm!.action === 'dismiss') handleDismiss(alertConfirm!.id);
+          if (alertConfirm!.action === 'suspend') await handleSuspend(alertConfirm!.id, alertConfirm!.memberId);
+          if (alertConfirm!.action === 'dismiss') await handleDismiss(alertConfirm!.id);
           setAlertConfirm(null);
         }
 
@@ -398,8 +348,14 @@ export function AdminMonitoringPage() {
               </Button>
               <Button
                 variant={confirmModal === 'on' ? 'danger' : 'brand'}
-                onClick={() => {
-                  setMaintenanceOn(confirmModal === 'on');
+                onClick={async () => {
+                  const turnOn = confirmModal === 'on';
+                  try {
+                    await systemApi.updateMaintenance({ status: turnOn ? 'ON' : 'OFF' });
+                    setMaintenanceOn(turnOn);
+                  } catch (e) {
+                    console.error(e);
+                  }
                   setConfirmModal(null);
                 }}
               >

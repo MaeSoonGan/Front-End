@@ -1,9 +1,10 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Card } from '../../../components/common/Card';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
+import { contestsApi } from '../../../api/admin/contests';
 
 type ContestStatus = 'ONGOING' | 'CLOSING_SOON' | 'SCHEDULED' | 'ENDED';
 type TabFilter = 'ALL' | 'ONGOING' | 'SCHEDULED' | 'ENDED';
@@ -37,28 +38,6 @@ interface FormState {
   allowShortSelling: boolean;
 }
 
-const MOCK_CONTESTS: Contest[] = [
-  { id: 'c1',  name: '5월 정기 대회',  category: '전체',   startDate: '05.01', endDate: '05.31', seedMoney: 10000000, maxParticipants: null, participants: 234, profitStandard: '수익률', status: 'ONGOING'     },
-  { id: 'c2',  name: '반도체 특별전',  category: '반도체', startDate: '05.05', endDate: '05.20', seedMoney:  5000000, maxParticipants: 100,  participants:  89, profitStandard: '수익률', status: 'CLOSING_SOON' },
-  { id: 'c3',  name: '6월 대회',       category: '전체',   startDate: '06.01', endDate: '06.30', seedMoney: 10000000, maxParticipants: null, participants:   0, profitStandard: '수익률', status: 'SCHEDULED'   },
-  { id: 'c4',  name: '4월 정기 대회',  category: '전체',   startDate: '04.01', endDate: '04.30', seedMoney: 10000000, maxParticipants: null, participants: 312, profitStandard: '수익률', status: 'ENDED'       },
-  { id: 'c5',  name: 'IT 섹터 챌린지', category: 'IT',     startDate: '03.01', endDate: '03.31', seedMoney:  8000000, maxParticipants:  50,  participants:  48, profitStandard: '금액',   status: 'ENDED'       },
-  { id: 'c6',  name: '3월 정기 대회',  category: '전체',   startDate: '03.01', endDate: '03.31', seedMoney: 10000000, maxParticipants: null, participants: 287, profitStandard: '수익률', status: 'ENDED'       },
-  { id: 'c7',  name: '바이오 챌린지',  category: '바이오', startDate: '02.15', endDate: '03.15', seedMoney:  5000000, maxParticipants:  80,  participants:  76, profitStandard: '수익률', status: 'ENDED'       },
-  { id: 'c8',  name: '2월 정기 대회',  category: '전체',   startDate: '02.01', endDate: '02.28', seedMoney: 10000000, maxParticipants: null, participants: 198, profitStandard: '수익률', status: 'ENDED'       },
-  { id: 'c9',  name: '금융 섹터전',    category: '금융',   startDate: '01.15', endDate: '02.15', seedMoney:  7000000, maxParticipants:  60,  participants:  55, profitStandard: '수익률', status: 'ENDED'       },
-  { id: 'c10', name: '1월 정기 대회',  category: '전체',   startDate: '01.01', endDate: '01.31', seedMoney: 10000000, maxParticipants: null, participants: 245, profitStandard: '수익률', status: 'ENDED'       },
-  { id: 'c11', name: '기타 챌린지',    category: '기타',   startDate: '12.01', endDate: '12.31', seedMoney:  3000000, maxParticipants:  30,  participants:  28, profitStandard: '금액',   status: 'ENDED'       },
-  { id: 'c12', name: '특별 이벤트',    category: '전체',   startDate: '11.01', endDate: '11.30', seedMoney:  5000000, maxParticipants: null, participants: 401, profitStandard: '수익률', status: 'ENDED'       },
-];
-
-const SUMMARY_STATS = {
-  total: 12,
-  ongoing: 2,
-  scheduled: 1,
-  totalParticipants: 323,
-};
-
 const STATUS_LABEL: Record<ContestStatus, string> = {
   ONGOING:      '진행중',
   CLOSING_SOON: '마감임박',
@@ -83,20 +62,31 @@ const TAB_LIST: { label: string; value: TabFilter }[] = [
 const CATEGORY_OPTIONS: ContestCategory[] = ['전체', '반도체', 'IT', '바이오', '금융', '기타'];
 
 const EMPTY_FORM: FormState = {
-  name: '',
-  category: '전체',
-  startDate: '',
-  endDate: '',
-  seedMoney: '',
-  maxParticipants: '',
-  profitStandard: '수익률',
-  description: '',
-  limitOrderAmount: false,
-  limitHoldingRatio: false,
-  allowShortSelling: false,
+  name: '', category: '전체', startDate: '', endDate: '',
+  seedMoney: '', maxParticipants: '', profitStandard: '수익률',
+  description: '', limitOrderAmount: false, limitHoldingRatio: false, allowShortSelling: false,
 };
 
 const PAGE_SIZE = 10;
+
+function toApiStatus(tab: TabFilter): string | undefined {
+  if (tab === 'ALL') return undefined;
+  if (tab === 'ONGOING') return 'ACTIVE';
+  return tab;
+}
+
+function toUiStatus(status: string): ContestStatus {
+  if (status === 'ACTIVE' || status === 'ONGOING') return 'ONGOING';
+  if (status === 'CLOSING_SOON') return 'CLOSING_SOON';
+  if (status === 'SCHEDULED') return 'SCHEDULED';
+  return 'ENDED';
+}
+
+function isoToDisplay(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function formatSeedMoney(amount: number): string {
   return `${(amount / 10000).toLocaleString('ko-KR')}만원`;
@@ -111,8 +101,8 @@ function toDisplayDate(d: string): string {
 
 function StatusBadge({ status }: { status: ContestStatus }) {
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASS[status]}`}>
-      {STATUS_LABEL[status]}
+    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_BADGE_CLASS[status] ?? 'bg-slate-100 text-slate-500'}`}>
+      {STATUS_LABEL[status] ?? status}
     </span>
   );
 }
@@ -120,26 +110,64 @@ function StatusBadge({ status }: { status: ContestStatus }) {
 export function AdminContestManagePage() {
   const [activeTab, setActiveTab]     = useState<TabFilter>('ALL');
   const [currentPage, setCurrentPage] = useState(1);
-  const [contests, setContests]       = useState<Contest[]>(MOCK_CONTESTS);
+  const [contests, setContests]       = useState<Contest[]>([]);
+  const [totalPages, setTotalPages]   = useState(1);
+  const [totalCount, setTotalCount]   = useState(0);
+  const [summary, setSummary]         = useState({ total: 0, ongoing: 0, scheduled: 0, totalParticipants: 0 });
+  const [loading, setLoading]         = useState(false);
 
-  const [isFormOpen, setIsFormOpen]     = useState(false);
-  const [editingId, setEditingId]       = useState<string | null>(null);
-  const [form, setForm]                 = useState<FormState>({ ...EMPTY_FORM });
+  const [isFormOpen, setIsFormOpen]       = useState(false);
+  const [editingId, setEditingId]         = useState<string | null>(null);
+  const [form, setForm]                   = useState<FormState>({ ...EMPTY_FORM });
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
-  const filtered = useMemo(() => {
-    return contests.filter(c => {
-      if (activeTab === 'ALL') return true;
-      if (activeTab === 'ONGOING') return c.status === 'ONGOING';
-      if (activeTab === 'SCHEDULED') return c.status === 'SCHEDULED' || c.status === 'CLOSING_SOON';
-      return c.status === activeTab;
-    });
-  }, [contests, activeTab]);
+  const fetchContests = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await contestsApi.getContests({
+        status: toApiStatus(activeTab),
+        page:   currentPage - 1,
+        size:   PAGE_SIZE,
+      });
+      setContests(
+        (data.content ?? []).map((c: any) => ({
+          id:             String(c.contestId),
+          name:           c.title ?? '',
+          category:       '전체' as ContestCategory,
+          startDate:      isoToDisplay(c.startAt),
+          endDate:        isoToDisplay(c.endAt),
+          seedMoney:      c.seedMoney ?? 0,
+          maxParticipants: c.maxParticipants ?? null,
+          participants:   c.participantCount ?? 0,
+          profitStandard: '수익률' as ProfitStandard,
+          status:         toUiStatus(c.status ?? ''),
+        }))
+      );
+      setTotalPages(data.totalPages ?? 1);
+      setTotalCount(data.totalElements ?? 0);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeTab, currentPage]);
 
-  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => { fetchContests(); }, [fetchContests]);
+
+  useEffect(() => {
+    contestsApi.getContestSummary()
+      .then(data => setSummary({
+        total:            data.totalContestCount ?? 0,
+        ongoing:          data.activeContestCount ?? 0,
+        scheduled:        data.scheduledContestCount ?? 0,
+        totalParticipants: data.totalParticipantCount ?? 0,
+      }))
+      .catch(console.error);
+  }, []);
+
+  const filtered    = contests;
   const safePage    = Math.min(currentPage, totalPages);
-  const paginated   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-  const ghostCount  = PAGE_SIZE - Math.max(paginated.length, paginated.length === 0 ? 1 : 0);
+  const ghostCount  = PAGE_SIZE - Math.max(filtered.length, filtered.length === 0 ? 1 : 0);
 
   function handleTabChange(tab: TabFilter) {
     setActiveTab(tab);
@@ -147,10 +175,7 @@ export function AdminContestManagePage() {
   }
 
   function handleNewContest() {
-    if (isFormOpen && editingId === null) {
-      setIsFormOpen(false);
-      return;
-    }
+    if (isFormOpen && editingId === null) { setIsFormOpen(false); return; }
     setEditingId(null);
     setForm({ ...EMPTY_FORM });
     setIsFormOpen(true);
@@ -161,40 +186,36 @@ export function AdminContestManagePage() {
     setIsConfirmOpen(true);
   }
 
-  function handleConfirm() {
-    const now = new Date();
-    const start = form.startDate ? new Date(form.startDate) : now;
-    const resolvedStatus: ContestStatus = start > now ? 'SCHEDULED' : 'ONGOING';
+  async function handleConfirm() {
+    try {
+      const payload = {
+        title:           form.name,
+        description:     form.description,
+        seedMoney:       (Number(form.seedMoney) || 0) * 10000,
+        maxParticipants: form.maxParticipants ? Number(form.maxParticipants) : undefined,
+        stockType:       form.category === '전체' ? undefined : form.category,
+        profitCriteria:  form.profitStandard,
+        startAt:         form.startDate ? `${form.startDate}T00:00:00` : undefined,
+        endAt:           form.endDate ? `${form.endDate}T23:59:59` : undefined,
+      };
 
-    const updated: Contest = {
-      id:              editingId ?? `c${Date.now()}`,
-      name:            form.name,
-      category:        form.category,
-      startDate:       toDisplayDate(form.startDate),
-      endDate:         toDisplayDate(form.endDate),
-      seedMoney:       (Number(form.seedMoney) || 0) * 10000,
-      maxParticipants: form.maxParticipants ? Number(form.maxParticipants) : null,
-      participants:    0,
-      profitStandard:  form.profitStandard,
-      status:          editingId
-        ? (contests.find(c => c.id === editingId)?.status ?? resolvedStatus)
-        : resolvedStatus,
-    };
-    setContests(prev =>
-      editingId
-        ? prev.map(c => (c.id === editingId ? updated : c))
-        : [updated, ...prev],
-    );
-    setEditingId(null);
-    setForm({ ...EMPTY_FORM });
-    setIsConfirmOpen(false);
+      if (editingId) {
+        await contestsApi.updateContest(Number(editingId), payload);
+      } else {
+        await contestsApi.createContest(payload);
+      }
+
+      setEditingId(null);
+      setForm({ ...EMPTY_FORM });
+      setIsConfirmOpen(false);
+      setIsFormOpen(false);
+      fetchContests();
+    } catch (e) {
+      console.error(e);
+    }
   }
 
-  const isFormValid =
-    form.name.trim() !== '' &&
-    form.startDate !== '' &&
-    form.endDate !== '' &&
-    form.seedMoney !== '';
+  const isFormValid = form.name.trim() !== '' && form.startDate !== '' && form.endDate !== '' && form.seedMoney !== '';
 
   function handleFormCancel() {
     setEditingId(null);
@@ -203,7 +224,7 @@ export function AdminContestManagePage() {
   }
 
   const handleNewContestRef = useRef(handleNewContest);
-  handleNewContestRef.current = handleNewContest;
+  useEffect(() => { handleNewContestRef.current = handleNewContest; });
 
   useAdminPageActions(
     <Button variant="brand" onClick={() => handleNewContestRef.current()} className="cursor-pointer">
@@ -216,17 +237,9 @@ export function AdminContestManagePage() {
     <>
       {/* 생성/수정 확인 모달 */}
       {isConfirmOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => setIsConfirmOpen(false)}
-        >
-          <div
-            className="w-96 rounded-lg bg-white p-6 shadow-xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <h3 className="mb-4 text-base font-bold text-slate-900">
-              {editingId ? '대회 수정 확인' : '대회 생성 확인'}
-            </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setIsConfirmOpen(false)}>
+          <div className="w-96 rounded-lg bg-white p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="mb-4 text-base font-bold text-slate-900">{editingId ? '대회 수정 확인' : '대회 생성 확인'}</h3>
             <div className="mb-5 space-y-2.5 rounded-md bg-slate-50 p-4 text-sm">
               {[
                 { label: '대회명',    value: form.name },
@@ -243,12 +256,8 @@ export function AdminContestManagePage() {
               ))}
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="brand" onClick={handleConfirm} className="cursor-pointer">
-                {editingId ? '수정' : '생성'}
-              </Button>
-              <Button variant="secondary" onClick={() => setIsConfirmOpen(false)} className="cursor-pointer">
-                취소
-              </Button>
+              <Button variant="brand" onClick={handleConfirm} className="cursor-pointer">{editingId ? '수정' : '생성'}</Button>
+              <Button variant="secondary" onClick={() => setIsConfirmOpen(false)} className="cursor-pointer">취소</Button>
             </div>
           </div>
         </div>
@@ -256,58 +265,31 @@ export function AdminContestManagePage() {
 
       {/* 요약 카드 */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="py-6">
-          <p className="text-xs text-slate-500">전체 대회</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{SUMMARY_STATS.total}개</p>
-        </Card>
-        <Card className="py-6">
-          <p className="text-xs text-slate-500">진행 중</p>
-          <p className="mt-2 text-2xl font-bold text-emerald-600">{SUMMARY_STATS.ongoing}개</p>
-        </Card>
-        <Card className="py-6">
-          <p className="text-xs text-slate-500">예정</p>
-          <p className="mt-2 text-2xl font-bold text-sky-600">{SUMMARY_STATS.scheduled}개</p>
-        </Card>
-        <Card className="py-6">
-          <p className="text-xs text-slate-500">총 참가자</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">{SUMMARY_STATS.totalParticipants.toLocaleString('ko-KR')}명</p>
-        </Card>
+        <Card className="py-6"><p className="text-xs text-slate-500">전체 대회</p><p className="mt-2 text-2xl font-bold text-slate-900">{summary.total}개</p></Card>
+        <Card className="py-6"><p className="text-xs text-slate-500">진행 중</p><p className="mt-2 text-2xl font-bold text-emerald-600">{summary.ongoing}개</p></Card>
+        <Card className="py-6"><p className="text-xs text-slate-500">예정</p><p className="mt-2 text-2xl font-bold text-sky-600">{summary.scheduled}개</p></Card>
+        <Card className="py-6"><p className="text-xs text-slate-500">총 참가자</p><p className="mt-2 text-2xl font-bold text-slate-900">{summary.totalParticipants.toLocaleString('ko-KR')}명</p></Card>
       </div>
 
       <div className={`grid gap-6 ${isFormOpen ? 'items-stretch lg:grid-cols-5' : ''}`}>
         <div className={isFormOpen ? 'flex flex-col lg:col-span-3' : ''}>
           <Card className={`flex flex-col p-0 ${isFormOpen ? 'flex-1' : ''}`}>
-            {/* 탭 필터 */}
             <div className="border-b border-slate-200 px-4 pt-4">
               <div className="flex gap-1">
                 {TAB_LIST.map(tab => (
-                  <button
-                    key={tab.value}
-                    onClick={() => handleTabChange(tab.value)}
-                    className={`cursor-pointer rounded-t-md px-4 py-2 text-sm font-medium transition-colors ${
-                      activeTab === tab.value
-                        ? 'border-b-2 border-[#1565C0] text-[#1565C0]'
-                        : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                  >
+                  <button key={tab.value} onClick={() => handleTabChange(tab.value)} className={`cursor-pointer rounded-t-md px-4 py-2 text-sm font-medium transition-colors ${activeTab === tab.value ? 'border-b-2 border-[#1565C0] text-[#1565C0]' : 'text-slate-500 hover:text-slate-700'}`}>
                     {tab.label}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* 테이블 */}
             <div className="overflow-x-auto">
               <table className="w-full min-w-160 table-fixed text-sm">
                 <colgroup>
-                  <col className="w-44" />
-                  <col className="w-16" />
-                  <col className="w-26" />
-                  <col className="w-22" />
-                  <col className="w-24" />
-                  <col className="w-20" />
-                  <col className="w-22" />
-                  <col className="w-20" />
+                  <col className="w-44" /><col className="w-16" /><col className="w-26" />
+                  <col className="w-22" /><col className="w-24" /><col className="w-20" />
+                  <col className="w-22" /><col className="w-20" />
                 </colgroup>
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-500">
@@ -322,218 +304,97 @@ export function AdminContestManagePage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {paginated.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="px-3 py-3 text-center text-sm text-slate-400">
-                        대회가 없습니다.
-                      </td>
-                    </tr>
-                  )}
-                  {paginated.map(contest => {
-                      const remaining = contest.maxParticipants
-                        ? (contest.maxParticipants - contest.participants) / contest.maxParticipants
-                        : null;
-                      const participantColor =
-                        contest.status === 'ENDED' ? 'text-slate-900' :
-                        remaining !== null && remaining <= 0.1 ? 'text-rose-600 font-semibold' :
-                        remaining !== null && remaining <= 0.2 ? 'text-orange-500 font-semibold' :
-                        'text-slate-900';
-
-                      return (
-                        <tr key={contest.id} className="hover:bg-slate-50">
-                          <td className="truncate px-3 py-3 text-center font-medium text-slate-900" title={contest.name}>
-                            <Link
-                              to={`/admin/contests/${contest.id}`}
-                              className="hover:text-[#1565C0] hover:underline"
-                            >
-                              {contest.name}
-                            </Link>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">
-                            {contest.category}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">
-                            {contest.startDate}~{contest.endDate}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">
-                            {formatSeedMoney(contest.seedMoney)}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">
-                            {contest.maxParticipants ? `${contest.maxParticipants}명` : '무제한'}
-                          </td>
-                          <td className={`whitespace-nowrap px-3 py-3 text-center ${participantColor}`}>
-                            {(contest.status === 'ONGOING' || contest.status === 'ENDED')
-                              ? `${contest.participants}명`
-                              : contest.maxParticipants
-                                ? `${contest.participants}/${contest.maxParticipants}명`
-                                : `${contest.participants}명`
-                            }
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">
-                            {contest.profitStandard}
-                          </td>
-                          <td className="px-3 py-3">
-                            <div className="flex justify-center whitespace-nowrap">
-                              <StatusBadge status={contest.status} />
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  {Array.from({ length: ghostCount }).map((_, i) => (
-                    <tr key={`ghost-${i}`}>
-                      <td colSpan={8} className="px-3 py-3">
-                        <span className="invisible select-none text-sm leading-5">x</span>
-                      </td>
-                    </tr>
+                  {loading && <tr><td colSpan={8} className="px-3 py-3 text-center text-sm text-slate-400">불러오는 중...</td></tr>}
+                  {!loading && filtered.length === 0 && <tr><td colSpan={8} className="px-3 py-3 text-center text-sm text-slate-400">대회가 없습니다.</td></tr>}
+                  {!loading && filtered.map(contest => {
+                    const remaining = contest.maxParticipants ? (contest.maxParticipants - contest.participants) / contest.maxParticipants : null;
+                    const participantColor = contest.status === 'ENDED' ? 'text-slate-900' : remaining !== null && remaining <= 0.1 ? 'text-rose-600 font-semibold' : remaining !== null && remaining <= 0.2 ? 'text-orange-500 font-semibold' : 'text-slate-900';
+                    return (
+                      <tr key={contest.id} className="hover:bg-slate-50">
+                        <td className="truncate px-3 py-3 text-center font-medium text-slate-900" title={contest.name}>
+                          <Link to={`/admin/contests/${contest.id}`} className="hover:text-[#1565C0] hover:underline">{contest.name}</Link>
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">{contest.category}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">{contest.startDate}~{contest.endDate}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">{formatSeedMoney(contest.seedMoney)}</td>
+                        <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">{contest.maxParticipants ? `${contest.maxParticipants}명` : '무제한'}</td>
+                        <td className={`whitespace-nowrap px-3 py-3 text-center ${participantColor}`}>
+                          {(contest.status === 'ONGOING' || contest.status === 'ENDED') ? `${contest.participants}명` : contest.maxParticipants ? `${contest.participants}/${contest.maxParticipants}명` : `${contest.participants}명`}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-3 text-center text-slate-600">{contest.profitStandard}</td>
+                        <td className="px-3 py-3"><div className="flex justify-center whitespace-nowrap"><StatusBadge status={contest.status} /></div></td>
+                      </tr>
+                    );
+                  })}
+                  {!loading && Array.from({ length: ghostCount }).map((_, i) => (
+                    <tr key={`ghost-${i}`}><td colSpan={8} className="px-3 py-3"><span className="invisible select-none text-sm leading-5">x</span></td></tr>
                   ))}
                 </tbody>
               </table>
             </div>
 
-            {/* 페이지네이션 */}
             <div className="flex items-center border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
-              <span className="flex-1">총 {filtered.length}건</span>
+              <span className="flex-1">총 {totalCount}건</span>
               <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={safePage === 1}
-                  className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronLeft size={16} />
-                </button>
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft size={16} /></button>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`cursor-pointer min-w-7 rounded px-2 py-1 text-sm font-medium ${
-                      safePage === page
-                        ? 'bg-[#1565C0] text-white'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {page}
-                  </button>
+                  <button key={page} onClick={() => setCurrentPage(page)} className={`cursor-pointer min-w-7 rounded px-2 py-1 text-sm font-medium ${safePage === page ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{page}</button>
                 ))}
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={safePage === totalPages}
-                  className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  <ChevronRight size={16} />
-                </button>
+                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"><ChevronRight size={16} /></button>
               </div>
               <div className="flex-1" />
             </div>
           </Card>
         </div>
 
-        {/* 새 대회 생성 / 수정 폼 */}
         {isFormOpen && (
           <div className="flex flex-col lg:col-span-2">
             <Card className="flex-1">
-              <h2 className="mb-4 text-base font-semibold text-slate-900">
-                {editingId ? '대회 수정' : '새 대회 생성'}
-              </h2>
+              <h2 className="mb-4 text-base font-semibold text-slate-900">{editingId ? '대회 수정' : '새 대회 생성'}</h2>
               <form onSubmit={handleSubmit} className="space-y-4">
-                {/* 대회명 + 종목 제한 */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">대회명</label>
-                    <input
-                      type="text"
-                      placeholder="대회 이름 입력"
-                      value={form.name}
-                      onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
-                    />
+                    <input type="text" placeholder="대회 이름 입력" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none" />
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">종목 제한</label>
-                    <select
-                      value={form.category}
-                      onChange={e => setForm(f => ({ ...f, category: e.target.value as ContestCategory }))}
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
-                    >
-                      {CATEGORY_OPTIONS.map(c => (
-                        <option key={c} value={c}>{c === '전체' ? '전체 종목' : c}</option>
-                      ))}
+                    <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value as ContestCategory }))} className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none">
+                      {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c === '전체' ? '전체 종목' : c}</option>)}
                     </select>
                   </div>
                 </div>
-
-                {/* 시작일 + 종료일 */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">시작일</label>
-                    <input
-                      type="date"
-                      value={form.startDate}
-                      onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))}
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
-                    />
+                    <input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none" />
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">종료일</label>
-                    <input
-                      type="date"
-                      value={form.endDate}
-                      onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))}
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
-                    />
+                    <input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none" />
                   </div>
                 </div>
-
-                {/* 시드머니 + 최대 참여 인원 */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">시드머니 (만원)</label>
-                    <input
-                      type="number"
-                      placeholder="1,000"
-                      value={form.seedMoney}
-                      onChange={e => setForm(f => ({ ...f, seedMoney: e.target.value }))}
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
-                    />
+                    <input type="number" placeholder="1,000" value={form.seedMoney} onChange={e => setForm(f => ({ ...f, seedMoney: e.target.value }))} className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none" />
                   </div>
                   <div>
                     <label className="mb-1 block text-sm font-medium text-slate-700">최대 참여 인원</label>
-                    <input
-                      type="number"
-                      placeholder="공백 시 무제한"
-                      value={form.maxParticipants}
-                      onChange={e => setForm(f => ({ ...f, maxParticipants: e.target.value }))}
-                      className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
-                    />
+                    <input type="number" placeholder="공백 시 무제한" value={form.maxParticipants} onChange={e => setForm(f => ({ ...f, maxParticipants: e.target.value }))} className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none" />
                   </div>
                 </div>
-
-                {/* 수익률 산정 기준 */}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">수익률 산정 기준</label>
-                  <select
-                    value={form.profitStandard}
-                    onChange={e => setForm(f => ({ ...f, profitStandard: e.target.value as ProfitStandard }))}
-                    className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
-                  >
+                  <select value={form.profitStandard} onChange={e => setForm(f => ({ ...f, profitStandard: e.target.value as ProfitStandard }))} className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none">
                     <option value="수익률">수익률 기준 (%)</option>
                     <option value="금액">금액 기준 (원)</option>
                   </select>
                 </div>
-
-                {/* 대회 설명 */}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">대회 설명</label>
-                  <textarea
-                    placeholder="대회 설명"
-                    value={form.description}
-                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                    rows={3}
-                    className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-[#1565C0] focus:outline-none"
-                  />
+                  <textarea placeholder="대회 설명" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} className="w-full resize-none rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-[#1565C0] focus:outline-none" />
                 </div>
-
-                {/* 거래 제한 옵션 */}
                 <div className="space-y-2">
                   {[
                     { key: 'limitOrderAmount',  label: '1회 최대 주문 금액 제한' },
@@ -541,23 +402,14 @@ export function AdminContestManagePage() {
                     { key: 'allowShortSelling', label: '공매도 허용' },
                   ].map(opt => (
                     <label key={opt.key} className="flex items-center gap-2 text-sm text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={form[opt.key as keyof FormState] as boolean}
-                        onChange={e => setForm(f => ({ ...f, [opt.key]: e.target.checked }))}
-                      />
+                      <input type="checkbox" checked={form[opt.key as keyof FormState] as boolean} onChange={e => setForm(f => ({ ...f, [opt.key]: e.target.checked }))} />
                       {opt.label}
                     </label>
                   ))}
                 </div>
-
                 <div className="flex gap-2 border-t border-slate-100 pt-3">
-                  <Button variant="brand" type="submit" className="flex-1" disabled={!isFormValid}>
-                    {editingId ? '저장' : '생성'}
-                  </Button>
-                  <Button variant="secondary" type="button" onClick={handleFormCancel}>
-                    취소
-                  </Button>
+                  <Button variant="brand" type="submit" className="flex-1" disabled={!isFormValid}>{editingId ? '저장' : '생성'}</Button>
+                  <Button variant="secondary" type="button" onClick={handleFormCancel}>취소</Button>
                 </div>
               </form>
             </Card>
