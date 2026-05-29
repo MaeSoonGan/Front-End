@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Search, Download, ChevronLeft, ChevronRight, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Search, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { getPaginationPages } from '../../../utils/pagination';
 import { Card } from '../../../components/common/Card';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
@@ -319,44 +320,50 @@ export function AdminSuspensionPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {paginated.length === 0 ? (
+                  {paginated.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-400">
+                      <td colSpan={6} className="py-3 text-center text-slate-400">
                         검색 결과가 없습니다.
                       </td>
                     </tr>
-                  ) : (
-                    paginated.map(record => (
-                      <tr
-                        key={record.id}
-                        className="cursor-pointer hover:bg-slate-50"
-                        onClick={() => handleRowClick(record)}
-                      >
-                        <td className="py-3 pr-3 font-medium text-slate-900">
-                          {record.targetNickname}
-                        </td>
-                        <td className="py-3 pr-3">
-                          <div className="flex justify-center">
-                            <TypeBadge type={record.type} />
-                          </div>
-                        </td>
-                        <td className="max-w-28 py-3 pr-3 text-center">
-                          <p className="truncate text-slate-700" title={record.reason}>
-                            {record.reason}
-                          </p>
-                        </td>
-                        <td className="py-3 pr-3 text-slate-600">{record.adminName}</td>
-                        <td className="whitespace-pre-line py-3 pr-3 text-center text-xs text-slate-500">
-                          {record.processedAt}
-                        </td>
-                        <td className="py-3">
-                          <div className="flex justify-center">
-                            <StatusBadge status={record.status} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))
                   )}
+                  {paginated.map(record => (
+                    <tr
+                      key={record.id}
+                      className="cursor-pointer hover:bg-slate-50"
+                      onClick={() => handleRowClick(record)}
+                    >
+                      <td className="py-3 pr-3 font-medium text-slate-900">
+                        {record.targetNickname}
+                      </td>
+                      <td className="py-3 pr-3">
+                        <div className="flex justify-center">
+                          <TypeBadge type={record.type} />
+                        </div>
+                      </td>
+                      <td className="max-w-28 py-3 pr-3 text-center">
+                        <p className="truncate text-slate-700" title={record.reason}>
+                          {record.reason}
+                        </p>
+                      </td>
+                      <td className="py-3 pr-3 text-slate-600">{record.adminName}</td>
+                      <td className="whitespace-pre-line py-3 pr-3 text-center text-xs text-slate-500">
+                        {record.processedAt}
+                      </td>
+                      <td className="py-3">
+                        <div className="flex justify-center">
+                          <StatusBadge status={record.status} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {Array.from({ length: Math.max(0, PAGE_SIZE - (paginated.length === 0 ? 1 : paginated.length)) }).map((_, i) => (
+                    <tr key={`ghost-${i}`}>
+                      <td colSpan={6} className="py-3">
+                        <span className="invisible select-none text-sm leading-5">x</span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -364,33 +371,13 @@ export function AdminSuspensionPage() {
             {/* 페이지네이션 */}
             <div className="mt-4 flex items-center justify-center">
               <div className="flex items-center gap-1">
-                <button
-                  disabled={safePage === 1}
-                  onClick={() => setCurrentPage(p => p - 1)}
-                  className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`cursor-pointer rounded px-2.5 py-0.5 text-sm ${
-                      page === safePage
-                        ? 'bg-[#1565C0] text-white'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {page}
-                  </button>
+                <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronsLeft size={16} /></button>
+                <button disabled={safePage === 1} onClick={() => setCurrentPage(p => p - 1)} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronLeft size={16} /></button>
+                {getPaginationPages(safePage, totalPages).map(page => (
+                  <button key={page} onClick={() => setCurrentPage(page)} className={`cursor-pointer rounded px-2.5 py-0.5 text-sm ${page === safePage ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{page}</button>
                 ))}
-                <button
-                  disabled={safePage === totalPages}
-                  onClick={() => setCurrentPage(p => p + 1)}
-                  className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
-                >
-                  <ChevronRight size={16} />
-                </button>
+                <button disabled={safePage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronRight size={16} /></button>
+                <button onClick={() => setCurrentPage(totalPages)} disabled={safePage === totalPages} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronsRight size={16} /></button>
               </div>
             </div>
           </Card>
@@ -398,13 +385,13 @@ export function AdminSuspensionPage() {
 
         {/* 오른쪽: 계정 정지 관리 */}
         <div className="flex flex-col lg:col-span-2">
-          <Card className="flex-1">
-            <div className="mb-4 flex items-center justify-between">
+          <Card className="flex flex-1 flex-col">
+            <div className="mb-6 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-900">계정 정지 관리</h2>
               <span className="text-xs text-slate-400">직접 정지 / 해제</span>
             </div>
 
-            <form onSubmit={handleProcessSubmit} className="space-y-4">
+            <form onSubmit={handleProcessSubmit} className="flex flex-1 flex-col gap-6">
               <TextInput
                 label="대상 회원 (닉네임 또는 이메일)"
                 placeholder="예) 홍길동 또는 hong@..."
@@ -425,7 +412,7 @@ export function AdminSuspensionPage() {
                 </select>
               </div>
 
-              <div>
+              <div className="flex flex-1 flex-col">
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
                   정지 사유 (필수)
                 </label>
@@ -434,8 +421,7 @@ export function AdminSuspensionPage() {
                   value={reason}
                   onChange={e => setReason(e.target.value)}
                   required
-                  rows={4}
-                  className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
+                  className="flex-1 resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
                 />
               </div>
 
@@ -448,7 +434,7 @@ export function AdminSuspensionPage() {
                 </div>
               )}
 
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2">
                 <Button variant="brand" type="submit" className="flex-1" disabled={!isFormComplete}>
                   처리하기
                 </Button>

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Download, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, ChevronDown } from 'lucide-react';
+import { getPaginationPages } from '../../../utils/pagination';
 import { Card } from '../../../components/common/Card';
 import { PageHeader } from '../../../components/common/PageHeader';
 import { Button } from '../../../components/common/Button';
@@ -443,11 +444,13 @@ export function AdminContestDetailPage() {
 
         <div className="flex items-center justify-center border-t border-slate-200 px-4 py-3 text-sm text-slate-500">
           <div className="flex items-center gap-1">
+            <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:opacity-40"><ChevronsLeft size={16} /></button>
             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:opacity-40"><ChevronLeft size={16} /></button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+            {getPaginationPages(currentPage, totalPages).map(page => (
               <button key={page} onClick={() => setCurrentPage(page)} className={`min-w-7 cursor-pointer rounded px-2 py-1 text-sm font-medium ${currentPage === page ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{page}</button>
             ))}
             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:opacity-40"><ChevronRight size={16} /></button>
+            <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:opacity-40"><ChevronsRight size={16} /></button>
           </div>
         </div>
       </Card>

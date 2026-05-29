@@ -1,15 +1,21 @@
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
+import { systemApi } from '../../../api/admin/system';
 
-interface AuditLog {
+interface AuditLogDetail {
   id: number;
   type: string;
   action: string;
   target: string;
   detail: string;
-  adminId: string;
+  result: string;
+  adminName: string;
+  adminLoginId: string;
+  adminRole: string;
   ip: string;
+  userAgent: string;
   createdAt: string;
 }
 
@@ -41,6 +47,7 @@ const ACTION_LABEL: Record<string, string> = {
   UPDATE_CONTEST:       '대회 수정',
   END_CONTEST:          '대회 종료',
   CANCEL_CONTEST:       '대회 취소',
+  REFRESH_RANKING:      '랭킹 갱신',
   EXCLUDE_RANKING:      '랭킹 제외',
   RESTORE_RANKING:      '랭킹 복구',
   SUSPEND_MEMBER:       '계정 정지',
@@ -49,18 +56,71 @@ const ACTION_LABEL: Record<string, string> = {
   ENABLE_MAINTENANCE:   '점검 모드 시작',
   DISABLE_MAINTENANCE:  '점검 모드 종료',
   IGNORE_ABNORMAL_ALERT: '알림 무시',
+  FORCE_CANCEL_ORDER:   '주문 강제 취소',
 };
 
-export function AdminAuditLogDetailPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const log = (location.state as { log?: AuditLog } | null)?.log;
+const TARGET_TYPE_LABEL: Record<string, string> = {
+  MEMBER:     '회원',
+  NOTICE:     '공지',
+  CONTEST:    '대회',
+  SYSTEM:     '시스템',
+  MONITORING: '모니터링',
+  ORDER:      '주문',
+  SEED:       '시드',
+};
 
-  if (!log) {
+function formatTarget(targetType: string | null, targetId: number | null): string {
+  if (!targetType) return '';
+  const label = TARGET_TYPE_LABEL[targetType] ?? targetType;
+  return targetId ? `${label} #${targetId}` : label;
+}
+
+function isoToDisplay(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${String(d.getFullYear()).slice(2)}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function AdminAuditLogDetailPage() {
+  const { logId } = useParams<{ logId: string }>();
+  const navigate = useNavigate();
+
+  const [log, setLog]         = useState<AuditLogDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    if (!logId) { setNotFound(true); setLoading(false); return; }
+    systemApi.getAuditLog(Number(logId))
+      .then(data => {
+        setLog({
+          id:           data.logId,
+          type:         data.type ?? 'SYSTEM',
+          action:       data.action ?? '',
+          target:       formatTarget(data.targetType, data.targetId),
+          detail:       data.detail ?? '',
+          result:       data.result ?? '',
+          adminName:    data.adminName ?? '',
+          adminLoginId: data.adminLoginId ?? '',
+          adminRole:    data.adminRole ?? '',
+          ip:           data.ipAddress ?? '-',
+          userAgent:    data.userAgent ?? '',
+          createdAt:    isoToDisplay(data.createdAt),
+        });
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false));
+  }, [logId]);
+
+  if (loading) {
+    return <div className="flex items-center justify-center py-20 text-slate-400">불러오는 중...</div>;
+  }
+
+  if (notFound || !log) {
     return (
       <Card className="flex flex-col items-center justify-center py-20 text-slate-400">
-        <p className="text-base">감사 로그 정보를 찾을 수 없습니다.</p>
-        <p className="mt-1 text-sm">목록에서 항목을 클릭해 다시 진입해 주세요.</p>
+        <p className="text-base">감사 로그를 찾을 수 없습니다.</p>
         <button
           onClick={() => navigate('/admin/audit-log')}
           className="mt-4 cursor-pointer text-sm text-[#1565C0] hover:underline"
@@ -100,7 +160,7 @@ export function AdminAuditLogDetailPage() {
           </div>
           <div>
             <p className="mb-1 text-xs font-medium text-slate-400">처리 관리자</p>
-            <p className="font-medium text-slate-800">{log.adminId}</p>
+            <p className="font-medium text-slate-800">{log.adminName}{log.adminLoginId ? ` (${log.adminLoginId})` : ''}</p>
           </div>
           <div>
             <p className="mb-1 text-xs font-medium text-slate-400">IP 주소</p>
@@ -110,6 +170,18 @@ export function AdminAuditLogDetailPage() {
             <p className="mb-1 text-xs font-medium text-slate-400">처리 일시</p>
             <p className="font-medium text-slate-800">{log.createdAt}</p>
           </div>
+          {log.result && (
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-400">처리 결과</p>
+              <p className="font-medium text-slate-800">{log.result}</p>
+            </div>
+          )}
+          {log.adminRole && (
+            <div>
+              <p className="mb-1 text-xs font-medium text-slate-400">관리자 권한</p>
+              <p className="font-medium text-slate-800">{log.adminRole}</p>
+            </div>
+          )}
         </div>
 
         {/* 구분선 */}
@@ -120,6 +192,13 @@ export function AdminAuditLogDetailPage() {
           <p className="mb-2 text-xs font-medium text-slate-400">상세 내용</p>
           <p className="text-sm leading-relaxed text-slate-700">{log.detail || '-'}</p>
         </div>
+
+        {log.userAgent && (
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-medium text-slate-400">User-Agent</p>
+            <p className="break-all text-xs leading-relaxed text-slate-500">{log.userAgent}</p>
+          </div>
+        )}
       </Card>
     </>
   );

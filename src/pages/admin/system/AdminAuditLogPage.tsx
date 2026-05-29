@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { getPaginationPages } from '../../../utils/pagination';
 import { Card } from '../../../components/common/Card';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
@@ -64,6 +65,7 @@ const ACTION_LABEL: Record<string, string> = {
   UPDATE_CONTEST:       '대회 수정',
   END_CONTEST:          '대회 종료',
   CANCEL_CONTEST:       '대회 취소',
+  REFRESH_RANKING:      '랭킹 갱신',
   EXCLUDE_RANKING:      '랭킹 제외',
   RESTORE_RANKING:      '랭킹 복구',
   SUSPEND_MEMBER:       '계정 정지',
@@ -72,6 +74,7 @@ const ACTION_LABEL: Record<string, string> = {
   ENABLE_MAINTENANCE:   '점검 모드 시작',
   DISABLE_MAINTENANCE:  '점검 모드 종료',
   IGNORE_ABNORMAL_ALERT: '알림 무시',
+  FORCE_CANCEL_ORDER:   '주문 강제 취소',
 };
 
 // 백엔드 targetType → 화면 표시 라벨
@@ -190,21 +193,7 @@ export function AdminAuditLogPage() {
   const safePage   = Math.min(currentPage, totalPages);
   const ghostCount = PAGE_SIZE - Math.max(logs.length, logs.length === 0 ? 1 : 0);
 
-  function getPageNumbers() {
-    const pages: (number | '...')[] = [];
-    if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i);
-    } else {
-      pages.push(1, 2, 3);
-      if (safePage > 5) pages.push('...');
-      if (safePage > 3 && safePage < totalPages - 2) pages.push(safePage);
-      if (safePage < totalPages - 4) pages.push('...');
-      pages.push(totalPages);
-    }
-    return [...new Set(pages)];
-  }
-
-  useAdminPageActions(
+useAdminPageActions(
     <Button variant="secondary" className="h-9 gap-1.5 text-sm">
       <Download size={14} />
       CSV 내보내기
@@ -277,7 +266,7 @@ export function AdminAuditLogPage() {
 
           <select
             value={typeFilter}
-            onChange={e => { setTypeFilter(e.target.value as LogType | ''); setCurrentPage(1); }}
+            onChange={e => { setTypeFilter(e.target.value); setCurrentPage(1); }}
             className="h-9 rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none"
           >
             <option value="">전체 유형</option>
@@ -332,7 +321,7 @@ export function AdminAuditLogPage() {
                 <tr className="h-11"><td colSpan={8} className="px-3 text-center text-sm text-slate-400">검색 결과가 없습니다.</td></tr>
               ) : (
                 logs.map(log => (
-                  <tr key={log.id} className="h-11 cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/admin/audit-log/${log.id}`, { state: { log } })}>
+                  <tr key={log.id} className="h-11 cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/admin/audit-log/${log.id}`)}>
                     <td className="px-3 text-center text-slate-400">{log.id}</td>
                     <td className="px-3 text-center">
                       <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-semibold ${TYPE_BADGE[log.type] ?? 'bg-slate-100 text-slate-500'}`}>
@@ -360,35 +349,13 @@ export function AdminAuditLogPage() {
         {/* 페이지네이션 */}
         <div className="flex items-center justify-center border-t border-slate-200 px-4 py-3">
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={safePage === 1}
-              className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:opacity-40"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            {getPageNumbers().map((page, idx) =>
-              page === '...'
-                ? <span key={`dots-${idx}`} className="px-1 text-slate-400">···</span>
-                : (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page as number)}
-                    className={`min-w-7 cursor-pointer rounded px-2 py-1 text-sm font-medium ${
-                      safePage === page ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                )
-            )}
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={safePage === totalPages}
-              className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:opacity-40"
-            >
-              <ChevronRight size={16} />
-            </button>
+            <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:opacity-40"><ChevronsLeft size={16} /></button>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:opacity-40"><ChevronLeft size={16} /></button>
+            {getPaginationPages(safePage, totalPages).map(page => (
+              <button key={page} onClick={() => setCurrentPage(page)} className={`min-w-7 cursor-pointer rounded px-2 py-1 text-sm font-medium ${safePage === page ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{page}</button>
+            ))}
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:opacity-40"><ChevronRight size={16} /></button>
+            <button onClick={() => setCurrentPage(totalPages)} disabled={safePage === totalPages} className="cursor-pointer rounded p-1 hover:bg-slate-100 disabled:opacity-40"><ChevronsRight size={16} /></button>
           </div>
         </div>
       </Card>

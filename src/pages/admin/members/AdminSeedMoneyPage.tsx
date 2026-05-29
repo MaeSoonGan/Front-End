@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Download, ChevronLeft, ChevronRight, AlertTriangle, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertTriangle, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { getPaginationPages } from '../../../utils/pagination';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
@@ -307,6 +308,13 @@ export function AdminSeedMoneyPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {paginated.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-3 text-center text-slate-400">
+                        지급 이력이 없습니다.
+                      </td>
+                    </tr>
+                  )}
                   {paginated.map(record => (
                     <tr key={record.id} className="cursor-pointer hover:bg-slate-50">
                       <td className="whitespace-nowrap py-3 pr-4 text-center font-medium text-slate-900">
@@ -325,6 +333,13 @@ export function AdminSeedMoneyPage() {
                       <td className="whitespace-nowrap py-3 text-center text-xs text-slate-400">{record.paidAt}</td>
                     </tr>
                   ))}
+                  {Array.from({ length: Math.max(0, PAGE_SIZE - (paginated.length === 0 ? 1 : paginated.length)) }).map((_, i) => (
+                    <tr key={`ghost-${i}`}>
+                      <td colSpan={6} className="py-3 pr-4">
+                        <span className="invisible select-none text-sm leading-5">x</span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -332,33 +347,13 @@ export function AdminSeedMoneyPage() {
             {/* 페이지네이션 */}
             <div className="mt-4 flex items-center justify-center">
               <div className="flex items-center gap-1">
-                <button
-                  disabled={safePage === 1}
-                  onClick={() => setCurrentPage(p => p - 1)}
-                  className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`cursor-pointer rounded px-2.5 py-0.5 text-sm ${
-                      page === safePage
-                        ? 'bg-[#1565C0] text-white'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {page}
-                  </button>
+                <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronsLeft size={15} /></button>
+                <button disabled={safePage === 1} onClick={() => setCurrentPage(p => p - 1)} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronLeft size={15} /></button>
+                {getPaginationPages(safePage, totalPages).map(page => (
+                  <button key={page} onClick={() => setCurrentPage(page)} className={`cursor-pointer rounded px-2.5 py-0.5 text-sm ${page === safePage ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{page}</button>
                 ))}
-                <button
-                  disabled={safePage === totalPages}
-                  onClick={() => setCurrentPage(p => p + 1)}
-                  className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
-                >
-                  <ChevronRight size={15} />
-                </button>
+                <button disabled={safePage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronRight size={15} /></button>
+                <button onClick={() => setCurrentPage(totalPages)} disabled={safePage === totalPages} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronsRight size={15} /></button>
               </div>
             </div>
           </Card>
@@ -367,9 +362,9 @@ export function AdminSeedMoneyPage() {
         {/* 오른쪽: 시드머니 수동 지급 폼 */}
         <div className="flex flex-col lg:col-span-2">
           <Card className="flex flex-1 flex-col">
-            <h2 className="mb-5 text-base font-semibold text-slate-900">시드머니 수동 지급</h2>
+            <h2 className="mb-6 text-base font-semibold text-slate-900">시드머니 수동 지급</h2>
 
-            <form onSubmit={handleSubmit} className="flex flex-1 flex-col space-y-5">
+            <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-6">
               {/* 대상 회원 검색 */}
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -452,7 +447,7 @@ export function AdminSeedMoneyPage() {
               </div>
 
               {/* 지급 사유 */}
-              <div>
+              <div className="flex flex-1 flex-col">
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
                   지급 사유 (필수)
                 </label>
@@ -461,8 +456,7 @@ export function AdminSeedMoneyPage() {
                   value={reason}
                   onChange={e => setReason(e.target.value)}
                   required
-                  rows={4}
-                  className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
+                  className="flex-1 resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
                 />
               </div>
 
@@ -473,7 +467,7 @@ export function AdminSeedMoneyPage() {
               </div>
 
               {/* 버튼 */}
-              <div className="flex gap-2">
+              <div className="mt-auto flex gap-2">
                 <Button
                   variant="brand"
                   type="submit"

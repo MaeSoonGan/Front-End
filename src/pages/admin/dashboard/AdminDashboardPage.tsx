@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { getPaginationPages } from '../../../utils/pagination';
 import {
   BarChart,
   Bar,
@@ -220,7 +221,12 @@ export function AdminDashboardPage() {
     }
   }
 
-  function handleCancelOrder(orderId: string) {
+  async function handleCancelOrder(orderId: string) {
+    try {
+      await systemApi.forceCancelOrder(Number(orderId), { reason: '비정상 탐지 — 관리자 강제 취소' });
+    } catch (e) {
+      console.error(e);
+    }
     setAlerts(prev => prev.filter(a => a.orderId !== orderId));
   }
 
@@ -330,11 +336,13 @@ export function AdminDashboardPage() {
 
           {totalAlertPages > 1 && (
             <div className="mt-3 flex items-center justify-center gap-1">
+              <button onClick={() => setAlertPage(1)} disabled={alertPage === 1} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronsLeft size={16} /></button>
               <button onClick={() => setAlertPage(p => Math.max(1, p - 1))} disabled={alertPage === 1} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronLeft size={16} /></button>
-              {Array.from({ length: totalAlertPages }, (_, i) => i + 1).map(page => (
+              {getPaginationPages(alertPage, totalAlertPages).map(page => (
                 <button key={page} onClick={() => setAlertPage(page)} className={`min-w-7 cursor-pointer rounded px-2 py-1 text-xs font-medium ${alertPage === page ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{page}</button>
               ))}
               <button onClick={() => setAlertPage(p => Math.min(totalAlertPages, p + 1))} disabled={alertPage === totalAlertPages} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronRight size={16} /></button>
+              <button onClick={() => setAlertPage(totalAlertPages)} disabled={alertPage === totalAlertPages} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronsRight size={16} /></button>
             </div>
           )}
         </Card>
@@ -383,15 +391,15 @@ export function AdminDashboardPage() {
               </tbody>
             </table>
           </div>
-          {totalContestPages > 1 && (
-            <div className="mt-3 flex items-center justify-center gap-1">
+          <div className="mt-3 flex items-center justify-center gap-1">
+              <button onClick={() => setContestPage(1)} disabled={contestPage === 1} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronsLeft size={16} /></button>
               <button onClick={() => setContestPage(p => Math.max(1, p - 1))} disabled={contestPage === 1} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronLeft size={16} /></button>
-              {Array.from({ length: totalContestPages }, (_, i) => i + 1).map(page => (
+              {getPaginationPages(contestPage, totalContestPages).map(page => (
                 <button key={page} onClick={() => setContestPage(page)} className={`min-w-7 cursor-pointer rounded px-2 py-1 text-xs font-medium ${contestPage === page ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{page}</button>
               ))}
               <button onClick={() => setContestPage(p => Math.min(totalContestPages, p + 1))} disabled={contestPage === totalContestPages} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronRight size={16} /></button>
+              <button onClick={() => setContestPage(totalContestPages)} disabled={contestPage === totalContestPages} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronsRight size={16} /></button>
             </div>
-          )}
         </Card>
 
         <Card className="flex flex-col lg:col-span-2">
@@ -410,11 +418,13 @@ export function AdminDashboardPage() {
 
           {totalActivityPages > 1 && (
             <div className="mt-auto flex items-center justify-center gap-1 pt-4">
+              <button onClick={() => setActivityPage(1)} disabled={activityPage === 1} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronsLeft size={16} /></button>
               <button onClick={() => setActivityPage(p => Math.max(1, p - 1))} disabled={activityPage === 1} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronLeft size={16} /></button>
-              {Array.from({ length: totalActivityPages }, (_, i) => i + 1).map(page => (
+              {getPaginationPages(activityPage, totalActivityPages).map(page => (
                 <button key={page} onClick={() => setActivityPage(page)} className={`min-w-7 cursor-pointer rounded px-2 py-1 text-xs font-medium ${activityPage === page ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{page}</button>
               ))}
               <button onClick={() => setActivityPage(p => Math.min(totalActivityPages, p + 1))} disabled={activityPage === totalActivityPages} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronRight size={16} /></button>
+              <button onClick={() => setActivityPage(totalActivityPages)} disabled={activityPage === totalActivityPages} className="cursor-pointer rounded p-1 text-slate-400 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"><ChevronsRight size={16} /></button>
             </div>
           )}
         </Card>

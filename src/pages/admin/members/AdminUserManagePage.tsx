@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { Download, UserPlus, Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Download, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { StatusBadge } from '../../../components/common/StatusBadge';
-import { AddMemberModal } from './AddMemberModal';
 import { SeedMoneyModal } from './SeedMoneyModal';
 import { cn } from '../../../utils/cn';
+import { getPaginationPages } from '../../../utils/pagination';
 import type { StatusTone } from '../../../types/common';
 import { membersApi } from '../../../api/admin/members';
 
@@ -52,16 +52,6 @@ const MEMBER_STATUS_LABEL: Record<MemberStatus, string> = {
 
 // ---- Helpers ----
 
-function getPaginationPages(currentPage: number, totalPages: number): (number | '...')[] {
-  const pages: (number | '...')[] = [1];
-  if (currentPage > 3) pages.push('...');
-  const start = Math.max(2, currentPage - 1);
-  const end = Math.min(totalPages - 1, currentPage + 1);
-  for (let i = start; i <= end; i++) pages.push(i);
-  if (currentPage < totalPages - 2) pages.push('...');
-  if (totalPages > 1) pages.push(totalPages);
-  return pages;
-}
 
 function joinedAtToIso(joinedAt: string): string {
   const [yy, mm, dd] = joinedAt.split('.');
@@ -95,8 +85,7 @@ export function AdminUserManagePage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
+const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
   const [showSuspendConfirm, setShowSuspendConfirm] = useState(false);
   const [sortField, setSortField] = useState<SortField | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
@@ -198,11 +187,6 @@ export function AdminUserManagePage() {
     );
   }
 
-  function handleAddMember(data: { nickname: string; email: string; accountId: string }) {
-    console.log('회원 직접 추가 — 백엔드 API 미제공', data);
-    setIsAddModalOpen(false);
-  }
-
   async function handleCsvExport() {
     try {
       const blob = await membersApi.exportMembers({
@@ -242,10 +226,6 @@ export function AdminUserManagePage() {
       <Button variant="secondary" onClick={handleCsvExport} className="gap-2">
         <Download size={16} />
         CSV 내보내기
-      </Button>
-      <Button variant="brand" onClick={() => setIsAddModalOpen(true)} className="gap-2">
-        <UserPlus size={16} />
-        회원 직접 추가
       </Button>
     </div>
   );
@@ -443,6 +423,7 @@ export function AdminUserManagePage() {
                 return (
                   <tr
                     key={member.id}
+                    onClick={() => handleSelectOne(member.id)}
                     className={cn(
                       'h-10.25 cursor-pointer border-t border-slate-100 transition-colors hover:bg-slate-50',
                       isSelected && 'bg-[#E8F0FE] hover:bg-[#dce8fd]',
@@ -502,44 +483,18 @@ export function AdminUserManagePage() {
         {/* 페이지네이션 */}
         <div className="flex items-center justify-center border-t border-slate-100 px-6 py-4">
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={safePage === 1}
-              className="cursor-pointer rounded p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            {paginationPages.map((page, idx) =>
-              page === '...' ? (
-                <span key={`ellipsis-${idx}`} className="px-2 py-1 text-sm text-slate-400">…</span>
-              ) : (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page as number)}
-                  className={cn(
-                    'min-w-8 cursor-pointer rounded px-2 py-1 text-sm',
-                    safePage === page
-                      ? 'bg-[#1565C0] text-white'
-                      : 'text-slate-600 hover:bg-slate-100',
-                  )}
-                >
-                  {page}
-                </button>
-              ),
-            )}
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={safePage === totalPages}
-              className="cursor-pointer rounded p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
-            >
-              <ChevronRight size={16} />
-            </button>
+            <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="cursor-pointer rounded p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronsLeft size={16} /></button>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="cursor-pointer rounded p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronLeft size={16} /></button>
+            {paginationPages.map(page => (
+              <button key={page} onClick={() => setCurrentPage(page)} className={cn('min-w-8 cursor-pointer rounded px-2 py-1 text-sm', safePage === page ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100')}>{page}</button>
+            ))}
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="cursor-pointer rounded p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronRight size={16} /></button>
+            <button onClick={() => setCurrentPage(totalPages)} disabled={safePage === totalPages} className="cursor-pointer rounded p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronsRight size={16} /></button>
           </div>
         </div>
       </Card>
 
-      <AddMemberModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddMember} />
-      <SeedMoneyModal
+<SeedMoneyModal
         isOpen={isSeedModalOpen}
         targetCount={selectedIds.length}
         onClose={() => setIsSeedModalOpen(false)}

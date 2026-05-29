@@ -25,6 +25,12 @@ export const systemApi = {
   getAuditLogs: (params?: { keyword?: string; startDate?: string; endDate?: string; type?: string; adminId?: number; page?: number; size?: number }) =>
     client.get('/api/admin/audit-logs', { params }).then(r => r.data.data),
 
+  getAuditLog: (logId: number) =>
+    client.get(`/api/admin/audit-logs/${logId}`).then(r => r.data.data),
+
+  forceCancelOrder: (orderId: number, data?: { reason?: string }) =>
+    client.patch(`/api/admin/orders/${orderId}/cancel`, data).then(r => r.data.data),
+
   getAdmins: () =>
     client.get('/api/admin/admins').then(r => r.data.data),
 };
