@@ -1,9 +1,11 @@
-import { useState, useMemo } from 'react';
-import { Search, Download, ChevronLeft, ChevronRight, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { Search, Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertTriangle, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { getPaginationPages } from '../../../utils/pagination';
 import { Card } from '../../../components/common/Card';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 import { TextInput } from '../../../components/common/TextInput';
+import { membersApi } from '../../../api/admin/members';
 
 type SuspensionType = 'MANUAL' | 'AUTO';
 type SuspensionStatus = 'SUSPENDED' | 'RELEASED';
@@ -21,66 +23,11 @@ interface SuspensionRecord {
   status: SuspensionStatus;
 }
 
-// GET /api/admin/members/suspensions
-const MOCK_SUSPENSIONS: SuspensionRecord[] = [
-  {
-    id: 's1',
-    targetNickname: '이영희',
-    targetAccountId: 'younghee',
-    type: 'MANUAL',
-    reason: '비정상 주문',
-    adminName: 'admin01',
-    processedAt: '25.05.08\n14:32',
-    status: 'SUSPENDED',
-  },
-  {
-    id: 's2',
-    targetNickname: '홍길동',
-    targetAccountId: 'gildong',
-    type: 'AUTO',
-    reason: '로그인 5회 실패',
-    adminName: '시스템',
-    processedAt: '25.04.22\n09:14',
-    status: 'RELEASED',
-  },
-  {
-    id: 's3',
-    targetNickname: '박민준',
-    targetAccountId: 'minjun',
-    type: 'MANUAL',
-    reason: '중복 계정 어뷰징 의심',
-    adminName: 'admin01',
-    processedAt: '25.04.15\n11:30',
-    status: 'RELEASED',
-  },
-  {
-    id: 's4',
-    targetNickname: '김태스트',
-    targetAccountId: 'testkim',
-    type: 'AUTO',
-    reason: '로그인 5회 실패',
-    adminName: '시스템',
-    processedAt: '25.04.10\n16:05',
-    status: 'RELEASED',
-  },
-  {
-    id: 's5',
-    targetNickname: '최의심',
-    targetAccountId: 'suspicious',
-    type: 'MANUAL',
-    reason: '타인 계정 도용 의심',
-    adminName: 'admin02',
-    processedAt: '25.03.28\n13:20',
-    status: 'SUSPENDED',
-  },
-];
-
-const SUMMARY_STATS = {
-  total: 84,
-  currentlySuspended: 36,
-  thisMonth: 5,
-  autoSuspended: 12,
-};
+function isoToProcessedAt(iso: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}\n${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
 
 const PAGE_SIZE = 7;
 
@@ -127,58 +74,75 @@ function DateSortIcon({ dir }: { dir: SortDir }) {
 }
 
 export function AdminSuspensionPage() {
-  const [search, setSearch] = useState('');
+  const [records, setRecords]   = useState<SuspensionRecord[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [summary, setSummary]   = useState({ total: 0, currentlySuspended: 0, thisMonth: 0, autoSuspended: 0 });
+  const [search, setSearch]     = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'ALL' | SuspensionType>('ALL');
   const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
+  const [dateTo, setDateTo]     = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortDir, setSortDir] = useState<SortDir>(null);
+  const [sortDir, setSortDir]   = useState<SortDir>(null);
 
+  const [selectedSuspensionId, setSelectedSuspensionId] = useState<string | null>(null);
   const [targetMember, setTargetMember] = useState('');
-  const [processType, setProcessType] = useState<ProcessType>('계정 정지');
-  const [reason, setReason] = useState('');
+  const [processType, setProcessType]   = useState<ProcessType>('계정 정지');
+  const [reason, setReason]     = useState('');
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
-  const filtered = useMemo(() => {
-    let result = [...MOCK_SUSPENSIONS];
-
-    if (search.trim()) {
-      const q = search.trim();
-      result = result.filter(r =>
-        r.targetNickname.includes(q) ||
-        r.targetAccountId.includes(q) ||
-        r.adminName.includes(q),
+  const fetchRecords = useCallback(async () => {
+    try {
+      const data = await membersApi.getSuspensions({
+        keyword:   appliedSearch || undefined,
+        startDate: dateFrom || undefined,
+        endDate:   dateTo || undefined,
+        page:      currentPage - 1,
+        size:      PAGE_SIZE,
+      });
+      setRecords(
+        (data.content ?? []).map((r: any) => ({
+          id:               String(r.suspensionId),
+          targetNickname:   r.nickname ?? '',
+          targetAccountId:  r.accountId ?? '',
+          type:             'MANUAL' as SuspensionType,
+          reason:           r.reason ?? '',
+          adminName:        r.adminName ?? '',
+          processedAt:      isoToProcessedAt(r.createdAt),
+          status:           (r.status === 'ACTIVE' ? 'SUSPENDED' : 'RELEASED') as SuspensionStatus,
+        }))
       );
+      setTotalPages(data.totalPages ?? 1);
+    } catch (e) {
+      console.error(e);
     }
+  }, [appliedSearch, dateFrom, dateTo, currentPage]);
 
-    if (typeFilter !== 'ALL') {
-      result = result.filter(r => r.type === typeFilter);
-    }
+  useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
-    if (dateFrom || dateTo) {
-      result = result.filter(r => {
-        const d = processedAtToIso(r.processedAt);
-        if (dateFrom && d < dateFrom) return false;
-        if (dateTo && d > dateTo) return false;
-        return true;
-      });
-    }
+  useEffect(() => {
+    membersApi.getSuspensionSummary()
+      .then(data => setSummary({
+        total:              data.totalSuspensionCount ?? 0,
+        currentlySuspended: data.activeSuspensionCount ?? 0,
+        thisMonth:          data.todaySuspensionCount ?? 0,
+        autoSuspended:      0,
+      }))
+      .catch(console.error);
+  }, []);
 
-    if (sortDir) {
-      result = [...result].sort((a, b) => {
-        const cmp = a.processedAt.localeCompare(b.processedAt);
-        return sortDir === 'asc' ? cmp : -cmp;
-      });
-    }
-
+  const filtered = useMemo(() => {
+    let result = [...records];
+    if (typeFilter !== 'ALL') result = result.filter(r => r.type === typeFilter);
+    if (sortDir) result = [...result].sort((a, b) => {
+      const cmp = a.processedAt.localeCompare(b.processedAt);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
     return result;
-  }, [search, typeFilter, dateFrom, dateTo, sortDir]);
+  }, [records, typeFilter, sortDir]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
-  const startIdx = (safePage - 1) * PAGE_SIZE + 1;
-  const endIdx = Math.min(safePage * PAGE_SIZE, filtered.length);
-  const paginated = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const paginated = filtered;
 
   const isFormComplete = targetMember.trim() !== '' && reason.trim() !== '';
 
@@ -188,8 +152,10 @@ export function AdminSuspensionPage() {
   }
 
   function handleRowClick(record: SuspensionRecord) {
+    setSelectedSuspensionId(record.id);
     setTargetMember(record.targetNickname);
     setProcessType(record.status === 'SUSPENDED' ? '계정 해제' : '계정 정지');
+    setReason('');
   }
 
   function handleProcessSubmit(e: React.FormEvent) {
@@ -197,29 +163,44 @@ export function AdminSuspensionPage() {
     setIsConfirmOpen(true);
   }
 
-  function handleConfirm() {
-    // POST /api/admin/members/suspensions
-    setIsConfirmOpen(false);
-    handleReset();
+  async function handleConfirm() {
+    try {
+      if (processType === '계정 해제' && selectedSuspensionId) {
+        await membersApi.releaseSuspension(Number(selectedSuspensionId), { reason });
+      }
+      setIsConfirmOpen(false);
+      handleReset();
+      fetchRecords();
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   function handleReset() {
+    setSelectedSuspensionId(null);
     setTargetMember('');
     setProcessType('계정 정지');
     setReason('');
   }
 
-  const csvAction = (
-    <button
-      onClick={() => {/* GET /api/admin/members/suspensions/export */}}
-      className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-    >
-      <Download size={15} />
-      CSV 내보내기
+  async function handleCsvExport() {
+    try {
+      const blob = await membersApi.exportSuspensions({
+        keyword:   appliedSearch || undefined,
+        startDate: dateFrom || undefined,
+        endDate:   dateTo || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'suspensions.csv'; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { console.error(e); }
+  }
+
+  useAdminPageActions(
+    <button onClick={handleCsvExport} className="flex cursor-pointer items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+      <Download size={15} />CSV 내보내기
     </button>
   );
-
-  useAdminPageActions(csvAction);
 
   return (
     <>
@@ -270,22 +251,10 @@ export function AdminSuspensionPage() {
 
       {/* 요약 카드 */}
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <Card>
-          <p className="text-sm text-slate-500">전체 정지 이력</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{SUMMARY_STATS.total}건</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-slate-500">현재 정지 중</p>
-          <p className="mt-1 text-2xl font-bold text-rose-600">{SUMMARY_STATS.currentlySuspended}명</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-slate-500">이번 달 정지</p>
-          <p className="mt-1 text-2xl font-bold text-rose-600">{SUMMARY_STATS.thisMonth}건</p>
-        </Card>
-        <Card>
-          <p className="text-sm text-slate-500">자동 정지 (로그인 실패)</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{SUMMARY_STATS.autoSuspended}건</p>
-        </Card>
+        <Card><p className="text-sm text-slate-500">전체 정지 이력</p><p className="mt-1 text-2xl font-bold text-slate-900">{summary.total}건</p></Card>
+        <Card><p className="text-sm text-slate-500">현재 정지 중</p><p className="mt-1 text-2xl font-bold text-rose-600">{summary.currentlySuspended}명</p></Card>
+        <Card><p className="text-sm text-slate-500">오늘 정지</p><p className="mt-1 text-2xl font-bold text-rose-600">{summary.thisMonth}건</p></Card>
+        <Card><p className="text-sm text-slate-500">자동 정지 (로그인 실패)</p><p className="mt-1 text-2xl font-bold text-slate-900">{summary.autoSuspended}건</p></Card>
       </div>
 
       {/* 메인 컨텐츠 */}
@@ -303,7 +272,8 @@ export function AdminSuspensionPage() {
                   type="text"
                   placeholder="닉네임 / 관리자 검색"
                   value={search}
-                  onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+                  onChange={e => setSearch(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { setAppliedSearch(search); setCurrentPage(1); } }}
                   className="w-full rounded-md border border-slate-200 py-2 pl-9 pr-3 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
                 />
               </div>
@@ -350,44 +320,50 @@ export function AdminSuspensionPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {paginated.length === 0 ? (
+                  {paginated.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-400">
+                      <td colSpan={6} className="py-3 text-center text-slate-400">
                         검색 결과가 없습니다.
                       </td>
                     </tr>
-                  ) : (
-                    paginated.map(record => (
-                      <tr
-                        key={record.id}
-                        className="cursor-pointer hover:bg-slate-50"
-                        onClick={() => handleRowClick(record)}
-                      >
-                        <td className="py-3 pr-3 font-medium text-slate-900">
-                          {record.targetNickname}
-                        </td>
-                        <td className="py-3 pr-3">
-                          <div className="flex justify-center">
-                            <TypeBadge type={record.type} />
-                          </div>
-                        </td>
-                        <td className="max-w-28 py-3 pr-3 text-center">
-                          <p className="truncate text-slate-700" title={record.reason}>
-                            {record.reason}
-                          </p>
-                        </td>
-                        <td className="py-3 pr-3 text-slate-600">{record.adminName}</td>
-                        <td className="whitespace-pre-line py-3 pr-3 text-center text-xs text-slate-500">
-                          {record.processedAt}
-                        </td>
-                        <td className="py-3">
-                          <div className="flex justify-center">
-                            <StatusBadge status={record.status} />
-                          </div>
-                        </td>
-                      </tr>
-                    ))
                   )}
+                  {paginated.map(record => (
+                    <tr
+                      key={record.id}
+                      className="cursor-pointer hover:bg-slate-50"
+                      onClick={() => handleRowClick(record)}
+                    >
+                      <td className="py-3 pr-3 font-medium text-slate-900">
+                        {record.targetNickname}
+                      </td>
+                      <td className="py-3 pr-3">
+                        <div className="flex justify-center">
+                          <TypeBadge type={record.type} />
+                        </div>
+                      </td>
+                      <td className="max-w-28 py-3 pr-3 text-center">
+                        <p className="truncate text-slate-700" title={record.reason}>
+                          {record.reason}
+                        </p>
+                      </td>
+                      <td className="py-3 pr-3 text-slate-600">{record.adminName}</td>
+                      <td className="whitespace-pre-line py-3 pr-3 text-center text-xs text-slate-500">
+                        {record.processedAt}
+                      </td>
+                      <td className="py-3">
+                        <div className="flex justify-center">
+                          <StatusBadge status={record.status} />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {Array.from({ length: Math.max(0, PAGE_SIZE - (paginated.length === 0 ? 1 : paginated.length)) }).map((_, i) => (
+                    <tr key={`ghost-${i}`}>
+                      <td colSpan={6} className="py-3">
+                        <span className="invisible select-none text-sm leading-5">x</span>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -395,33 +371,13 @@ export function AdminSuspensionPage() {
             {/* 페이지네이션 */}
             <div className="mt-4 flex items-center justify-center">
               <div className="flex items-center gap-1">
-                <button
-                  disabled={safePage === 1}
-                  onClick={() => setCurrentPage(p => p - 1)}
-                  className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`cursor-pointer rounded px-2.5 py-0.5 text-sm ${
-                      page === safePage
-                        ? 'bg-[#1565C0] text-white'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    {page}
-                  </button>
+                <button onClick={() => setCurrentPage(1)} disabled={safePage === 1} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronsLeft size={16} /></button>
+                <button disabled={safePage === 1} onClick={() => setCurrentPage(p => p - 1)} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronLeft size={16} /></button>
+                {getPaginationPages(safePage, totalPages).map(page => (
+                  <button key={page} onClick={() => setCurrentPage(page)} className={`cursor-pointer rounded px-2.5 py-0.5 text-sm ${page === safePage ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{page}</button>
                 ))}
-                <button
-                  disabled={safePage === totalPages}
-                  onClick={() => setCurrentPage(p => p + 1)}
-                  className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"
-                >
-                  <ChevronRight size={16} />
-                </button>
+                <button disabled={safePage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronRight size={16} /></button>
+                <button onClick={() => setCurrentPage(totalPages)} disabled={safePage === totalPages} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronsRight size={16} /></button>
               </div>
             </div>
           </Card>
@@ -429,13 +385,13 @@ export function AdminSuspensionPage() {
 
         {/* 오른쪽: 계정 정지 관리 */}
         <div className="flex flex-col lg:col-span-2">
-          <Card className="flex-1">
-            <div className="mb-4 flex items-center justify-between">
+          <Card className="flex flex-1 flex-col">
+            <div className="mb-6 flex items-center justify-between">
               <h2 className="text-base font-semibold text-slate-900">계정 정지 관리</h2>
               <span className="text-xs text-slate-400">직접 정지 / 해제</span>
             </div>
 
-            <form onSubmit={handleProcessSubmit} className="space-y-4">
+            <form onSubmit={handleProcessSubmit} className="flex flex-1 flex-col gap-6">
               <TextInput
                 label="대상 회원 (닉네임 또는 이메일)"
                 placeholder="예) 홍길동 또는 hong@..."
@@ -456,7 +412,7 @@ export function AdminSuspensionPage() {
                 </select>
               </div>
 
-              <div>
+              <div className="flex flex-1 flex-col">
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
                   정지 사유 (필수)
                 </label>
@@ -465,8 +421,7 @@ export function AdminSuspensionPage() {
                   value={reason}
                   onChange={e => setReason(e.target.value)}
                   required
-                  rows={4}
-                  className="w-full resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
+                  className="flex-1 resize-none rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
                 />
               </div>
 
@@ -479,7 +434,7 @@ export function AdminSuspensionPage() {
                 </div>
               )}
 
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2">
                 <Button variant="brand" type="submit" className="flex-1" disabled={!isFormComplete}>
                   처리하기
                 </Button>

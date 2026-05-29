@@ -1,151 +1,96 @@
-import { useState, useEffect } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { RefreshCw, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { getPaginationPages } from '../../../utils/pagination';
 import { Card } from '../../../components/common/Card';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 import { useAlertCount } from '../../../contexts/AlertCountContext';
-
-type ServiceStatus = 'NORMAL' | 'STANDBY' | 'ERROR' | 'WARNING';
+import { systemApi } from '../../../api/admin/system';
+import { membersApi } from '../../../api/admin/members';
 
 interface Alert {
   id: string;
   type: string;
   memberName: string;
   memberId: string;
+  orderId: string;
   detail: string;
 }
 
-interface ServiceItem {
-  name: string;
-  status: ServiceStatus;
-  lag?: string;
-  badge?: string;
-}
-
-// GET /api/admin/orders/today
-const STATS = {
-  todayOrders:    4821,
-  settledOrders:  3214,
-  activeUsers:    142,
-};
-
-// GET /api/admin/monitoring/alerts
-const MOCK_ALERTS: Alert[] = [
-  {
-    id: 'a1',
-    type: '대량 주문 탐지',
-    memberName: '이영희',
-    memberId: 'user003',
-    detail: '3분 내 50건 주문 / 일계치 30건 초과 / 25.05.08 14:28',
-  },
-  {
-    id: 'a2',
-    type: '중복 주문 탐지',
-    memberName: '박민준',
-    memberId: 'user004',
-    detail: '동일 종목 동일가 5회 반복 / 25.05.08 13:55',
-  },
-  {
-    id: 'a3',
-    type: '비정상 수익률 탐지',
-    memberName: '최수상',
-    memberId: 'user011',
-    detail: '단일 거래 수익률 480% 초과 / 상한가 연속 매매 의심 / 25.05.08 13:40',
-  },
-  {
-    id: 'a4',
-    type: '대량 주문 탐지',
-    memberName: '김봇넷',
-    memberId: 'user022',
-    detail: '5분 내 120건 주문 / API 자동매매 의심 / 25.05.08 13:12',
-  },
-  {
-    id: 'a5',
-    type: '동시다발 로그인 탐지',
-    memberName: '정해킹',
-    memberId: 'user031',
-    detail: '상이한 IP 3곳에서 동시 접속 / 계정 탈취 의심 / 25.05.08 12:58',
-  },
-  {
-    id: 'a6',
-    type: '중복 주문 탐지',
-    memberName: '오반복',
-    memberId: 'user045',
-    detail: '삼성전자 65,400원 동일가 8회 반복 / 25.05.08 12:34',
-  },
-  {
-    id: 'a7',
-    type: '비정상 수익률 탐지',
-    memberName: '한이상',
-    memberId: 'user057',
-    detail: '30분 내 수익률 +230% / 선취매 의심 / 25.05.08 11:50',
-  },
-  {
-    id: 'a8',
-    type: '대량 주문 탐지',
-    memberName: '임테스터',
-    memberId: 'user062',
-    detail: '2분 내 80건 주문 / 체결 엔진 부하 유발 / 25.05.08 11:22',
-  },
-];
-
-// GET /api/admin/monitoring/services
-const SERVICES: ServiceItem[] = [
-  { name: '체결 엔진 (온프레미스 VM-5)',  status: 'NORMAL'  },
-  { name: 'DB Master (온프레미스 VM-3)',   status: 'NORMAL'  },
-  { name: 'DB Slave (온프레미스 VM-4)',    status: 'NORMAL',  lag: 'Lag: 0.2s' },
-  { name: 'Redis Primary (온프레미스 VM-7)', status: 'NORMAL' },
-  { name: 'AWS EKS (채널계)',              status: 'NORMAL'  },
-  { name: 'AWS VPN 터널 (3개)',            status: 'NORMAL',  badge: '모두 연결됨' },
-  { name: '한투 시세 API',                 status: 'NORMAL'  },
-  { name: 'Prometheus / Grafana',          status: 'NORMAL'  },
-  { name: 'DR DC (Cold Standby)',           status: 'STANDBY', badge: 'STANDBY' },
-];
-
-const DOT_CLASS: Record<ServiceStatus, string> = {
-  NORMAL:  'bg-emerald-500',
-  STANDBY: 'bg-slate-400',
-  WARNING: 'bg-orange-400',
-  ERROR:   'bg-rose-500',
-};
-
-const BADGE_CLASS: Record<ServiceStatus, string> = {
-  NORMAL:  'bg-emerald-100 text-emerald-700',
-  STANDBY: 'bg-slate-100 text-slate-500',
-  WARNING: 'bg-orange-100 text-orange-700',
-  ERROR:   'bg-rose-100 text-rose-700',
-};
-
-const BADGE_LABEL: Record<ServiceStatus, string> = {
-  NORMAL:  '정상',
-  STANDBY: '대기중 (정상)',
-  WARNING: '경고',
-  ERROR:   '오류',
-};
 
 export function AdminMonitoringPage() {
   const { setAlertCount } = useAlertCount();
-  const [alerts, setAlerts]               = useState<Alert[]>(MOCK_ALERTS);
+  const [alerts, setAlerts]               = useState<Alert[]>([]);
+  const [stats, setStats]                 = useState({ todayOrders: 0, settledOrders: 0, activeUsers: 0 });
   const [maintenanceOn, setMaintenanceOn] = useState(false);
   const [confirmModal, setConfirmModal]   = useState<'on' | 'off' | null>(null);
-  const [alertConfirm, setAlertConfirm]   = useState<{ id: string; action: 'cancel' | 'suspend' | 'dismiss' } | null>(null);
+  const [alertConfirm, setAlertConfirm]   = useState<{ id: string; action: 'cancel' | 'suspend' | 'dismiss'; memberId: string } | null>(null);
+  const [alertPage, setAlertPage]         = useState(1);
+
+  const ALERT_PAGE_SIZE = 5;
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [monitoring, maintenance] = await Promise.all([
+        systemApi.getMonitoring(),
+        systemApi.getMaintenance(),
+      ]);
+      setStats({
+        todayOrders:   monitoring.todayOrders ?? 0,
+        settledOrders: monitoring.todayCompletedOrders ?? 0,
+        activeUsers:   monitoring.activeUsers ?? 0,
+      });
+      setAlerts(
+        (monitoring.alerts ?? []).map((a: any) => ({
+          id:         String(a.alertId),
+          type:       a.type ?? '',
+          memberName: a.memberName ?? '',
+          memberId:   String(a.memberId ?? ''),
+          orderId:    a.orderId ? String(a.orderId) : '',
+          detail:     a.content ?? '',
+        }))
+      );
+      setMaintenanceOn(maintenance.enabled ?? false);
+    } catch (e) { console.error(e); }
+  }, []);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   useEffect(() => {
     setAlertCount(alerts.length);
+    setAlertPage(1);
   }, [alerts, setAlertCount]);
 
-  function handleDismiss(id: string) {
+  const totalAlertPages = Math.max(1, Math.ceil(alerts.length / ALERT_PAGE_SIZE));
+  const safeAlertPage   = Math.min(alertPage, totalAlertPages);
+  const pagedAlerts     = alerts.slice((safeAlertPage - 1) * ALERT_PAGE_SIZE, safeAlertPage * ALERT_PAGE_SIZE);
+
+  async function handleDismiss(id: string) {
+    try {
+      await systemApi.ignoreAlert(Number(id));
+      setAlerts(prev => prev.filter(a => a.id !== id));
+    } catch (e) {
+      setAlerts(prev => prev.filter(a => a.id !== id));
+    }
+  }
+
+  async function handleCancelOrder(id: string) {
+    const target = alerts.find(a => a.id === id);
+    if (target?.orderId) {
+      try {
+        await systemApi.forceCancelOrder(Number(target.orderId), { reason: '비정상 탐지 — 관리자 강제 취소' });
+      } catch (e) {
+        console.error(e);
+      }
+    }
     setAlerts(prev => prev.filter(a => a.id !== id));
   }
 
-  function handleCancelOrder(id: string) {
-    // POST /api/admin/orders/{orderId}/cancel
-    setAlerts(prev => prev.filter(a => a.id !== id));
-  }
-
-  function handleSuspend(id: string) {
-    // POST /api/admin/members/{memberId}/suspend
-    setAlerts(prev => prev.filter(a => a.id !== id));
+  async function handleSuspend(id: string, memberId: string) {
+    try {
+      await membersApi.suspendMembers({ memberIds: [Number(memberId)], reason: '비정상 탐지 — 즉시 정지' });
+      setAlerts(prev => prev.filter(a => a.id !== id));
+    } catch (e) { console.error(e); }
   }
 
   useAdminPageActions(
@@ -154,7 +99,7 @@ export function AdminMonitoringPage() {
         <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
         시스템 정상 운영 중
       </span>
-      <Button variant="secondary" className="h-9 gap-1.5 text-sm">
+      <Button variant="secondary" className="h-9 gap-1.5 text-sm" onClick={() => fetchData()}>
         <RefreshCw size={14} />
         새로고침
       </Button>
@@ -168,18 +113,14 @@ export function AdminMonitoringPage() {
         {/* 오늘 주문 */}
         <Card>
           <p className="text-xs font-medium text-slate-500">오늘 주문</p>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
-            {STATS.todayOrders.toLocaleString('ko-KR')}건
-          </p>
-          <p className="mt-1 text-xs text-slate-400">체결 {STATS.settledOrders.toLocaleString('ko-KR')}건</p>
+          <p className="mt-2 text-2xl font-bold text-slate-900">{stats.todayOrders.toLocaleString('ko-KR')}건</p>
+          <p className="mt-1 text-xs text-slate-400">체결 {stats.settledOrders.toLocaleString('ko-KR')}건</p>
         </Card>
 
         {/* 현재 접속자 */}
         <Card>
           <p className="text-xs font-medium text-slate-500">현재 접속자</p>
-          <p className="mt-2 text-2xl font-bold text-[#1565C0]">
-            {STATS.activeUsers}명
-          </p>
+          <p className="mt-2 text-2xl font-bold text-[#1565C0]">{stats.activeUsers}명</p>
         </Card>
 
         {/* 비정상 탐지 */}
@@ -205,9 +146,7 @@ export function AdminMonitoringPage() {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-5">
-        {/* 좌측: 비정상 탐지 목록 + 점검 모드 설정 */}
-        <div className="space-y-6 lg:col-span-3">
+      <div className="grid gap-6 lg:grid-cols-2">
           {/* 비정상 탐지 목록 */}
           <Card className="p-0">
             <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-4">
@@ -219,68 +158,75 @@ export function AdminMonitoringPage() {
               </h2>
             </div>
 
-            <div className="h-72 overflow-y-auto scrollbar-none">
+            <div className="divide-y divide-slate-100">
               {alerts.length === 0 ? (
-                <p className="flex h-full items-center justify-center text-sm text-slate-400">처리할 비정상 탐지 항목이 없습니다.</p>
+                <p className="flex items-center justify-center py-4 text-sm text-slate-400">처리할 비정상 탐지 항목이 없습니다.</p>
               ) : (
-                <div className="divide-y divide-slate-100">
-                  {alerts.map(alert => (
-                    <div key={alert.id} className="flex items-start gap-4 border-l-4 border-rose-400 bg-rose-50 px-5 py-4">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-rose-700">
-                          {alert.type} — {alert.memberName} ({alert.memberId})
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-500">{alert.detail}</p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        <button
-                          onClick={() => setAlertConfirm({ id: alert.id, action: 'cancel' })}
-                          className="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                        >
-                          주문취소
-                        </button>
-                        <button
-                          onClick={() => setAlertConfirm({ id: alert.id, action: 'suspend' })}
-                          className="cursor-pointer rounded border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50"
-                        >
-                          계정정지
-                        </button>
-                        <button
-                          onClick={() => setAlertConfirm({ id: alert.id, action: 'dismiss' })}
-                          className="cursor-pointer rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-slate-50"
-                        >
-                          무시
-                        </button>
-                      </div>
+                pagedAlerts.map(alert => (
+                  <div key={alert.id} className="flex items-start gap-4 border-l-4 border-rose-400 bg-rose-50 px-5 py-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-rose-700">
+                        {alert.type} — {alert.memberName} ({alert.memberId})
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-500">{alert.detail}</p>
                     </div>
-                  ))}
-                </div>
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <button onClick={() => setAlertConfirm({ id: alert.id, action: 'cancel', memberId: alert.memberId })} className="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">주문취소</button>
+                      <button onClick={() => setAlertConfirm({ id: alert.id, action: 'suspend', memberId: alert.memberId })} className="cursor-pointer rounded border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50">계정정지</button>
+                      <button onClick={() => setAlertConfirm({ id: alert.id, action: 'dismiss', memberId: alert.memberId })} className="cursor-pointer rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-slate-50">무시</button>
+                    </div>
+                  </div>
+                ))
               )}
+              {Array.from({ length: Math.max(0, ALERT_PAGE_SIZE - (alerts.length === 0 ? 1 : pagedAlerts.length)) }).map((_, i) => (
+                <div key={`ghost-${i}`} className="px-5 py-4">
+                  <span className="invisible select-none text-sm leading-5">x</span>
+                  <span className="invisible block text-xs leading-4">x</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-center border-t border-slate-100 px-5 py-3">
+              <div className="flex items-center gap-1">
+                <button onClick={() => setAlertPage(1)} disabled={safeAlertPage === 1} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronsLeft size={15} /></button>
+                <button onClick={() => setAlertPage(p => Math.max(1, p - 1))} disabled={safeAlertPage === 1} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronLeft size={15} /></button>
+                {getPaginationPages(safeAlertPage, totalAlertPages).map(page => (
+                  <button key={page} onClick={() => setAlertPage(page)} className={`min-w-7 cursor-pointer rounded px-2 py-0.5 text-sm ${page === safeAlertPage ? 'bg-[#1565C0] text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{page}</button>
+                ))}
+                <button onClick={() => setAlertPage(p => Math.min(totalAlertPages, p + 1))} disabled={safeAlertPage === totalAlertPages} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronRight size={15} /></button>
+                <button onClick={() => setAlertPage(totalAlertPages)} disabled={safeAlertPage === totalAlertPages} className="cursor-pointer rounded p-1 text-slate-500 hover:bg-slate-100 disabled:cursor-default disabled:opacity-40"><ChevronsRight size={15} /></button>
+              </div>
             </div>
           </Card>
 
           {/* 점검 모드 설정 */}
-          <Card>
-            <h2 className="mb-4 text-sm font-semibold text-slate-900">점검 모드 설정</h2>
+          <Card className="flex flex-col">
+            <h2 className="mb-6 text-sm font-semibold text-slate-900">점검 모드 설정</h2>
 
-            <div className="mb-4 rounded-lg border border-slate-200 px-4 py-3">
-              <p className="text-sm font-medium text-slate-800">점검 모드 ON/OFF</p>
-              <p className="mt-0.5 text-xs text-slate-500">
-                점검 모드 ON 시 모든 주문·체결 즉시 차단
-              </p>
+            <div className="flex flex-1 flex-col gap-4">
+              <div className="rounded-lg border border-slate-200 px-4 py-4">
+                <p className="text-sm font-medium text-slate-800">점검 모드 ON/OFF</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  점검 모드 ON 시 모든 주문·체결이 즉시 차단되며, 사용자 접근이 제한됩니다.
+                </p>
+              </div>
+
+              <div className="flex flex-1 flex-col rounded-lg border border-amber-200 bg-amber-50 px-4 py-4">
+                <p className="text-xs font-semibold text-amber-700">점검 모드 활성화 시</p>
+                <ul className="mt-2 flex-1 space-y-1.5 text-xs text-amber-600">
+                  <li>· 사용자 화면에 점검 중 안내 메시지 노출</li>
+                  <li>· 주문 불가 / 체결 엔진 일시 중단</li>
+                  <li>· 진행 중인 모든 미체결 주문 자동 취소</li>
+                  <li>· 신규 회원가입 및 로그인 차단</li>
+                  <li>· 시세 데이터 수신은 유지되나 거래 반영 안 됨</li>
+                  <li>· 점검 종료 후 체결 엔진 재시작 필요</li>
+                  <li>· 사전 공지 필수 (최소 10분 전 권장)</li>
+                  <li>· 점검 이력은 감사 로그에 자동 기록됨</li>
+                </ul>
+              </div>
             </div>
 
-            {/* 활성화 시 안내 */}
-            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-              <p className="text-xs font-semibold text-amber-700">점검 모드 활성화 시</p>
-              <ul className="mt-1 space-y-0.5 text-xs text-amber-600">
-                <li>· 사용자 화면에 점검 중 안내 메시지 노출</li>
-                <li>· 주문 불가 / 체결 엔진 일시 중단</li>
-                <li>· 사전 공지 필수</li>
-              </ul>
-            </div>
-
-            <div className="flex gap-2">
+            <div className="mt-auto flex gap-2 pt-6">
               <Button
                 variant="danger"
                 className="flex-1"
@@ -299,40 +245,6 @@ export function AdminMonitoringPage() {
               </Button>
             </div>
           </Card>
-        </div>
-
-        {/* 우측: 서비스 상태 */}
-        <Card className="lg:col-span-2">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">서비스 상태</h2>
-            <span className="text-xs text-slate-400">실시간 (자동 갱신)</span>
-          </div>
-
-          <div className="divide-y divide-slate-100">
-            {SERVICES.map(svc => (
-              <div key={svc.name} className="flex items-center gap-3 py-3">
-                <span className={`h-2 w-2 shrink-0 rounded-full ${DOT_CLASS[svc.status]}`} />
-                <span className="flex-1 text-sm text-slate-700">{svc.name}</span>
-                {svc.lag && (
-                  <span className="text-xs text-slate-400">{svc.lag}</span>
-                )}
-                {svc.badge ? (
-                  <span className={`rounded px-2 py-0.5 text-xs font-medium ${
-                    svc.badge === 'STANDBY'
-                      ? 'bg-slate-100 text-slate-500'
-                      : 'bg-emerald-100 text-emerald-700'
-                  }`}>
-                    {svc.badge}
-                  </span>
-                ) : (
-                  <span className={`rounded px-2 py-0.5 text-xs font-medium ${BADGE_CLASS[svc.status]}`}>
-                    {BADGE_LABEL[svc.status]}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
       </div>
 
       {/* 비정상 탐지 액션 확인 모달 */}
@@ -347,10 +259,10 @@ export function AdminMonitoringPage() {
         };
         const meta = ACTION_META[alertConfirm.action];
 
-        function handleConfirm() {
-          if (alertConfirm!.action === 'cancel')  handleCancelOrder(alertConfirm!.id);
-          if (alertConfirm!.action === 'suspend') handleSuspend(alertConfirm!.id);
-          if (alertConfirm!.action === 'dismiss') handleDismiss(alertConfirm!.id);
+        async function handleConfirm() {
+          if (alertConfirm!.action === 'cancel')  await handleCancelOrder(alertConfirm!.id);
+          if (alertConfirm!.action === 'suspend') await handleSuspend(alertConfirm!.id, alertConfirm!.memberId);
+          if (alertConfirm!.action === 'dismiss') await handleDismiss(alertConfirm!.id);
           setAlertConfirm(null);
         }
 
@@ -398,8 +310,14 @@ export function AdminMonitoringPage() {
               </Button>
               <Button
                 variant={confirmModal === 'on' ? 'danger' : 'brand'}
-                onClick={() => {
-                  setMaintenanceOn(confirmModal === 'on');
+                onClick={async () => {
+                  const turnOn = confirmModal === 'on';
+                  try {
+                    await systemApi.updateMaintenance({ status: turnOn ? 'ON' : 'OFF' });
+                    setMaintenanceOn(turnOn);
+                  } catch (e) {
+                    console.error(e);
+                  }
                   setConfirmModal(null);
                 }}
               >
