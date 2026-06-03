@@ -1,24 +1,12 @@
-import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { InfoBox } from '../../components/common/InfoBox';
 
-const MOCK_MASKED_USER_ID = 'hong****';
-
-function formatChangedAt(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-
-  return `${year}.${month}.${day} ${hours}:${minutes} 변경`;
-}
-
 export function ResetPasswordCompletePage() {
   const navigate = useNavigate();
-  const changedAt = useMemo(() => formatChangedAt(new Date()), []);
+  const location = useLocation();
+  const { maskedUserId, changedAt } = (location.state as { maskedUserId?: string; changedAt?: string }) ?? {};
 
   return (
     <Card className="flex min-h-screen w-full flex-col rounded-none border-0 shadow-none sm:min-h-[640px] sm:max-w-md sm:rounded-lg sm:border sm:shadow-sm">
@@ -42,9 +30,9 @@ export function ResetPasswordCompletePage() {
           <div className="mt-8 rounded-xl border border-blue-100 bg-[#E5F4FF] px-4 py-4 text-center text-xs text-[#6C88A4]">
             <p>변경 완료 계정</p>
             <p className="mt-1 text-base font-bold text-[#1565C0]">
-              {MOCK_MASKED_USER_ID}
+              {maskedUserId ?? '-'}
             </p>
-            <p className="mt-1">{changedAt}</p>
+            <p className="mt-1">{changedAt ?? ''}</p>
           </div>
 
           <InfoBox className="mt-4 text-center" variant="warning">

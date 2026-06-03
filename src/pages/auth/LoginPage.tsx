@@ -4,6 +4,8 @@ import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { PasswordInput } from '../../components/common/PasswordInput';
 import { TextInput } from '../../components/common/TextInput';
+import { authApi, parseApiError } from '../../api/auth';
+import { saveTokens } from '../../utils/tokenStorage';
 import loginLogo from '../../assets/login-logo-transparent.png';
 
 interface LoginErrors {
@@ -18,8 +20,9 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [keepLoggedIn, setKeepLoggedIn] = useState(false);
   const [errors, setErrors] = useState<LoginErrors>({});
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const nextErrors: LoginErrors = {};
@@ -38,20 +41,16 @@ export function LoginPage() {
       return;
     }
 
-    // TODO: API 연동 후 존재하지 않는 아이디, 탈퇴/정지 계정 오류를 처리합니다.
-    // TODO: API 연동 후 아이디/비밀번호 불일치, 로그인 실패 횟수 초과 오류를 처리합니다.
-    // setErrors({ server: '존재하지 않는 아이디입니다' });
-    // setErrors({ server: '사용할 수 없는 계정입니다' });
-    // setErrors({ server: '아이디 또는 비밀번호가 일치하지 않습니다' });
-    // setErrors({ server: '로그인 실패 횟수를 초과했습니다. 잠시 후 다시 시도해주세요' });
-    console.log('mock login', {
-      username,
-      keepLoggedIn,
-    });
-
-    // TODO: API/토큰 연동 단계에서 토큰 생성, 세션 저장, 로그인 유지 처리를 구현합니다.
-    window.sessionStorage.setItem('mockAuthStatus', 'authenticated');
-    navigate('/home', { replace: true });
+    setIsLoading(true);
+    try {
+      const data = await authApi.login({ userId: username, password, keepLogin: keepLoggedIn });
+      saveTokens(data.accessToken, data.refreshToken, keepLoggedIn);
+      navigate('/home', { replace: true });
+    } catch (error) {
+      setErrors({ server: parseApiError(error) });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -122,10 +121,11 @@ export function LoginPage() {
 
         <Button
           className="h-12 w-full rounded-xl text-base font-bold"
+          disabled={isLoading}
           type="submit"
           variant="brand"
         >
-          로그인
+          {isLoading ? '로그인 중...' : '로그인'}
         </Button>
 
         <p className="pt-1 text-center text-xs text-slate-500">

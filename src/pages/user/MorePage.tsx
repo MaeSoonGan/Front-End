@@ -3,6 +3,7 @@ import { PageContainer } from '../../components/common/PageContainer';
 import { MenuCard } from '../../components/user/MenuCard';
 import { useContestMode } from '../../contexts/ContestModeContext';
 import { userMoreMock } from '../../mocks/userHomeMock';
+import { clearTokens } from '../../utils/tokenStorage';
 
 export function MorePage() {
   const navigate = useNavigate();
@@ -13,9 +14,7 @@ export function MorePage() {
   const accountMenus = userMoreMock.accountMenus;
 
   const handleLogout = () => {
-    // TODO: authStore/API 연동 후 실제 로그아웃과 토큰 정리를 처리합니다.
-    console.log('mock logout');
-    window.sessionStorage.removeItem('mockAuthStatus');
+    clearTokens();
     navigate('/login', { replace: true });
   };
 

@@ -4,19 +4,16 @@ import { ContestModeBanner } from '../components/user/ContestModeBanner';
 import { BottomNavigation } from '../components/user/BottomNavigation';
 import { UserHeader } from '../components/user/UserHeader';
 import { ContestModeProvider } from '../contexts/ContestModeContext';
-
-const MOCK_AUTH_KEY = 'mockAuthStatus';
-const MOCK_AUTHENTICATED = 'authenticated';
+import { isAuthenticated } from '../utils/tokenStorage';
 
 export function UserLayout() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (window.sessionStorage.getItem(MOCK_AUTH_KEY) === MOCK_AUTHENTICATED) {
+    if (isAuthenticated()) {
       return;
     }
 
-    // TODO: API/토큰 연동 후 실제 인증 상태 기반 보호 라우트로 교체합니다.
     navigate('/login', { replace: true });
   }, [navigate]);
 
