@@ -7,6 +7,7 @@ import { PasswordChangeForm } from '../../components/user/PasswordChangeForm';
 import { ProfileEditForm } from '../../components/user/ProfileEditForm';
 import { ProfileImageUploader } from '../../components/user/ProfileImageUploader';
 import { profileMock } from '../../mocks/profileMock';
+import { clearTokens } from '../../utils/tokenStorage';
 import type { ProfileEditErrors, ProfileEditFormState } from '../../types/profile';
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{10,}$/;
@@ -106,9 +107,8 @@ export function ProfileEditPage() {
   };
 
   const handleWithdraw = () => {
-    // TODO: 회원 탈퇴 API 연동 후 세션 삭제와 서버 상태를 동기화합니다.
-    console.log('mock member withdraw');
-    window.sessionStorage.removeItem('mockAuthStatus');
+    // TODO: 회원 탈퇴 API 연동 후 서버 상태를 동기화합니다.
+    clearTokens();
     navigate('/login', { replace: true });
   };
 

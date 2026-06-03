@@ -1,18 +1,18 @@
-import { type FormEvent, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthPageHeader } from '../../components/auth/AuthPageHeader';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { InfoBox } from '../../components/common/InfoBox';
 import { PasswordInput } from '../../components/common/PasswordInput';
 import { PasswordRuleList } from '../../components/common/PasswordRuleList';
+import { authApi, parseApiError } from '../../api/auth';
 
 const INPUT_CLASS =
   'h-11 w-full rounded-xl border-blue-100 !bg-[#F0F6FF] px-4 text-[#6C88A4] placeholder:text-[#6C88A4] focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-100';
 const LABEL_CLASS = 'mb-2 text-xs font-bold text-[#6C88A4]';
 const ERROR_CLASS = 'mt-1 text-xs text-red-500';
 const SUCCESS_CLASS = 'mt-1 text-xs font-bold text-emerald-600';
-const MOCK_MASKED_USER_ID = 'hong****';
 
 interface ResetPasswordErrors {
   password?: string;
@@ -22,55 +22,44 @@ interface ResetPasswordErrors {
 
 function getPasswordRules(password: string) {
   return [
-    {
-      label: '영문 대문자 포함',
-      isValid: /[A-Z]/.test(password),
-    },
-    {
-      label: '영문 소문자 포함',
-      isValid: /[a-z]/.test(password),
-    },
-    {
-      label: '숫자 포함',
-      isValid: /\d/.test(password),
-    },
-    {
-      label: '특수문자 포함 (!@#$%^&*)',
-      isValid: /[!@#$%^&*]/.test(password),
-    },
-    {
-      label: '10자 이상',
-      isValid: password.length >= 10,
-    },
+    { label: '영문 대문자 포함', isValid: /[A-Z]/.test(password) },
+    { label: '영문 소문자 포함', isValid: /[a-z]/.test(password) },
+    { label: '숫자 포함', isValid: /\d/.test(password) },
+    { label: '특수문자 포함 (!@#$%^&*)', isValid: /[!@#$%^&*]/.test(password) },
+    { label: '10자 이상', isValid: password.length >= 10 },
   ];
 }
 
 export function ResetPasswordPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { resetToken, maskedUserId } = (location.state as { resetToken?: string; maskedUserId?: string }) ?? {};
+
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [errors, setErrors] = useState<ResetPasswordErrors>({});
+  const [isLoading, setIsLoading] = useState(false);
 
   const passwordRules = useMemo(() => getPasswordRules(password), [password]);
   const isPasswordValid = passwordRules.every((rule) => rule.isValid);
   const isPasswordMatched = Boolean(passwordConfirm && password === passwordConfirm);
   const canSubmit = isPasswordValid && isPasswordMatched;
 
+  useEffect(() => {
+    if (!resetToken) {
+      navigate('/find-account', { replace: true });
+    }
+  }, [resetToken, navigate]);
+
   const goBack = () => {
     if (window.history.length > 1) {
       navigate(-1);
       return;
     }
-
     navigate('/find-account');
   };
 
   const handleCancel = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-      return;
-    }
-
     navigate('/login');
   };
 
@@ -89,13 +78,10 @@ export function ResetPasswordPage() {
       nextErrors.passwordConfirm = '비밀번호가 일치하지 않습니다';
     }
 
-    // TODO: API 연동 후 이전과 동일한 비밀번호 입력 여부를 검증합니다.
-    // setErrors({ server: '이전과 동일한 비밀번호는 사용할 수 없어요' });
-    // TODO: API 연동 후 비밀번호 재설정 토큰과 본인 인증 완료 여부를 검증합니다.
     return nextErrors;
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const nextErrors = validateForm();
@@ -105,10 +91,27 @@ export function ResetPasswordPage() {
       return;
     }
 
-    console.log('mock reset password complete', {
-      maskedUserId: MOCK_MASKED_USER_ID,
-    });
-    navigate('/reset-password/complete');
+    if (!resetToken) return;
+
+    setIsLoading(true);
+    try {
+      const data = await authApi.resetPassword({
+        resetToken,
+        newPassword: password,
+        newPasswordConfirm: passwordConfirm,
+      });
+      navigate('/reset-password/complete', {
+        replace: true,
+        state: {
+          maskedUserId: data.maskedUserId,
+          changedAt: data.changedAt,
+        },
+      });
+    } catch (error) {
+      setErrors({ server: parseApiError(error) });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -118,7 +121,7 @@ export function ResetPasswordPage() {
       <InfoBox variant="success">
         <p className="font-bold">☑ 본인 인증이 완료됐어요</p>
         <p className="mt-1 text-emerald-600">
-          {MOCK_MASKED_USER_ID} 님의 새 비밀번호를 설정해주세요
+          {maskedUserId ?? ''} 님의 새 비밀번호를 설정해주세요
         </p>
       </InfoBox>
 
@@ -149,11 +152,7 @@ export function ResetPasswordPage() {
               className={INPUT_CLASS}
               onChange={(event) => {
                 setPasswordConfirm(event.target.value);
-                setErrors((prev) => ({
-                  ...prev,
-                  passwordConfirm: undefined,
-                  server: undefined,
-                }));
+                setErrors((prev) => ({ ...prev, passwordConfirm: undefined, server: undefined }));
               }}
               placeholder="새 비밀번호 재입력"
               value={passwordConfirm}
@@ -183,11 +182,11 @@ export function ResetPasswordPage() {
 
         <Button
           className="h-12 w-full rounded-xl text-base font-bold"
-          disabled={!canSubmit}
+          disabled={!canSubmit || isLoading}
           type="submit"
           variant="brand"
         >
-          비밀번호 변경 완료
+          {isLoading ? '변경 중...' : '비밀번호 변경 완료'}
         </Button>
         <Button
           className="h-12 w-full rounded-xl border-blue-100 bg-[#F0F6FF] text-base font-bold text-slate-900 hover:bg-[#E5F4FF]"

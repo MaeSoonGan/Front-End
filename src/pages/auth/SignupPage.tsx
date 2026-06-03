@@ -6,6 +6,7 @@ import { Card } from '../../components/common/Card';
 import { Modal } from '../../components/common/Modal';
 import { PasswordInput } from '../../components/common/PasswordInput';
 import { TextInput } from '../../components/common/TextInput';
+import { authApi, parseApiError } from '../../api/auth';
 
 const INPUT_CLASS =
   'h-11 w-full rounded-xl border-blue-100 !bg-[#F0F6FF] px-4 text-[#6C88A4] placeholder:text-[#6C88A4] focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-100';
@@ -13,10 +14,10 @@ const INPUT_CLASS =
 const LABEL_CLASS = 'mb-2 text-xs text-[#6C88A4]';
 const ERROR_CLASS = 'mt-1 text-xs text-red-500';
 const HELP_CLASS = 'mt-1 text-xs text-[#1565C0]';
-const MOCK_AUTH_CODE = '123456';
 const AUTH_SECONDS = 180;
 
 interface SignupErrors {
+  userId?: string;
   password?: string;
   passwordConfirm?: string;
   email?: string;
@@ -50,6 +51,7 @@ function formatTimer(seconds: number) {
 
 export function SignupPage() {
   const navigate = useNavigate();
+  const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [email, setEmail] = useState('');
@@ -65,11 +67,13 @@ export function SignupPage() {
   const [noticeMessage, setNoticeMessage] = useState('');
   const [errors, setErrors] = useState<SignupErrors>({});
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const canSubmit = useMemo(
     () =>
       Boolean(
-        password &&
+        userId &&
+          password &&
           passwordConfirm &&
           email &&
           authCode &&
@@ -78,16 +82,7 @@ export function SignupPage() {
           serviceTerm &&
           privacyTerm,
       ),
-    [
-      password,
-      passwordConfirm,
-      email,
-      authCode,
-      nickname,
-      phone,
-      serviceTerm,
-      privacyTerm,
-    ],
+    [userId, password, passwordConfirm, email, authCode, nickname, phone, serviceTerm, privacyTerm],
   );
 
   useEffect(() => {
@@ -121,6 +116,13 @@ export function SignupPage() {
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{10,}$/;
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^010-\d{4}-\d{4}$/;
+    const userIdRegex = /^[A-Za-z0-9]{5,20}$/;
+
+    if (!userId.trim()) {
+      nextErrors.userId = '아이디를 입력해주세요';
+    } else if (!userIdRegex.test(userId)) {
+      nextErrors.userId = '아이디는 5~20자 영문/숫자로 입력해주세요';
+    }
 
     if (!password) {
       nextErrors.password = '비밀번호를 입력해주세요';
@@ -145,7 +147,7 @@ export function SignupPage() {
       nextErrors.authCode =
         authTimeLeft <= 0
           ? '인증 시간이 만료되었습니다. 다시 발송해주세요'
-          : '인증번호가 일치하지 않습니다';
+          : '이메일 인증을 완료해주세요';
     }
 
     if (!nickname.trim()) {
@@ -167,7 +169,7 @@ export function SignupPage() {
     return nextErrors;
   };
 
-  const handleSendAuthCode = () => {
+  const handleSendAuthCode = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!emailRegex.test(email)) {
@@ -178,17 +180,20 @@ export function SignupPage() {
       return;
     }
 
-    // TODO: API 연동 후 이미 가입된 이메일 여부를 검사합니다.
-    // setErrors((prev) => ({ ...prev, email: '이미 사용 중인 이메일입니다' }));
-    setAuthCode('');
-    setIsAuthSent(true);
-    setIsEmailVerified(false);
-    setAuthTimeLeft(AUTH_SECONDS);
-    setNoticeMessage('인증번호가 발송되었습니다');
-    clearFieldError('email');
+    try {
+      await authApi.sendCode({ email, purpose: 'signup' });
+      setAuthCode('');
+      setIsAuthSent(true);
+      setIsEmailVerified(false);
+      setAuthTimeLeft(AUTH_SECONDS);
+      setNoticeMessage('인증번호가 발송되었습니다');
+      clearFieldError('email');
+    } catch (error) {
+      setErrors((prev) => ({ ...prev, email: parseApiError(error) }));
+    }
   };
 
-  const handleVerifyAuthCode = () => {
+  const handleVerifyAuthCode = async () => {
     if (!authCode) {
       setErrors((prev) => ({ ...prev, authCode: '인증번호를 입력해주세요' }));
       return;
@@ -202,17 +207,21 @@ export function SignupPage() {
       return;
     }
 
-    if (authCode !== MOCK_AUTH_CODE) {
-      setErrors((prev) => ({ ...prev, authCode: '인증번호가 일치하지 않습니다' }));
-      return;
+    try {
+      const data = await authApi.verifyCode({ email, code: authCode });
+      if (data.verified) {
+        setIsEmailVerified(true);
+        setNoticeMessage('이메일 인증이 완료되었습니다');
+        clearFieldError('authCode');
+      } else {
+        setErrors((prev) => ({ ...prev, authCode: '인증번호가 일치하지 않습니다' }));
+      }
+    } catch (error) {
+      setErrors((prev) => ({ ...prev, authCode: parseApiError(error) }));
     }
-
-    setIsEmailVerified(true);
-    setNoticeMessage('이메일 인증이 완료되었습니다');
-    clearFieldError('authCode');
   };
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     const nextErrors = validateForm();
@@ -222,17 +231,33 @@ export function SignupPage() {
       return;
     }
 
-    // TODO: API 연동 후 이메일/닉네임 중복 검사를 처리합니다.
-    // setErrors({ email: '이미 사용 중인 이메일입니다' });
-    // setErrors({ nickname: '이미 사용 중인 닉네임입니다' });
-    // setErrors({ server: '회원가입에 실패했습니다. 잠시 후 다시 시도해주세요' });
-    console.log('mock signup', {
-      email,
-      nickname,
-      phone,
-      marketingTerm,
-    });
-    setIsCompleteModalOpen(true);
+    setIsLoading(true);
+    try {
+      await authApi.register({
+        userId,
+        password,
+        email,
+        nickname,
+        phone,
+        termsAgreed: serviceTerm,
+        privacyAgreed: privacyTerm,
+        marketingAgreed: marketingTerm,
+      });
+      setIsCompleteModalOpen(true);
+    } catch (error) {
+      const message = parseApiError(error);
+      if (message.includes('아이디')) {
+        setErrors({ userId: message });
+      } else if (message.includes('이메일')) {
+        setErrors({ email: message });
+      } else if (message.includes('닉네임')) {
+        setErrors({ nickname: message });
+      } else {
+        setErrors({ server: message });
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -303,6 +328,21 @@ export function SignupPage() {
             </div>
             {errors.authCode ? <p className={ERROR_CLASS}>{errors.authCode}</p> : null}
             {noticeMessage ? <p className={HELP_CLASS}>{noticeMessage}</p> : null}
+          </div>
+
+          <div>
+            <p className={LABEL_CLASS}>아이디 (5~20자 영문/숫자)</p>
+            <TextInput
+              autoComplete="off"
+              className={INPUT_CLASS}
+              onChange={(event) => {
+                setUserId(event.target.value);
+                clearFieldError('userId');
+              }}
+              placeholder="아이디 입력"
+              value={userId}
+            />
+            {errors.userId ? <p className={ERROR_CLASS}>{errors.userId}</p> : null}
           </div>
 
           <div>
@@ -404,11 +444,11 @@ export function SignupPage() {
 
           <Button
             className="h-12 w-full rounded-xl text-base font-bold"
-            disabled={!canSubmit}
+            disabled={!canSubmit || isLoading}
             type="submit"
             variant="brand"
           >
-            가입하기
+            {isLoading ? '가입 중...' : '가입하기'}
           </Button>
         </form>
       </Card>

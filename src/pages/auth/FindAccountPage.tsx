@@ -5,7 +5,7 @@ import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { Modal } from '../../components/common/Modal';
 import { TextInput } from '../../components/common/TextInput';
-import { cn } from '../../utils/cn';
+import { authApi, parseApiError } from '../../api/auth';
 
 const INPUT_CLASS =
   'h-11 w-full rounded-xl border-blue-100 !bg-[#F0F6FF] px-4 text-[#6C88A4] placeholder:text-[#6C88A4] focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-100';
@@ -14,46 +14,25 @@ const ERROR_CLASS = 'mt-1 text-xs text-red-500';
 const HELP_CLASS = 'mt-1 text-xs text-[#1565C0]';
 const SUCCESS_CLASS = 'mt-1 text-xs text-emerald-600';
 const SECTION_CLASS = 'rounded-xl border border-blue-100 bg-white p-4 shadow-sm';
-const METHOD_BUTTON_CLASS =
-  'h-10 flex-1 rounded-xl px-2 text-xs font-bold transition';
-const MOCK_AUTH_CODE = '123456';
-const MOCK_FOUND_EMAIL = 'user@example.com';
 const AUTH_SECONDS = 180;
 
-type PasswordAuthMethod = 'email' | 'phone';
-
 interface FindIdErrors {
-  phone?: string;
+  email?: string;
   authCode?: string;
   server?: string;
 }
 
 interface FindPasswordErrors {
-  userEmail?: string;
+  userId?: string;
   name?: string;
-  phone?: string;
+  email?: string;
   authCode?: string;
   server?: string;
-}
-
-function formatPhoneNumber(value: string) {
-  const digits = value.replace(/\D/g, '').slice(0, 11);
-
-  if (digits.length <= 3) {
-    return digits;
-  }
-
-  if (digits.length <= 7) {
-    return `${digits.slice(0, 3)}-${digits.slice(3)}`;
-  }
-
-  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
 }
 
 function formatTimer(seconds: number) {
   const minutes = Math.floor(seconds / 60);
   const restSeconds = String(seconds % 60).padStart(2, '0');
-
   return `${minutes}:${restSeconds}`;
 }
 
@@ -61,22 +40,11 @@ function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function isPhone(value: string) {
-  return /^010-\d{4}-\d{4}$/.test(value);
-}
-
-function getMethodButtonClass(isSelected: boolean) {
-  return cn(
-    METHOD_BUTTON_CLASS,
-    isSelected
-      ? '!border-blue-700 bg-[#EAF4FF] !text-blue-700'
-      : '!border-blue-100 bg-white !text-slate-700',
-  );
-}
-
 export function FindAccountPage() {
   const navigate = useNavigate();
-  const [findIdPhone, setFindIdPhone] = useState('');
+
+  // 아이디 찾기
+  const [findIdEmail, setFindIdEmail] = useState('');
   const [findIdAuthCode, setFindIdAuthCode] = useState('');
   const [isFindIdAuthSent, setIsFindIdAuthSent] = useState(false);
   const [isFindIdVerified, setIsFindIdVerified] = useState(false);
@@ -84,12 +52,12 @@ export function FindAccountPage() {
   const [findIdNotice, setFindIdNotice] = useState('');
   const [findIdErrors, setFindIdErrors] = useState<FindIdErrors>({});
   const [isFindIdModalOpen, setIsFindIdModalOpen] = useState(false);
+  const [foundUserId, setFoundUserId] = useState('');
 
-  const [passwordAuthMethod, setPasswordAuthMethod] =
-    useState<PasswordAuthMethod>('email');
-  const [passwordUserEmail, setPasswordUserEmail] = useState('');
+  // 비밀번호 찾기
+  const [passwordUserId, setPasswordUserId] = useState('');
   const [passwordName, setPasswordName] = useState('');
-  const [passwordPhone, setPasswordPhone] = useState('');
+  const [passwordEmail, setPasswordEmail] = useState('');
   const [passwordAuthCode, setPasswordAuthCode] = useState('');
   const [isPasswordAuthSent, setIsPasswordAuthSent] = useState(false);
   const [isPasswordVerified, setIsPasswordVerified] = useState(false);
@@ -100,35 +68,28 @@ export function FindAccountPage() {
   const canResetPassword = useMemo(
     () =>
       Boolean(
-        passwordUserEmail &&
-          isEmail(passwordUserEmail) &&
+        passwordUserId.trim() &&
           passwordName.trim() &&
+          passwordEmail &&
+          isEmail(passwordEmail) &&
           isPasswordVerified,
       ),
-    [isPasswordVerified, passwordName, passwordUserEmail],
+    [isPasswordVerified, passwordName, passwordUserId, passwordEmail],
   );
 
   useEffect(() => {
-    if (!isFindIdAuthSent || isFindIdVerified || findIdTimeLeft <= 0) {
-      return;
-    }
-
+    if (!isFindIdAuthSent || isFindIdVerified || findIdTimeLeft <= 0) return;
     const timerId = window.setInterval(() => {
       setFindIdTimeLeft((prev) => Math.max(prev - 1, 0));
     }, 1000);
-
     return () => window.clearInterval(timerId);
   }, [findIdTimeLeft, isFindIdAuthSent, isFindIdVerified]);
 
   useEffect(() => {
-    if (!isPasswordAuthSent || isPasswordVerified || passwordTimeLeft <= 0) {
-      return;
-    }
-
+    if (!isPasswordAuthSent || isPasswordVerified || passwordTimeLeft <= 0) return;
     const timerId = window.setInterval(() => {
       setPasswordTimeLeft((prev) => Math.max(prev - 1, 0));
     }, 1000);
-
     return () => window.clearInterval(timerId);
   }, [isPasswordAuthSent, isPasswordVerified, passwordTimeLeft]);
 
@@ -137,7 +98,6 @@ export function FindAccountPage() {
       navigate(-1);
       return;
     }
-
     navigate('/login');
   };
 
@@ -149,212 +109,136 @@ export function FindAccountPage() {
     setPasswordErrors((prev) => ({ ...prev, [field]: undefined, server: undefined }));
   };
 
-  const resetPasswordAuthState = () => {
-    setPasswordAuthCode('');
-    setIsPasswordAuthSent(false);
-    setIsPasswordVerified(false);
-    setPasswordTimeLeft(AUTH_SECONDS);
-    setPasswordNotice('');
-    setPasswordErrors((prev) => ({
-      ...prev,
-      phone: undefined,
-      authCode: undefined,
-      server: undefined,
-    }));
-  };
-
-  const handleSendFindIdCode = () => {
-    if (!findIdPhone) {
-      setFindIdErrors((prev) => ({ ...prev, phone: '전화번호를 입력해주세요' }));
+  // 아이디 찾기 — 이메일로 인증번호 발송
+  const handleSendFindIdCode = async () => {
+    if (!findIdEmail) {
+      setFindIdErrors((prev) => ({ ...prev, email: '이메일을 입력해주세요' }));
       return;
     }
-
-    if (!isPhone(findIdPhone)) {
-      setFindIdErrors((prev) => ({
-        ...prev,
-        phone: '올바른 전화번호 형식으로 입력해주세요',
-      }));
+    if (!isEmail(findIdEmail)) {
+      setFindIdErrors((prev) => ({ ...prev, email: '올바른 이메일 형식으로 입력해주세요' }));
       return;
     }
-
-    // TODO: API 연동 후 가입된 휴대폰 번호 없음, 탈퇴/정지 계정 여부를 검증합니다.
-    // setFindIdErrors({ server: '일치하는 회원 정보를 찾을 수 없습니다' });
-    // setFindIdErrors({ server: '사용할 수 없는 계정입니다' });
-    console.log('mock send find id sms code', { phone: findIdPhone });
-    setFindIdAuthCode('');
-    setIsFindIdAuthSent(true);
-    setIsFindIdVerified(false);
-    setFindIdTimeLeft(AUTH_SECONDS);
-    setFindIdNotice('인증번호가 발송되었습니다');
-    clearFindIdError('phone');
+    try {
+      await authApi.sendCode({ email: findIdEmail, purpose: 'find-id' });
+      setFindIdAuthCode('');
+      setIsFindIdAuthSent(true);
+      setIsFindIdVerified(false);
+      setFindIdTimeLeft(AUTH_SECONDS);
+      setFindIdNotice('인증번호가 발송되었습니다');
+      clearFindIdError('email');
+    } catch (error) {
+      setFindIdErrors((prev) => ({ ...prev, email: parseApiError(error) }));
+    }
   };
 
-  const handleVerifyFindIdCode = () => {
+  const handleVerifyFindIdCode = async () => {
     if (!findIdAuthCode) {
-      setFindIdErrors((prev) => ({
-        ...prev,
-        authCode: '인증번호를 입력해주세요',
-      }));
+      setFindIdErrors((prev) => ({ ...prev, authCode: '인증번호를 입력해주세요' }));
       return;
     }
-
     if (findIdTimeLeft <= 0) {
-      setFindIdErrors((prev) => ({
-        ...prev,
-        authCode: '인증 시간이 만료되었습니다. 다시 발송해주세요',
-      }));
+      setFindIdErrors((prev) => ({ ...prev, authCode: '인증 시간이 만료되었습니다. 다시 발송해주세요' }));
       return;
     }
-
-    if (findIdAuthCode !== MOCK_AUTH_CODE) {
-      setFindIdErrors((prev) => ({
-        ...prev,
-        authCode: '인증번호가 일치하지 않습니다',
-      }));
-      return;
+    try {
+      const data = await authApi.verifyCode({ email: findIdEmail, code: findIdAuthCode });
+      if (data.verified) {
+        setIsFindIdVerified(true);
+        setFindIdNotice('이메일 인증이 완료되었습니다');
+        clearFindIdError('authCode');
+      } else {
+        setFindIdErrors((prev) => ({ ...prev, authCode: '인증번호가 일치하지 않습니다' }));
+      }
+    } catch (error) {
+      setFindIdErrors((prev) => ({ ...prev, authCode: parseApiError(error) }));
     }
-
-    setIsFindIdVerified(true);
-    setFindIdNotice('휴대폰 인증이 완료되었습니다');
-    clearFindIdError('authCode');
   };
 
-  const handleFindId = () => {
+  const handleFindId = async () => {
     if (!isFindIdVerified) {
-      setFindIdErrors((prev) => ({
-        ...prev,
-        authCode: '휴대폰 인증을 완료해주세요',
-      }));
+      setFindIdErrors((prev) => ({ ...prev, authCode: '이메일 인증을 완료해주세요' }));
       return;
     }
-
-    // TODO: API 연동 후 실제 회원 조회와 계정 상태 검증을 처리합니다.
-    console.log('mock find id', { phone: findIdPhone });
-    setIsFindIdModalOpen(true);
-  };
-
-  const handleSendPasswordCode = () => {
-    if (passwordAuthMethod === 'email') {
-      if (!passwordUserEmail) {
-        setPasswordErrors((prev) => ({
-          ...prev,
-          userEmail: '아이디를 입력해주세요',
-        }));
-        return;
-      }
-
-      if (!isEmail(passwordUserEmail)) {
-        setPasswordErrors((prev) => ({
-          ...prev,
-          userEmail: '아이디는 이메일 형식으로 입력해주세요',
-        }));
-        return;
-      }
-
-      console.log('mock send password email code', { email: passwordUserEmail });
-      clearPasswordError('userEmail');
-    } else {
-      if (!passwordPhone) {
-        setPasswordErrors((prev) => ({ ...prev, phone: '전화번호를 입력해주세요' }));
-        return;
-      }
-
-      if (!isPhone(passwordPhone)) {
-        setPasswordErrors((prev) => ({
-          ...prev,
-          phone: '올바른 전화번호 형식으로 입력해주세요',
-        }));
-        return;
-      }
-
-      // TODO: API 연동 후 가입 정보와 전화번호 일치 여부를 검증합니다.
-      // setPasswordErrors({ server: '입력한 정보와 일치하는 회원이 없습니다' });
-      console.log('mock send password sms code', { phone: passwordPhone });
-      clearPasswordError('phone');
+    try {
+      const data = await authApi.findId({ email: findIdEmail, code: findIdAuthCode });
+      setFoundUserId(data.maskedUserId ?? '');
+      setIsFindIdModalOpen(true);
+    } catch (error) {
+      setFindIdErrors((prev) => ({ ...prev, server: parseApiError(error) }));
     }
-
-    setPasswordAuthCode('');
-    setIsPasswordAuthSent(true);
-    setIsPasswordVerified(false);
-    setPasswordTimeLeft(AUTH_SECONDS);
-    setPasswordNotice('인증번호가 발송되었습니다');
   };
 
-  const handleVerifyPasswordCode = () => {
+  // 비밀번호 찾기 — 이메일로 인증번호 발송
+  const handleSendPasswordCode = async () => {
+    if (!passwordEmail) {
+      setPasswordErrors((prev) => ({ ...prev, email: '이메일을 입력해주세요' }));
+      return;
+    }
+    if (!isEmail(passwordEmail)) {
+      setPasswordErrors((prev) => ({ ...prev, email: '올바른 이메일 형식으로 입력해주세요' }));
+      return;
+    }
+    try {
+      await authApi.sendCode({ email: passwordEmail, purpose: 'reset-password' });
+      setPasswordAuthCode('');
+      setIsPasswordAuthSent(true);
+      setIsPasswordVerified(false);
+      setPasswordTimeLeft(AUTH_SECONDS);
+      setPasswordNotice('인증번호가 발송되었습니다');
+      clearPasswordError('email');
+    } catch (error) {
+      setPasswordErrors((prev) => ({ ...prev, email: parseApiError(error) }));
+    }
+  };
+
+  const handleVerifyPasswordCode = async () => {
     if (!passwordAuthCode) {
-      setPasswordErrors((prev) => ({
-        ...prev,
-        authCode: '인증번호를 입력해주세요',
-      }));
+      setPasswordErrors((prev) => ({ ...prev, authCode: '인증번호를 입력해주세요' }));
       return;
     }
-
     if (passwordTimeLeft <= 0) {
-      setPasswordErrors((prev) => ({
-        ...prev,
-        authCode: '인증 시간이 만료되었습니다. 다시 발송해주세요',
-      }));
+      setPasswordErrors((prev) => ({ ...prev, authCode: '인증 시간이 만료되었습니다. 다시 발송해주세요' }));
       return;
     }
-
-    if (passwordAuthCode !== MOCK_AUTH_CODE) {
-      setPasswordErrors((prev) => ({
-        ...prev,
-        authCode: '인증번호가 일치하지 않습니다',
-      }));
-      return;
+    try {
+      const data = await authApi.verifyCode({ email: passwordEmail, code: passwordAuthCode });
+      if (data.verified) {
+        setIsPasswordVerified(true);
+        setPasswordNotice('이메일 인증이 완료되었습니다');
+        clearPasswordError('authCode');
+      } else {
+        setPasswordErrors((prev) => ({ ...prev, authCode: '인증번호가 일치하지 않습니다' }));
+      }
+    } catch (error) {
+      setPasswordErrors((prev) => ({ ...prev, authCode: parseApiError(error) }));
     }
-
-    setIsPasswordVerified(true);
-    setPasswordNotice(
-      passwordAuthMethod === 'email'
-        ? '이메일 인증이 완료되었습니다'
-        : '휴대폰 인증이 완료되었습니다',
-    );
-    clearPasswordError('authCode');
   };
 
-  const validatePasswordInfo = () => {
+  const handleResetPassword = async () => {
     const nextErrors: FindPasswordErrors = {};
+    if (!passwordUserId.trim()) nextErrors.userId = '아이디를 입력해주세요';
+    if (!passwordName.trim()) nextErrors.name = '이름을 입력해주세요';
+    if (!passwordEmail) nextErrors.email = '이메일을 입력해주세요';
+    else if (!isEmail(passwordEmail)) nextErrors.email = '올바른 이메일 형식으로 입력해주세요';
+    if (!isPasswordVerified) nextErrors.authCode = '이메일 인증을 완료해주세요';
 
-    if (!passwordUserEmail) {
-      nextErrors.userEmail = '아이디를 입력해주세요';
-    } else if (!isEmail(passwordUserEmail)) {
-      nextErrors.userEmail = '아이디는 이메일 형식으로 입력해주세요';
+    setPasswordErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
+
+    try {
+      const data = await authApi.verifyReset({
+        userId: passwordUserId,
+        name: passwordName,
+        email: passwordEmail,
+        code: passwordAuthCode,
+      });
+      navigate('/reset-password', {
+        state: { resetToken: data.resetToken, maskedUserId: data.maskedUserId },
+      });
+    } catch (error) {
+      setPasswordErrors((prev) => ({ ...prev, server: parseApiError(error) }));
     }
-
-    if (!passwordName.trim()) {
-      nextErrors.name = '이름을 입력해주세요';
-    }
-
-    if (!isPasswordVerified) {
-      nextErrors.authCode = '본인 인증을 완료해주세요';
-    }
-
-    // TODO: API 연동 후 존재하지 않는 아이디와 가입 정보 불일치 여부를 검증합니다.
-    // setPasswordErrors({ userEmail: '존재하지 않는 아이디입니다' });
-    // setPasswordErrors({ server: '입력한 정보와 일치하는 회원이 없습니다' });
-    return nextErrors;
-  };
-
-  const handleResetPassword = () => {
-    const nextErrors = validatePasswordInfo();
-    setPasswordErrors((prev) => ({ ...prev, ...nextErrors }));
-
-    if (Object.keys(nextErrors).length > 0) {
-      return;
-    }
-
-    console.log('mock reset password request', {
-      userEmail: passwordUserEmail,
-      name: passwordName,
-      authMethod: passwordAuthMethod,
-      authEmail: passwordUserEmail,
-      phone: passwordPhone,
-    });
-
-    // TODO: 비밀번호 재설정 페이지 구현 후 실제 라우트와 토큰 전달 방식을 연결합니다.
-    navigate('/reset-password');
   };
 
   return (
@@ -363,34 +247,27 @@ export function FindAccountPage() {
         <AuthPageHeader onBack={goBack} title="아이디/비밀번호 찾기" />
 
         <div className="space-y-4">
+          {/* 아이디 찾기 */}
           <section className={SECTION_CLASS}>
             <h2 className="text-sm font-bold text-slate-950">아이디 찾기</h2>
             <p className="mt-1 text-xs leading-5 text-[#6C88A4]">
-              가입 시 사용한 휴대폰 인증을 통해 이메일 아이디를 확인할 수 있습니다.
+              가입 시 사용한 이메일로 인증하면 아이디를 확인할 수 있습니다.
             </p>
 
-            <div className="mt-4">
-              <p className={LABEL_CLASS}>인증 방법 선택</p>
-              <Button className={getMethodButtonClass(true)} variant="secondary">
-                휴대폰 인증
-              </Button>
-            </div>
-
             <div className="mt-3">
-              <p className={LABEL_CLASS}>전화번호</p>
+              <p className={LABEL_CLASS}>이메일</p>
               <div className="flex gap-2">
                 <div className="min-w-0 flex-1">
                   <TextInput
-                    autoComplete="tel"
+                    autoComplete="email"
                     className={INPUT_CLASS}
-                    inputMode="tel"
                     onChange={(event) => {
-                      setFindIdPhone(formatPhoneNumber(event.target.value));
+                      setFindIdEmail(event.target.value);
                       setIsFindIdVerified(false);
-                      clearFindIdError('phone');
+                      clearFindIdError('email');
                     }}
-                    placeholder="010-0000-0000"
-                    value={findIdPhone}
+                    placeholder="가입한 이메일 입력"
+                    value={findIdEmail}
                   />
                 </div>
                 <Button
@@ -401,9 +278,7 @@ export function FindAccountPage() {
                   인증 발송
                 </Button>
               </div>
-              {findIdErrors.phone ? (
-                <p className={ERROR_CLASS}>{findIdErrors.phone}</p>
-              ) : null}
+              {findIdErrors.email ? <p className={ERROR_CLASS}>{findIdErrors.email}</p> : null}
             </div>
 
             <div className="mt-3">
@@ -416,12 +291,10 @@ export function FindAccountPage() {
                     inputMode="numeric"
                     maxLength={6}
                     onChange={(event) => {
-                      setFindIdAuthCode(
-                        event.target.value.replace(/\D/g, '').slice(0, 6),
-                      );
+                      setFindIdAuthCode(event.target.value.replace(/\D/g, '').slice(0, 6));
                       clearFindIdError('authCode');
                     }}
-                    placeholder="SMS로 받은 인증번호 입력"
+                    placeholder="인증번호 6자리 입력"
                     value={findIdAuthCode}
                   />
                 </div>
@@ -439,17 +312,11 @@ export function FindAccountPage() {
                   확인
                 </Button>
               </div>
-              {findIdErrors.authCode ? (
-                <p className={ERROR_CLASS}>{findIdErrors.authCode}</p>
-              ) : null}
+              {findIdErrors.authCode ? <p className={ERROR_CLASS}>{findIdErrors.authCode}</p> : null}
               {findIdNotice ? (
-                <p className={isFindIdVerified ? SUCCESS_CLASS : HELP_CLASS}>
-                  {findIdNotice}
-                </p>
+                <p className={isFindIdVerified ? SUCCESS_CLASS : HELP_CLASS}>{findIdNotice}</p>
               ) : null}
-              {findIdErrors.server ? (
-                <p className={ERROR_CLASS}>{findIdErrors.server}</p>
-              ) : null}
+              {findIdErrors.server ? <p className={ERROR_CLASS}>{findIdErrors.server}</p> : null}
             </div>
 
             <Button
@@ -467,68 +334,26 @@ export function FindAccountPage() {
             <div className="h-px flex-1 bg-blue-100" />
           </div>
 
+          {/* 비밀번호 찾기 */}
           <section className={SECTION_CLASS}>
             <h2 className="text-sm font-bold text-slate-950">비밀번호 찾기</h2>
             <p className="mt-1 text-xs leading-5 text-[#6C88A4]">
-              가입한 이메일 아이디와 본인 인증을 통해 비밀번호를 재설정할 수
-              있습니다.
+              아이디, 이름, 가입한 이메일 인증을 통해 비밀번호를 재설정할 수 있습니다.
             </p>
 
-            <div className="mt-4">
-              <p className={LABEL_CLASS}>인증 방법 선택</p>
-              <div className="flex gap-2">
-                <Button
-                  className={getMethodButtonClass(passwordAuthMethod === 'email')}
-                  onClick={() => {
-                    setPasswordAuthMethod('email');
-                    resetPasswordAuthState();
-                  }}
-                  variant="secondary"
-                >
-                  이메일 인증
-                </Button>
-                <Button
-                  className={getMethodButtonClass(passwordAuthMethod === 'phone')}
-                  onClick={() => {
-                    setPasswordAuthMethod('phone');
-                    resetPasswordAuthState();
-                  }}
-                  variant="secondary"
-                >
-                  휴대폰 인증
-                </Button>
-              </div>
-            </div>
-
             <div className="mt-3">
-              <p className={LABEL_CLASS}>아이디(이메일)</p>
-              <div className={passwordAuthMethod === 'email' ? 'flex gap-2' : undefined}>
-                <div className="min-w-0 flex-1">
-                  <TextInput
-                    autoComplete="username"
-                    className={INPUT_CLASS}
-                    onChange={(event) => {
-                      setPasswordUserEmail(event.target.value);
-                      setIsPasswordVerified(false);
-                      clearPasswordError('userEmail');
-                    }}
-                    placeholder="가입한 이메일 아이디 입력"
-                    value={passwordUserEmail}
-                  />
-                </div>
-                {passwordAuthMethod === 'email' ? (
-                  <Button
-                    className="h-11 w-[86px] shrink-0 rounded-xl !border-blue-700 px-0 text-xs !text-blue-700"
-                    onClick={handleSendPasswordCode}
-                    variant="secondary"
-                  >
-                    인증 발송
-                  </Button>
-                ) : null}
-              </div>
-              {passwordErrors.userEmail ? (
-                <p className={ERROR_CLASS}>{passwordErrors.userEmail}</p>
-              ) : null}
+              <p className={LABEL_CLASS}>아이디</p>
+              <TextInput
+                autoComplete="username"
+                className={INPUT_CLASS}
+                onChange={(event) => {
+                  setPasswordUserId(event.target.value);
+                  clearPasswordError('userId');
+                }}
+                placeholder="아이디 입력"
+                value={passwordUserId}
+              />
+              {passwordErrors.userId ? <p className={ERROR_CLASS}>{passwordErrors.userId}</p> : null}
             </div>
 
             <div className="mt-3">
@@ -543,42 +368,35 @@ export function FindAccountPage() {
                 placeholder="이름 입력"
                 value={passwordName}
               />
-              {passwordErrors.name ? (
-                <p className={ERROR_CLASS}>{passwordErrors.name}</p>
-              ) : null}
+              {passwordErrors.name ? <p className={ERROR_CLASS}>{passwordErrors.name}</p> : null}
             </div>
 
-            {passwordAuthMethod === 'phone' ? (
-              <div className="mt-3">
-                <p className={LABEL_CLASS}>전화번호</p>
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <TextInput
-                      autoComplete="tel"
-                      className={INPUT_CLASS}
-                      inputMode="tel"
-                      onChange={(event) => {
-                        setPasswordPhone(formatPhoneNumber(event.target.value));
-                        setIsPasswordVerified(false);
-                        clearPasswordError('phone');
-                      }}
-                      placeholder="010-0000-0000"
-                      value={passwordPhone}
-                    />
-                  </div>
-                  <Button
-                    className="h-11 w-[86px] shrink-0 rounded-xl !border-blue-700 px-0 text-xs !text-blue-700"
-                    onClick={handleSendPasswordCode}
-                    variant="secondary"
-                  >
-                    인증 발송
-                  </Button>
+            <div className="mt-3">
+              <p className={LABEL_CLASS}>이메일</p>
+              <div className="flex gap-2">
+                <div className="min-w-0 flex-1">
+                  <TextInput
+                    autoComplete="email"
+                    className={INPUT_CLASS}
+                    onChange={(event) => {
+                      setPasswordEmail(event.target.value);
+                      setIsPasswordVerified(false);
+                      clearPasswordError('email');
+                    }}
+                    placeholder="가입한 이메일 입력"
+                    value={passwordEmail}
+                  />
                 </div>
-                {passwordErrors.phone ? (
-                  <p className={ERROR_CLASS}>{passwordErrors.phone}</p>
-                ) : null}
+                <Button
+                  className="h-11 w-[86px] shrink-0 rounded-xl !border-blue-700 px-0 text-xs !text-blue-700"
+                  onClick={handleSendPasswordCode}
+                  variant="secondary"
+                >
+                  인증 발송
+                </Button>
               </div>
-            ) : null}
+              {passwordErrors.email ? <p className={ERROR_CLASS}>{passwordErrors.email}</p> : null}
+            </div>
 
             <div className="mt-3">
               <p className={LABEL_CLASS}>인증번호</p>
@@ -590,16 +408,10 @@ export function FindAccountPage() {
                     inputMode="numeric"
                     maxLength={6}
                     onChange={(event) => {
-                      setPasswordAuthCode(
-                        event.target.value.replace(/\D/g, '').slice(0, 6),
-                      );
+                      setPasswordAuthCode(event.target.value.replace(/\D/g, '').slice(0, 6));
                       clearPasswordError('authCode');
                     }}
-                    placeholder={
-                      passwordAuthMethod === 'email'
-                        ? '인증번호 6자리 입력'
-                        : 'SMS로 받은 인증번호 입력'
-                    }
+                    placeholder="인증번호 6자리 입력"
                     value={passwordAuthCode}
                   />
                 </div>
@@ -617,24 +429,16 @@ export function FindAccountPage() {
                   확인
                 </Button>
               </div>
-              {passwordErrors.authCode ? (
-                <p className={ERROR_CLASS}>{passwordErrors.authCode}</p>
-              ) : null}
+              {passwordErrors.authCode ? <p className={ERROR_CLASS}>{passwordErrors.authCode}</p> : null}
               {passwordNotice ? (
-                <p className={isPasswordVerified ? SUCCESS_CLASS : HELP_CLASS}>
-                  {passwordNotice}
-                </p>
+                <p className={isPasswordVerified ? SUCCESS_CLASS : HELP_CLASS}>{passwordNotice}</p>
               ) : null}
-              {passwordErrors.server ? (
-                <p className={ERROR_CLASS}>{passwordErrors.server}</p>
-              ) : null}
+              {passwordErrors.server ? <p className={ERROR_CLASS}>{passwordErrors.server}</p> : null}
             </div>
 
             <Button
-              className={cn(
-                'mt-4 h-11 w-full rounded-xl text-sm font-bold',
-                !canResetPassword && 'opacity-60',
-              )}
+              className="mt-4 h-11 w-full rounded-xl text-sm font-bold"
+              disabled={!canResetPassword}
               onClick={handleResetPassword}
               variant="brand"
             >
@@ -653,7 +457,7 @@ export function FindAccountPage() {
 
       <Modal
         confirmText="로그인하러 가기"
-        description={`가입된 이메일 아이디는 ${MOCK_FOUND_EMAIL} 입니다.`}
+        description={`가입된 아이디는 ${foundUserId} 입니다.`}
         isOpen={isFindIdModalOpen}
         onClose={() => setIsFindIdModalOpen(false)}
         onConfirm={() => navigate('/login')}
