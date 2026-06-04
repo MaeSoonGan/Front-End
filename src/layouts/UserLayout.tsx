@@ -23,7 +23,7 @@ export function UserLayout() {
         <div className="relative flex min-h-screen w-full flex-col overflow-hidden bg-[#F3F7FC] sm:min-h-[720px] sm:max-w-md sm:rounded-3xl sm:shadow-xl">
           <UserHeader />
           <ContestModeBanner />
-          <main className="min-h-0 flex-1 overflow-y-auto">
+          <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <Outlet />
           </main>
           <BottomNavigation />
