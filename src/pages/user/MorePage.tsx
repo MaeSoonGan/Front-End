@@ -1,8 +1,10 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageContainer } from '../../components/common/PageContainer';
 import { MenuCard } from '../../components/user/MenuCard';
 import { useContestMode } from '../../contexts/ContestModeContext';
 import { userMoreMock } from '../../mocks/userHomeMock';
+import { membersApi } from '../../api/user/members';
 import { clearTokens } from '../../utils/tokenStorage';
 
 export function MorePage() {
@@ -12,6 +14,18 @@ export function MorePage() {
     ? userMoreMock.menus.filter((menu) => menu.to !== '/my-contests')
     : userMoreMock.menus;
   const accountMenus = userMoreMock.accountMenus;
+
+  const [profile, setProfile] = useState({ nickname: '', email: '', profileImageUrl: '' });
+
+  useEffect(() => {
+    membersApi.getMyProfile()
+      .then(data => setProfile({
+        nickname: data.nickname ?? '',
+        email: data.email ?? '',
+        profileImageUrl: data.profileImageUrl ?? '',
+      }))
+      .catch(() => {});
+  }, []);
 
   const handleLogout = () => {
     clearTokens();
@@ -23,14 +37,22 @@ export function MorePage() {
       <section className="rounded-2xl bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#E5F4FF] text-lg font-extrabold text-[#1565C0]">
-              {userMoreMock.userName.slice(0, 1)}
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#E5F4FF] text-lg font-extrabold text-[#1565C0]">
+              {profile.profileImageUrl ? (
+                <img
+                  alt={`${profile.nickname} 프로필`}
+                  className="h-full w-full object-cover"
+                  src={profile.profileImageUrl}
+                />
+              ) : (
+                profile.nickname.slice(0, 1)
+              )}
             </div>
             <div className="min-w-0">
               <p className="truncate text-base font-extrabold text-slate-950">
-                {userMoreMock.userName} 님
+                {profile.nickname} 님
               </p>
-              <p className="mt-1 truncate text-xs text-[#6C88A4]">{userMoreMock.email}</p>
+              <p className="mt-1 truncate text-xs text-[#6C88A4]">{profile.email}</p>
             </div>
           </div>
           <button

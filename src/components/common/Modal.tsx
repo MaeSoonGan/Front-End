@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Button } from './Button';
 
 interface ModalProps {
@@ -8,6 +8,8 @@ interface ModalProps {
   confirmText?: string;
   confirmVariant?: 'brand' | 'danger';
   cancelText?: string;
+  confirmDisabled?: boolean;
+  children?: ReactNode;
   onClose: () => void;
   onConfirm?: () => void;
 }
@@ -19,6 +21,8 @@ export function Modal({
   confirmText = '확인',
   confirmVariant = 'brand',
   cancelText,
+  confirmDisabled = false,
+  children,
   onClose,
   onConfirm,
 }: ModalProps) {
@@ -56,15 +60,21 @@ export function Modal({
       >
         <h2 className="text-xl font-bold text-slate-950">{title}</h2>
         {description ? (
-          <p className="mt-3 text-sm leading-6 text-slate-600">{description}</p>
+          <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{description}</p>
         ) : null}
+        {children ? <div className="mt-4">{children}</div> : null}
         <div className="mt-6 flex gap-2">
           {cancelText ? (
             <Button className="flex-1" onClick={onClose} variant="secondary">
               {cancelText}
             </Button>
           ) : null}
-          <Button className="flex-1 rounded-xl" onClick={onConfirm ?? onClose} variant={confirmVariant}>
+          <Button
+            className="flex-1 rounded-xl"
+            disabled={confirmDisabled}
+            onClick={onConfirm ?? onClose}
+            variant={confirmVariant}
+          >
             {confirmText}
           </Button>
         </div>

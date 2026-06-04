@@ -23,4 +23,5 @@ export interface ProfileEditErrors {
   currentPassword?: string;
   newPassword?: string;
   confirmPassword?: string;
+  form?: string;
 }
