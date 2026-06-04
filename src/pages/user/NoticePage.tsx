@@ -68,26 +68,35 @@ export function NoticePage() {
         ) : notices.length === 0 ? (
           <p className="py-10 text-center text-xs font-bold text-[#6C88A4]">등록된 공지가 없습니다.</p>
         ) : (
-          notices.map((notice) => (
-            <article
-              className="cursor-pointer rounded-2xl border border-blue-100 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md"
-              key={notice.id}
-              onClick={() => goDetail(notice.id)}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-extrabold text-slate-950">
-                    {notice.isPinned ? '📌 ' : ''}{notice.title}
-                  </p>
-                  <p className="mt-2 truncate text-xs leading-5 text-[#6C88A4]">{notice.content}</p>
-                  <p className="mt-2 text-[11px] font-bold text-slate-900">작성자: 운영자</p>
+          <>
+            {notices.map((notice) => (
+              <article
+                className="cursor-pointer rounded-2xl border border-blue-100 bg-white p-4 shadow-sm transition hover:border-blue-300 hover:shadow-md"
+                key={notice.id}
+                onClick={() => goDetail(notice.id)}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-extrabold text-slate-950">
+                      {notice.isPinned ? '📌 ' : ''}{notice.title}
+                    </p>
+                    <p className="mt-2 truncate text-xs leading-5 text-[#6C88A4]">{notice.content}</p>
+                    <p className="mt-2 text-[11px] font-bold text-slate-900">작성자: 운영자</p>
+                  </div>
+                  <span className="shrink-0 text-[11px] font-bold text-slate-900">
+                    {notice.date}
+                  </span>
                 </div>
-                <span className="shrink-0 text-[11px] font-bold text-slate-900">
-                  {notice.date}
-                </span>
-              </div>
-            </article>
-          ))
+              </article>
+            ))}
+            {Array.from({ length: Math.max(0, PAGE_SIZE - notices.length) }).map((_, i) => (
+              <article key={`ghost-${i}`} aria-hidden className="invisible rounded-2xl border border-blue-100 p-4">
+                <p className="truncate text-sm font-extrabold">&nbsp;</p>
+                <p className="mt-2 truncate text-xs leading-5">&nbsp;</p>
+                <p className="mt-2 text-[11px] font-bold">&nbsp;</p>
+              </article>
+            ))}
+          </>
         )}
       </section>
 
