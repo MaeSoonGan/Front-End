@@ -10,6 +10,26 @@ export default defineConfig({
         target: 'http://localhost:8081',
         changeOrigin: true,
       },
+      '/api/members': {
+        target: 'http://localhost:8081',
+        changeOrigin: true,
+      },
+      '/api/notices': {
+        target: 'http://localhost:8086',
+        changeOrigin: true,
+      },
+      '/api/notifications': {
+        target: 'http://localhost:8086',
+        changeOrigin: true,
+      },
+      '/api/contests': {
+        target: 'http://localhost:8082',
+        changeOrigin: true,
+      },
+      '/api/portfolio': {
+        target: 'http://localhost:8084',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,

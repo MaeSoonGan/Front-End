@@ -6,7 +6,8 @@ import { Card } from '../../components/common/Card';
 import { InfoBox } from '../../components/common/InfoBox';
 import { PasswordInput } from '../../components/common/PasswordInput';
 import { PasswordRuleList } from '../../components/common/PasswordRuleList';
-import { authApi, parseApiError } from '../../api/auth';
+import { authApi } from '../../api/auth/auth';
+import { parseApiError } from '../../api/parseApiError';
 
 const INPUT_CLASS =
   'h-11 w-full rounded-xl border-blue-100 !bg-[#F0F6FF] px-4 text-[#6C88A4] placeholder:text-[#6C88A4] focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-100';
