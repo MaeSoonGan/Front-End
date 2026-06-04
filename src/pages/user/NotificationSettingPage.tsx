@@ -1,14 +1,56 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PageContainer } from '../../components/common/PageContainer';
 import { NotificationSection } from '../../components/user/NotificationSection';
 import { NotificationToggleItem } from '../../components/user/NotificationToggleItem';
 import {
   contestNotificationItems,
   marketNotificationItems,
-  notificationSettingMock,
   tradeNotificationItems,
 } from '../../mocks/notificationSettingMock';
-import type { NotificationSettingItem, NotificationSettings } from '../../types/notification';
+import { notificationsApi } from '../../api/user/notifications';
+import { parseApiError } from '../../api/parseApiError';
+import type {
+  NotificationSettingItem,
+  NotificationSettingKey,
+  NotificationSettings,
+} from '../../types/notification';
+
+const EMPTY_SETTINGS: NotificationSettings = {
+  executionAlert: false,
+  orderCancelAlert: false,
+  pendingOrderAlert: false,
+  contestStartAlert: false,
+  contestEndAlert: false,
+  rankingChangeAlert: false,
+  marketOpenAlert: false,
+  marketCloseAlert: false,
+};
+
+// 프론트 설정 키 ↔ 백엔드 필드명 매핑
+const KEY_TO_FIELD: Record<NotificationSettingKey, string> = {
+  executionAlert: 'tradeComplete',
+  orderCancelAlert: 'orderCancel',
+  pendingOrderAlert: 'pendingOrder',
+  contestStartAlert: 'contestStart',
+  contestEndAlert: 'contestEnd',
+  rankingChangeAlert: 'rankChange',
+  marketOpenAlert: 'marketOpen',
+  marketCloseAlert: 'marketClose',
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toSettings(data: any): NotificationSettings {
+  return {
+    executionAlert: Boolean(data.tradeComplete),
+    orderCancelAlert: Boolean(data.orderCancel),
+    pendingOrderAlert: Boolean(data.pendingOrder),
+    contestStartAlert: Boolean(data.contestStart),
+    contestEndAlert: Boolean(data.contestEnd),
+    rankingChangeAlert: Boolean(data.rankChange),
+    marketOpenAlert: Boolean(data.marketOpen),
+    marketCloseAlert: Boolean(data.marketClose),
+  };
+}
 
 function renderItems(
   items: NotificationSettingItem[],
@@ -28,11 +70,28 @@ function renderItems(
 }
 
 export function NotificationSettingPage() {
-  const [settings, setSettings] = useState<NotificationSettings>(notificationSettingMock);
+  const [settings, setSettings] = useState<NotificationSettings>(EMPTY_SETTINGS);
+  const [loading, setLoading] = useState(true);
 
-  const handleToggle = (key: NotificationSettingItem['key'], checked: boolean) => {
-    // TODO: PATCH /api/members/me/notification-settings 연동 후 서버 상태와 동기화합니다.
+  useEffect(() => {
+    notificationsApi.getSettings()
+      .then((data) => setSettings(toSettings(data)))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleToggle = async (key: NotificationSettingItem['key'], checked: boolean) => {
+    const previous = settings;
+    // 낙관적 업데이트
     setSettings((current) => ({ ...current, [key]: checked }));
+    try {
+      const data = await notificationsApi.updateSettings({ [KEY_TO_FIELD[key]]: checked });
+      setSettings(toSettings(data));
+    } catch (e) {
+      // 실패 시 롤백
+      setSettings(previous);
+      console.error(parseApiError(e));
+    }
   };
 
   return (
@@ -48,17 +107,21 @@ export function NotificationSettingPage() {
         </div>
       </section>
 
-      <div className="space-y-4">
-        <NotificationSection title="거래 알림">
-          {renderItems(tradeNotificationItems, settings, handleToggle)}
-        </NotificationSection>
-        <NotificationSection title="대회 알림">
-          {renderItems(contestNotificationItems, settings, handleToggle)}
-        </NotificationSection>
-        <NotificationSection title="시장 알림">
-          {renderItems(marketNotificationItems, settings, handleToggle)}
-        </NotificationSection>
-      </div>
+      {loading ? (
+        <p className="py-12 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
+      ) : (
+        <div className="space-y-4">
+          <NotificationSection title="거래 알림">
+            {renderItems(tradeNotificationItems, settings, handleToggle)}
+          </NotificationSection>
+          <NotificationSection title="대회 알림">
+            {renderItems(contestNotificationItems, settings, handleToggle)}
+          </NotificationSection>
+          <NotificationSection title="시장 알림">
+            {renderItems(marketNotificationItems, settings, handleToggle)}
+          </NotificationSection>
+        </div>
+      )}
     </PageContainer>
   );
 }
