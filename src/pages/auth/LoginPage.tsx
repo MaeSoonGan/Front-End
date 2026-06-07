@@ -4,7 +4,8 @@ import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { PasswordInput } from '../../components/common/PasswordInput';
 import { TextInput } from '../../components/common/TextInput';
-import { authApi, parseApiError } from '../../api/auth';
+import { authApi } from '../../api/auth/auth';
+import { parseApiError } from '../../api/parseApiError';
 import { saveTokens } from '../../utils/tokenStorage';
 import loginLogo from '../../assets/login-logo-transparent.png';
 

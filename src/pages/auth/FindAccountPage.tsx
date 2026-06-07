@@ -5,7 +5,8 @@ import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
 import { Modal } from '../../components/common/Modal';
 import { TextInput } from '../../components/common/TextInput';
-import { authApi, parseApiError } from '../../api/auth';
+import { authApi } from '../../api/auth/auth';
+import { parseApiError } from '../../api/parseApiError';
 
 const INPUT_CLASS =
   'h-11 w-full rounded-xl border-blue-100 !bg-[#F0F6FF] px-4 text-[#6C88A4] placeholder:text-[#6C88A4] focus:border-blue-500 disabled:cursor-not-allowed disabled:opacity-100';

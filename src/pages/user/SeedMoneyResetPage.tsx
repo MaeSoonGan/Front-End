@@ -3,22 +3,37 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { PageContainer } from '../../components/common/PageContainer';
+import { portfolioApi } from '../../api/user/portfolio';
+import { parseApiError } from '../../api/parseApiError';
 
 export function SeedMoneyResetPage() {
   const navigate = useNavigate();
   const [isStockLossChecked, setIsStockLossChecked] = useState(false);
   const [isIrreversibleChecked, setIsIrreversibleChecked] = useState(false);
   const [modalStep, setModalStep] = useState<'confirm' | 'complete' | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+  const [error, setError] = useState('');
   const canResetSeedMoney = isStockLossChecked && isIrreversibleChecked;
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (!canResetSeedMoney) {
       return;
     }
 
-    // TODO: API 연동 후 시드머니 초기화 요청을 보내고 보유 종목/주문 상태 검증 결과를 처리합니다.
-    console.log('mock seed money reset');
-    setModalStep('complete');
+    setIsResetting(true);
+    setError('');
+    try {
+      await portfolioApi.resetSeedMoney({
+        holdingsAndCashResetAgreed: isStockLossChecked,
+        irreversibleAgreed: isIrreversibleChecked,
+      });
+      setModalStep('complete');
+    } catch (e) {
+      setError(parseApiError(e));
+      setModalStep(null);
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   const handleCompleteReset = () => {
@@ -107,17 +122,26 @@ export function SeedMoneyResetPage() {
       </section>
 
       <Button
-        className="mt-3 h-12 w-full rounded-2xl border border-rose-200 bg-rose-50 text-sm font-extrabold text-red-500 hover:bg-rose-100 disabled:bg-rose-50"
+        className="mt-3 h-12 w-full rounded-2xl bg-rose-600 text-sm font-extrabold text-white hover:bg-rose-700 disabled:bg-rose-300"
         disabled={!canResetSeedMoney}
         onClick={() => setModalStep('confirm')}
-        variant="secondary"
+        variant="danger"
       >
         시드머니 초기화하기
       </Button>
 
+      {error ? (
+        <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-center text-sm font-extrabold text-red-500">
+          {error}
+        </p>
+      ) : null}
+
       <Modal
         cancelText={modalStep === 'confirm' ? '취소' : undefined}
-        confirmText={modalStep === 'confirm' ? '확인' : '홈으로 이동'}
+        confirmText={
+          modalStep === 'confirm' ? (isResetting ? '처리 중...' : '확인') : '홈으로 이동'
+        }
+        confirmDisabled={isResetting}
         confirmVariant={modalStep === 'confirm' ? 'danger' : 'brand'}
         description={
           modalStep === 'confirm'
@@ -125,7 +149,11 @@ export function SeedMoneyResetPage() {
             : '초기화되었습니다. 홈 화면으로 이동합니다.'
         }
         isOpen={modalStep !== null}
-        onClose={() => setModalStep(null)}
+        onClose={() => {
+          if (!isResetting) {
+            setModalStep(null);
+          }
+        }}
         onConfirm={modalStep === 'confirm' ? handleReset : handleCompleteReset}
         title={modalStep === 'confirm' ? '시드머니 초기화' : '초기화 완료'}
       />

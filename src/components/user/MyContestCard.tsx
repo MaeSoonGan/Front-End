@@ -130,9 +130,9 @@ export function MyContestCard({ contest, onWithdraw }: MyContestCardProps) {
 
       {isActive ? (
         <Button
-          className="mt-2 h-10 w-full rounded-xl border border-rose-200 bg-rose-50 text-xs font-extrabold text-rose-600 hover:bg-rose-100"
+          className="mt-2 h-10 w-full rounded-xl bg-rose-600 text-xs font-extrabold text-white hover:bg-rose-700"
           onClick={() => onWithdraw(contest)}
-          variant="secondary"
+          variant="danger"
         >
           대회 포기하기
         </Button>

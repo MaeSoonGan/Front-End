@@ -1,12 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
 import { PageContainer } from '../../components/common/PageContainer';
+import { PasswordInput } from '../../components/common/PasswordInput';
 import { PasswordChangeForm } from '../../components/user/PasswordChangeForm';
 import { ProfileEditForm } from '../../components/user/ProfileEditForm';
 import { ProfileImageUploader } from '../../components/user/ProfileImageUploader';
-import { profileMock } from '../../mocks/profileMock';
+import { membersApi } from '../../api/user/members';
+import { parseApiError } from '../../api/parseApiError';
 import { clearTokens } from '../../utils/tokenStorage';
 import type { ProfileEditErrors, ProfileEditFormState } from '../../types/profile';
 
@@ -27,24 +29,44 @@ function formatPhone(value: string) {
   return `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7)}`;
 }
 
-function getInitialFormState(): ProfileEditFormState {
-  return {
-    nickname: profileMock.nickname,
-    phone: profileMock.phone,
-    email: profileMock.email,
-    profileImage: profileMock.profileImage,
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  };
-}
+const EMPTY_FORM: ProfileEditFormState = {
+  nickname: '',
+  phone: '',
+  email: '',
+  profileImage: null,
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: '',
+};
 
 export function ProfileEditPage() {
   const navigate = useNavigate();
-  const [formState, setFormState] = useState<ProfileEditFormState>(() => getInitialFormState());
+  const [formState, setFormState] = useState<ProfileEditFormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<ProfileEditErrors>({});
   const [successMessage, setSuccessMessage] = useState('');
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [withdrawPassword, setWithdrawPassword] = useState('');
+  const [withdrawError, setWithdrawError] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    membersApi.getMyProfile()
+      .then(data => {
+        setFormState({
+          nickname: data.nickname ?? '',
+          phone: data.phone ?? '',
+          email: data.email ?? '',
+          profileImage: data.profileImageUrl ?? null,
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: '',
+        });
+      })
+      .catch(e => setErrors({ form: parseApiError(e) }))
+      .finally(() => setLoading(false));
+  }, []);
 
   const handleChange = (name: keyof ProfileEditFormState, value: string) => {
     setSuccessMessage('');
@@ -94,23 +116,89 @@ export function ProfileEditPage() {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     if (!validateForm()) {
       return;
     }
 
-    // TODO: 회원정보 수정 API 연동 후 서버 응답 기준으로 사용자 정보를 갱신합니다.
-    // TODO: 닉네임 중복 검사는 API 연동 후 서버 오류 메시지로 처리합니다.
-    // TODO: 현재 비밀번호 일치 여부는 API 연동 후 서버 오류 메시지로 처리합니다.
-    console.log('mock profile save:', formState);
-    setSuccessMessage('회원 정보가 저장되었습니다');
+    const hasPasswordInput =
+      Boolean(formState.currentPassword) ||
+      Boolean(formState.newPassword) ||
+      Boolean(formState.confirmPassword);
+
+    setSaving(true);
+    try {
+      const updated = await membersApi.updateMyProfile({
+        nickname: formState.nickname.trim(),
+        phone: formState.phone,
+        profileImageUrl: formState.profileImage ?? undefined,
+      });
+
+      if (hasPasswordInput) {
+        await membersApi.changePassword({
+          currentPassword: formState.currentPassword,
+          newPassword: formState.newPassword,
+          newPasswordConfirm: formState.confirmPassword,
+        });
+      }
+
+      setFormState((current) => ({
+        ...current,
+        nickname: updated.nickname ?? current.nickname,
+        phone: updated.phone ?? current.phone,
+        email: updated.email ?? current.email,
+        profileImage: updated.profileImageUrl ?? current.profileImage,
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      }));
+      setErrors({});
+      setSuccessMessage('회원 정보가 저장되었습니다');
+    } catch (e) {
+      const message = parseApiError(e);
+      if (message.includes('닉네임')) {
+        setErrors({ nickname: message });
+      } else if (message.includes('비밀번호')) {
+        setErrors({ currentPassword: message });
+      } else {
+        setErrors({ form: message });
+      }
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleWithdraw = () => {
-    // TODO: 회원 탈퇴 API 연동 후 서버 상태를 동기화합니다.
-    clearTokens();
-    navigate('/login', { replace: true });
+  const closeWithdrawModal = () => {
+    setIsWithdrawModalOpen(false);
+    setWithdrawPassword('');
+    setWithdrawError('');
   };
+
+  const handleWithdraw = async () => {
+    if (!withdrawPassword) {
+      setWithdrawError('비밀번호를 입력해주세요');
+      return;
+    }
+
+    setWithdrawing(true);
+    try {
+      await membersApi.withdraw({ password: withdrawPassword });
+      clearTokens();
+      navigate('/login', { replace: true });
+    } catch (e) {
+      setWithdrawError(parseApiError(e));
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <PageContainer className="min-h-full bg-[#F3F7FC] pt-4">
+        <p className="py-10 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
+      </PageContainer>
+    );
+  }
 
   return (
     <PageContainer className="min-h-full bg-[#F3F7FC] pt-4">
@@ -135,16 +223,23 @@ export function ProfileEditPage() {
           </p>
         ) : null}
 
+        {errors.form ? (
+          <p className="rounded-xl bg-red-50 px-4 py-3 text-center text-sm font-extrabold text-red-500">
+            {errors.form}
+          </p>
+        ) : null}
+
         <Button
           className="h-12 w-full rounded-xl text-sm font-extrabold"
+          disabled={saving}
           onClick={handleSaveProfile}
           variant="brand"
         >
-          저장하기
+          {saving ? '저장 중...' : '저장하기'}
         </Button>
 
         <button
-          className="mx-auto block pb-2 pt-4 text-xs font-bold text-slate-400 transition hover:text-rose-500"
+          className="mx-auto block cursor-pointer pb-2 pt-4 text-xs font-bold text-slate-400 transition hover:text-rose-500"
           onClick={() => setIsWithdrawModalOpen(true)}
           type="button"
         >
@@ -154,14 +249,30 @@ export function ProfileEditPage() {
 
       <Modal
         cancelText="취소"
-        confirmText="탈퇴하기"
+        confirmDisabled={withdrawing}
+        confirmText={withdrawing ? '처리 중...' : '탈퇴하기'}
         confirmVariant="danger"
-        description="정말 회원 탈퇴하시겠습니까? 탈퇴 후 계정 복구가 어려울 수 있습니다."
+        description={'탈퇴하면 계정과 데이터를 복구할 수 없습니다.\n계속하려면 비밀번호를 입력해주세요.'}
         isOpen={isWithdrawModalOpen}
-        onClose={() => setIsWithdrawModalOpen(false)}
+        onClose={closeWithdrawModal}
         onConfirm={handleWithdraw}
         title="회원 탈퇴"
-      />
+      >
+        <label className="mb-1.5 block text-sm font-medium text-slate-700">비밀번호</label>
+        <PasswordInput
+          autoComplete="current-password"
+          className="h-11 rounded-xl border-blue-100 bg-[#F0F6FF] font-bold focus:border-[#1565C0]"
+          onChange={(event) => {
+            setWithdrawPassword(event.target.value);
+            setWithdrawError('');
+          }}
+          placeholder="비밀번호 입력"
+          value={withdrawPassword}
+        />
+        {withdrawError ? (
+          <p className="mt-1 text-xs font-bold text-red-500">{withdrawError}</p>
+        ) : null}
+      </Modal>
     </PageContainer>
   );
 }
