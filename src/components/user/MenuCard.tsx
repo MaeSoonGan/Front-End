@@ -35,7 +35,7 @@ export function MenuCard({
   return (
     <button
       className={cn(
-        'flex w-full items-center gap-3 rounded-xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]',
+        'flex w-full cursor-pointer items-center gap-3 rounded-xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]',
         className,
       )}
       onClick={handleClick}

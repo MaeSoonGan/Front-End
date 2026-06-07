@@ -9,6 +9,7 @@ interface ModalProps {
   confirmVariant?: 'brand' | 'danger';
   cancelText?: string;
   confirmDisabled?: boolean;
+  reverseButtons?: boolean;
   children?: ReactNode;
   onClose: () => void;
   onConfirm?: () => void;
@@ -22,6 +23,7 @@ export function Modal({
   confirmVariant = 'brand',
   cancelText,
   confirmDisabled = false,
+  reverseButtons = false,
   children,
   onClose,
   onConfirm,
@@ -63,7 +65,7 @@ export function Modal({
           <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{description}</p>
         ) : null}
         {children ? <div className="mt-4">{children}</div> : null}
-        <div className="mt-5 flex gap-2">
+        <div className={`mt-5 flex gap-2 ${reverseButtons ? 'flex-row-reverse' : ''}`}>
           {cancelText ? (
             <Button className="flex-1" onClick={onClose} variant="secondary">
               {cancelText}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Modal } from '../../components/common/Modal';
 import { PageContainer } from '../../components/common/PageContainer';
 import { MenuCard } from '../../components/user/MenuCard';
 import { useContestMode } from '../../contexts/ContestModeContext';
@@ -16,6 +17,7 @@ export function MorePage() {
   const accountMenus = userMoreMock.accountMenus;
 
   const [profile, setProfile] = useState({ nickname: '', email: '', profileImageUrl: '' });
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   useEffect(() => {
     membersApi.getMyProfile()
@@ -56,7 +58,7 @@ export function MorePage() {
             </div>
           </div>
           <button
-            className="h-8 shrink-0 rounded-full border border-[#1565C0] bg-white px-3 text-xs font-extrabold text-[#1565C0] transition hover:bg-[#E5F4FF]"
+            className="h-8 shrink-0 cursor-pointer rounded-full border border-[#1565C0] bg-white px-3 text-xs font-extrabold text-[#1565C0] transition hover:bg-[#E5F4FF]"
             onClick={() => navigate(isContestMode ? getContestPath('/profile/edit') : '/profile/edit')}
             type="button"
           >
@@ -97,10 +99,22 @@ export function MorePage() {
           className="mt-3"
           description="현재 기기에서 로그아웃해요"
           icon="🚪"
-          onClick={handleLogout}
+          onClick={() => setIsLogoutModalOpen(true)}
           title="로그아웃"
         />
       </section>
+
+      <Modal
+        cancelText="취소"
+        confirmText="로그아웃"
+        confirmVariant="danger"
+        reverseButtons
+        description="현재 기기에서 로그아웃합니다. 계속하시겠어요?"
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        onConfirm={handleLogout}
+        title="로그아웃"
+      />
     </PageContainer>
   );
 }
