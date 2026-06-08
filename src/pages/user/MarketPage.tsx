@@ -48,20 +48,36 @@ export function MarketPage() {
   );
   const stockCode = searchParams.get('stockCode');
   const searchQuery = searchParams.get('query')?.trim() ?? '';
-  const searchResults = searchQuery
-    ? stockMocks.filter(({ summary: item }) => {
-        const keyword = searchQuery.toLowerCase();
 
-        return (
-          item.stockName.toLowerCase().includes(keyword) ||
-          item.stockCode.toLowerCase().includes(keyword)
+  // 종목 검색 (API)
+  const [searchResults, setSearchResults] = useState<
+    { stockCode: string; stockName: string; currentPrice: number }[]
+  >([]);
+  useEffect(() => {
+    if (!searchQuery) {
+      setSearchResults([]);
+      return;
+    }
+    let active = true;
+    marketApi.searchStocks(searchQuery, 'KOSPI')
+      .then((data) => {
+        if (!active) return;
+        setSearchResults(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (data.stocks ?? []).map((s: any) => ({
+            stockCode: s.stockCode,
+            stockName: s.stockName ?? '',
+            currentPrice: Number(s.currentPrice ?? 0),
+          })),
         );
       })
-    : [];
+      .catch(() => { if (active) setSearchResults([]); });
+    return () => { active = false; };
+  }, [searchQuery]);
+
+  // 차트/체결 탭 mock용 종목 (백엔드 API 없음)
   const selectedStock =
-    stockMocks.find((stock) => stock.summary.stockCode === stockCode) ??
-    searchResults[0] ??
-    stockMock;
+    stockMocks.find((stock) => stock.summary.stockCode === stockCode) ?? stockMock;
   // 차트/체결 탭은 백엔드 API가 없어 mock 유지, summary/orderBook만 실데이터로 덮어씀
   const { chart, tradeTrend, tradeHistory } = selectedStock;
 
@@ -193,7 +209,7 @@ export function MarketPage() {
           </div>
           <div className="mt-3 space-y-2">
             {searchResults.length > 0 ? (
-              searchResults.map(({ summary: item }) => (
+              searchResults.map((item) => (
                 <button
                   className={cn(
                     'flex w-full items-center justify-between rounded-xl border px-3 py-3 text-left transition',
@@ -220,7 +236,7 @@ export function MarketPage() {
               ))
             ) : (
               <p className="rounded-xl bg-[#F0F6FF] px-3 py-4 text-center text-xs font-bold text-[#6C88A4]">
-                일치하는 mock 종목이 없습니다.
+                일치하는 종목이 없습니다.
               </p>
             )}
           </div>
