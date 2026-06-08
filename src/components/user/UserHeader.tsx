@@ -1,10 +1,17 @@
 import { Search, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import loginLogo from '../../assets/login-logo-transparent.png';
 import { useContestMode } from '../../contexts/ContestModeContext';
+import { marketApi } from '../../api/user/market';
 import { stockMocks } from '../../mocks/stockMock';
+
+interface SearchResultItem {
+  stockCode: string;
+  stockName: string;
+  currentPrice: number;
+}
 
 const pageTitles: Record<string, string> = {
   '/': '홈',
@@ -92,21 +99,36 @@ export function UserHeader() {
     typeof state.from === 'string'
       ? state.from
       : null;
-  const searchResults = useMemo(() => {
-    const keyword = searchKeyword.trim().toLowerCase();
+  const [searchResults, setSearchResults] = useState<SearchResultItem[]>([]);
 
+  useEffect(() => {
+    const keyword = searchKeyword.trim();
     if (!keyword) {
-      return [];
+      setSearchResults([]);
+      return;
     }
 
-    return stockMocks
-      .filter(({ summary }) => {
-        const name = summary.stockName.toLowerCase();
-        const code = summary.stockCode.toLowerCase();
+    let active = true;
+    const timer = window.setTimeout(() => {
+      marketApi.searchStocks(keyword, 'KOSPI')
+        .then((data) => {
+          if (!active) return;
+          setSearchResults(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (data.stocks ?? []).slice(0, 5).map((s: any) => ({
+              stockCode: s.stockCode,
+              stockName: s.stockName ?? '',
+              currentPrice: Number(s.currentPrice ?? 0),
+            })),
+          );
+        })
+        .catch(() => { if (active) setSearchResults([]); });
+    }, 250);
 
-        return name.includes(keyword) || code.includes(keyword);
-      })
-      .slice(0, 5);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
   }, [searchKeyword]);
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
@@ -118,15 +140,15 @@ export function UserHeader() {
       return;
     }
 
-    const exactStock = stockMocks.find(
-      ({ summary }) => summary.stockName === keyword || summary.stockCode === keyword,
+    const exactStock = searchResults.find(
+      (item) => item.stockName === keyword || item.stockCode === keyword,
     );
 
     setIsSearchOpen(false);
     const marketPath = isContestMode ? getContestPath('/market') : '/market';
     navigate(
       exactStock
-        ? `${marketPath}?stockCode=${exactStock.summary.stockCode}`
+        ? `${marketPath}?stockCode=${exactStock.stockCode}`
         : `${marketPath}?query=${encodeURIComponent(keyword)}`,
     );
   };
@@ -164,23 +186,23 @@ export function UserHeader() {
           </button>
           {searchResults.length > 0 ? (
             <div className="absolute left-4 right-4 top-14 overflow-hidden rounded-xl border border-blue-100 bg-white shadow-lg">
-              {searchResults.map(({ summary }) => (
+              {searchResults.map((item) => (
                 <button
                   className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-[#F8FBFF]"
-                  key={summary.stockCode}
-                  onMouseDown={() => handleSelectStock(summary.stockCode)}
+                  key={item.stockCode}
+                  onMouseDown={() => handleSelectStock(item.stockCode)}
                   type="button"
                 >
                   <span>
                     <span className="block text-sm font-extrabold text-slate-950">
-                      {summary.stockName}
+                      {item.stockName}
                     </span>
                     <span className="block text-xs font-bold text-[#A3B4C6]">
-                      {summary.stockCode}
+                      {item.stockCode}
                     </span>
                   </span>
                   <span className="text-sm font-extrabold text-[#1565C0]">
-                    {summary.currentPrice.toLocaleString('ko-KR')}
+                    {item.currentPrice.toLocaleString('ko-KR')}
                   </span>
                 </button>
               ))}
