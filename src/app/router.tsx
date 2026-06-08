@@ -54,7 +54,6 @@ import { NotificationSettingPage } from '../pages/user/NotificationSettingPage';
 import { OrderPage } from '../pages/user/OrderPage';
 import { ProfileEditPage } from '../pages/user/ProfileEditPage';
 import { SeedMoneyResetPage } from '../pages/user/SeedMoneyResetPage';
-import { StockDetailPage } from '../pages/user/StockDetailPage';
 import { WatchlistPage } from '../pages/user/WatchlistPage';
 
 export const router = createBrowserRouter([
@@ -75,7 +74,6 @@ export const router = createBrowserRouter([
       { path: '/home', element: <HomePage /> },
       { path: '/balance', element: <BalancePage /> },
       { path: '/market', element: <MarketPage /> },
-      { path: '/stocks/:stockCode', element: <StockDetailPage /> },
       { path: '/order', element: <OrderPage /> },
       { path: '/watchlist', element: <WatchlistPage /> },
       { path: '/my-contests', element: <MyContestsPage /> },

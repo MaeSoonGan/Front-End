@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MarketTabs } from '../../components/user/MarketTabs';
 import { OrderBottomSheet } from '../../components/user/OrderBottomSheet';
@@ -9,8 +9,15 @@ import { StockPriceSummary } from '../../components/user/StockPriceSummary';
 import { TradeActionButtons } from '../../components/user/TradeActionButtons';
 import { TradeHistoryTab } from '../../components/user/TradeHistoryTab';
 import { stockMock, stockMocks } from '../../mocks/stockMock';
+import { marketApi } from '../../api/user/market';
 import type { OrderSide, OrderStockInfo } from '../../types/order';
-import type { ChartPeriod, ChartType, MarketTab } from '../../types/stock';
+import type {
+  ChartPeriod,
+  ChartType,
+  MarketTab,
+  OrderBookData,
+  StockSummary,
+} from '../../types/stock';
 import { cn } from '../../utils/cn';
 
 function getInitialTab(tab: string | null): MarketTab {
@@ -55,18 +62,86 @@ export function MarketPage() {
     stockMocks.find((stock) => stock.summary.stockCode === stockCode) ??
     searchResults[0] ??
     stockMock;
-  const { summary, orderBook, chart, tradeTrend, tradeHistory } = selectedStock;
-  const orderStock: OrderStockInfo = {
-    stockName: summary.stockName,
-    stockCode: summary.stockCode,
-    market: 'KOSPI',
-    currentPrice: summary.currentPrice,
-    changeRate: summary.changeRate,
-  };
+  // 차트/체결 탭은 백엔드 API가 없어 mock 유지, summary/orderBook만 실데이터로 덮어씀
+  const { chart, tradeTrend, tradeHistory } = selectedStock;
 
-  const handleToggleFavorite = () => {
-    // TODO: 관심종목 API 연동 후 서버 상태와 동기화합니다.
-    setIsFavorite((current) => !current);
+  const [apiSummary, setApiSummary] = useState<StockSummary | null>(null);
+  const [apiOrderBook, setApiOrderBook] = useState<OrderBookData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // 현재가 + 일별정보 + 호가 조회
+  useEffect(() => {
+    if (!stockCode) return;
+    let active = true;
+    setLoading(true);
+    Promise.all([
+      marketApi.getStockPrice(stockCode),
+      marketApi.getStockDailyInfo(stockCode).catch(() => null),
+      marketApi.getStockOrderbook(stockCode).catch(() => null),
+    ])
+      .then(([price, daily, orderbook]) => {
+        if (!active) return;
+        setApiSummary({
+          stockName: price.name ?? '',
+          stockCode: price.code,
+          currentPrice: Number(price.price ?? 0),
+          changeAmount: Number(price.change ?? 0),
+          changeRate: Number(price.changeRate ?? 0),
+          volume: Number(price.volume ?? 0).toLocaleString('ko-KR'),
+          openPrice: Number(daily?.open ?? 0),
+          highPrice: Number(daily?.high ?? 0),
+          lowPrice: Number(daily?.low ?? 0),
+          previousClose: Number(daily?.prevClose ?? 0),
+        });
+        if (orderbook) {
+          setApiOrderBook({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            askOrders: (orderbook.asks ?? []).map((l: any) => ({ price: Number(l.price), quantity: Number(l.quantity), changeRate: 0 })),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            bidOrders: (orderbook.bids ?? []).map((l: any) => ({ price: Number(l.price), quantity: Number(l.quantity), changeRate: 0 })),
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [stockCode]);
+
+  // 관심종목 여부 조회
+  useEffect(() => {
+    if (!stockCode) return;
+    marketApi.getWatchlist('domestic')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((data) => setIsFavorite((data.items ?? []).some((i: any) => i.code === stockCode)))
+      .catch(() => {});
+  }, [stockCode]);
+
+  const summary = apiSummary;
+  const orderBook = apiOrderBook ?? { askOrders: [], bidOrders: [] };
+
+  const orderStock: OrderStockInfo | null = summary
+    ? {
+        stockName: summary.stockName,
+        stockCode: summary.stockCode,
+        market: 'KOSPI',
+        currentPrice: summary.currentPrice,
+        changeRate: summary.changeRate,
+      }
+    : null;
+
+  const handleToggleFavorite = async () => {
+    if (!stockCode) return;
+    const next = !isFavorite;
+    setIsFavorite(next); // 낙관적 업데이트
+    try {
+      if (next) {
+        await marketApi.addWatchlist(stockCode);
+      } else {
+        await marketApi.deleteWatchlist(stockCode);
+      }
+    } catch {
+      setIsFavorite(!next); // 실패 시 롤백
+    }
   };
 
   const handleChangeTab = (tab: MarketTab) => {
@@ -89,6 +164,16 @@ export function MarketPage() {
     nextSearchParams.delete('orderSide');
     setSearchParams(nextSearchParams);
   };
+
+  if (loading || !summary) {
+    return (
+      <div className="min-h-full bg-[#F3F7FC]">
+        <p className="py-20 text-center text-xs font-bold text-[#6C88A4]">
+          {loading ? '불러오는 중...' : '종목 정보를 불러올 수 없습니다.'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-full bg-[#F3F7FC]">

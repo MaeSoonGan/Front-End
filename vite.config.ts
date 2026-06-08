@@ -30,6 +30,18 @@ export default defineConfig({
         target: 'http://localhost:8084',
         changeOrigin: true,
       },
+      '/api/market': {
+        target: 'http://localhost:8085',
+        changeOrigin: true,
+      },
+      '/api/stocks': {
+        target: 'http://localhost:8085',
+        changeOrigin: true,
+      },
+      '/api/watchlist': {
+        target: 'http://localhost:8085',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
