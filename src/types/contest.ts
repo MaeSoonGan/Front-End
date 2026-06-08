@@ -13,6 +13,8 @@ export interface ContestListItem {
   maxParticipants: number | null;
   seedMoney: number;
   isJoined: boolean;
+  joinable: boolean;
+  joinDisabledReason: string | null;
 }
 
 export interface ContestRankingItem {
