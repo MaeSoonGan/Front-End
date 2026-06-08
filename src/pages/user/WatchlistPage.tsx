@@ -1,20 +1,58 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { WatchlistGuideBanner } from '../../components/user/WatchlistGuideBanner';
 import { WatchlistStockCard } from '../../components/user/WatchlistStockCard';
 import { WatchlistTabs } from '../../components/user/WatchlistTabs';
-import { watchlistMock } from '../../mocks/watchlistMock';
-import type { WatchlistMarketType } from '../../types/watchlist';
+import { marketApi } from '../../api/user/market';
+import { parseApiError } from '../../api/parseApiError';
+import type { WatchlistMarketType, WatchlistStockItem } from '../../types/watchlist';
 
 export function WatchlistPage() {
   const [activeMarket, setActiveMarket] = useState<WatchlistMarketType>('DOMESTIC');
-  const [watchlistItems, setWatchlistItems] = useState(watchlistMock);
-  const filteredItems = useMemo(
-    () => watchlistItems.filter((item) => item.marketType === activeMarket),
-    [activeMarket, watchlistItems],
-  );
+  const [watchlistItems, setWatchlistItems] = useState<WatchlistStockItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const handleRemoveWatchlist = (id: string) => {
-    setWatchlistItems((current) => current.filter((item) => item.id !== id));
+  const fetchWatchlist = useCallback(async () => {
+    // 해외는 백엔드 미지원 → 조회 생략
+    if (activeMarket === 'OVERSEAS') {
+      setWatchlistItems([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const data = await marketApi.getWatchlist('domestic');
+      setWatchlistItems(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (data.items ?? []).map((item: any) => ({
+          id: item.code,
+          stockName: item.name ?? '',
+          stockCode: item.code,
+          marketType: 'DOMESTIC' as WatchlistMarketType,
+          exchange: item.market ?? '',
+          currentPrice: Number(item.price ?? 0),
+          changeRate: Number(item.changeRate ?? 0),
+        })),
+      );
+      setError('');
+    } catch (e) {
+      setError(parseApiError(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [activeMarket]);
+
+  useEffect(() => {
+    fetchWatchlist();
+  }, [fetchWatchlist]);
+
+  const handleRemoveWatchlist = async (id: string) => {
+    try {
+      await marketApi.deleteWatchlist(id);
+      setWatchlistItems((current) => current.filter((item) => item.id !== id));
+    } catch (e) {
+      setError(parseApiError(e));
+    }
   };
 
   return (
@@ -23,7 +61,7 @@ export function WatchlistPage() {
 
       <section className="mt-4 flex items-center justify-between gap-3">
         <h1 className="text-base font-extrabold text-slate-950">
-          내 관심종목 {filteredItems.length}개
+          내 관심종목 {watchlistItems.length}개
         </h1>
         <WatchlistTabs activeMarket={activeMarket} onChangeMarket={setActiveMarket} />
       </section>
@@ -36,9 +74,13 @@ export function WatchlistPage() {
               해외 관심종목은 추후 제공 예정입니다.
             </p>
           </div>
-        ) : filteredItems.length > 0 ? (
+        ) : loading ? (
+          <p className="py-16 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
+        ) : error ? (
+          <p className="py-16 text-center text-xs font-bold text-red-500">{error}</p>
+        ) : watchlistItems.length > 0 ? (
           <div className="space-y-3">
-            {filteredItems.map((stock) => (
+            {watchlistItems.map((stock) => (
               <WatchlistStockCard
                 key={stock.id}
                 onRemove={handleRemoveWatchlist}
@@ -56,9 +98,11 @@ export function WatchlistPage() {
         )}
       </section>
 
-      <p className="mt-5 text-center text-xs font-bold text-[#6C88A4]">
-        최대 30개까지 등록 가능 ({filteredItems.length}/30)
-      </p>
+      {activeMarket === 'DOMESTIC' ? (
+        <p className="mt-5 text-center text-xs font-bold text-[#6C88A4]">
+          최대 30개까지 등록 가능 ({watchlistItems.length}/30)
+        </p>
+      ) : null}
     </div>
   );
 }
