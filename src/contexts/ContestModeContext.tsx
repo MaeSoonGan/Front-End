@@ -1,12 +1,17 @@
-import { createContext, useContext, useMemo } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { contestMocks } from '../mocks/contestMock';
-import type { ContestListItem } from '../types/contest';
+import { contestsApi } from '../api/user/contests';
+
+interface ContestModeInfo {
+  contestId: string;
+  title: string;
+  startAt: string;
+}
 
 interface ContestModeContextValue {
   basePath: string;
-  contest: ContestListItem | null;
+  contest: ContestModeInfo | null;
   contestId: string | null;
   getContestPath: (path: string) => string;
   isContestMode: boolean;
@@ -39,8 +44,36 @@ export function ContestModeProvider({ children }: ContestModeProviderProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const contestId = getContestId(location.pathname);
-  const contest = contestMocks.find((item) => item.id === contestId) ?? null;
   const basePath = contestId ? `/contests/${contestId}` : '';
+
+  const [contest, setContest] = useState<ContestModeInfo | null>(null);
+
+  // 대회 모드 진입 시 실제 대회 정보 조회 (배너 표시용)
+  useEffect(() => {
+    if (!contestId) {
+      setContest(null);
+      return;
+    }
+
+    let cancelled = false;
+    contestsApi
+      .getContest(Number(contestId))
+      .then((detail) => {
+        if (cancelled || !detail) return;
+        setContest({
+          contestId,
+          title: detail.title ?? '',
+          startAt: String(detail.startAt ?? ''),
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setContest(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contestId]);
 
   const value = useMemo<ContestModeContextValue>(
     () => ({

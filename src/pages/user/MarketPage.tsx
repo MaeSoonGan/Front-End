@@ -82,6 +82,7 @@ export function MarketPage() {
   const { chart, tradeTrend, tradeHistory } = selectedStock;
 
   const [apiSummary, setApiSummary] = useState<StockSummary | null>(null);
+  const [stockId, setStockId] = useState(0);
   const [apiOrderBook, setApiOrderBook] = useState<OrderBookData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -97,6 +98,7 @@ export function MarketPage() {
     ])
       .then(([price, daily, orderbook]) => {
         if (!active) return;
+        setStockId(Number(price.stockId ?? 0));
         setApiSummary({
           stockName: price.name ?? '',
           stockCode: price.code,
@@ -265,6 +267,7 @@ export function MarketPage() {
           key={`${summary.stockCode}-${orderSheetSide}`}
           onClose={handleCloseOrderSheet}
           stock={orderStock}
+          stockId={stockId}
         />
       ) : null}
     </div>

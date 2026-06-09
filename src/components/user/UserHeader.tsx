@@ -5,7 +5,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import loginLogo from '../../assets/login-logo-transparent.png';
 import { useContestMode } from '../../contexts/ContestModeContext';
 import { marketApi } from '../../api/user/market';
-import { stockMocks } from '../../mocks/stockMock';
 
 interface SearchResultItem {
   stockCode: string;
@@ -38,11 +37,8 @@ function stripContestPrefix(pathname: string) {
 function getTitle(pathname: string, search: string) {
   if (pathname === '/market') {
     const searchParams = new URLSearchParams(search);
-    const stockCode = searchParams.get('stockCode');
-    const query = searchParams.get('query');
-    const stock = stockMocks.find((item) => item.summary.stockCode === stockCode);
-
-    return stock?.summary.stockName ?? (query ? '종목 검색' : '삼성전자');
+    // 종목명은 컴포넌트에서 API로 받아 덮어씀. 여기선 기본 제목만.
+    return searchParams.get('query') ? '종목 검색' : '시세';
   }
 
   if (pathname.startsWith('/contests')) {
@@ -89,8 +85,37 @@ export function UserHeader() {
     titlePathname === '/profile/edit' ||
     titlePathname === '/seed-money/reset';
   const contestTitle = contest ? `${contest.startAt.slice(0, 4)}년 ${contest.title}` : '대회';
-  const pageTitle =
+
+  // 시세 페이지 헤더 제목용 종목명 (API 조회)
+  const marketStockCode =
+    titlePathname === '/market' ? new URLSearchParams(search).get('stockCode') : null;
+  const [marketStockName, setMarketStockName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!marketStockCode) {
+      setMarketStockName(null);
+      return;
+    }
+
+    let active = true;
+    marketApi
+      .getStockPrice(marketStockCode)
+      .then((data) => {
+        if (active) setMarketStockName(data?.name ?? null);
+      })
+      .catch(() => {
+        if (active) setMarketStockName(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [marketStockCode]);
+
+  const baseTitle =
     isContestMode && titlePathname === '/home' ? contestTitle : getTitle(titlePathname, search);
+  const pageTitle =
+    titlePathname === '/market' && marketStockName ? marketStockName : baseTitle;
   const isNotificationListPage = titlePathname === '/notifications';
   const previousPath =
     typeof state === 'object' &&

@@ -7,7 +7,6 @@ import { useContestMode } from '../../contexts/ContestModeContext';
 import { marketApi } from '../../api/user/market';
 import { portfolioApi } from '../../api/user/portfolio';
 import { contestsApi } from '../../api/user/contests';
-import { userHomeMock } from '../../mocks/userHomeMock';
 
 interface AssetView {
   total: string;
@@ -38,6 +37,15 @@ interface MyContestView {
   participants: number;
   myAsset: string;
   endDate: string;
+}
+
+interface ContestHomeView {
+  title: string;
+  total: string;
+  change: string;
+  rate: string;
+  rank: number;
+  participants: number;
 }
 
 const EMPTY_ASSET: AssetView = {
@@ -134,22 +142,20 @@ function toDDay(endAt: string | null | undefined) {
 
 export function HomePage() {
   const navigate = useNavigate();
-  const { contest, getContestPath, isContestMode } = useContestMode();
+  const { contestId, getContestPath, isContestMode } = useContestMode();
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
-
-  // 대회 모드 전용 표시는 아직 mock 유지(다음 패스에서 연동)
-  const { asset: mockAsset, activeContest } = userHomeMock;
-  const contestTitle = contest ? `${contest.startAt.slice(0, 4)}년 ${contest.title}` : '참여 대회';
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const [summaryAsset, setSummaryAsset] = useState<AssetView | null>(null);
   const [marketStatus, setMarketStatus] = useState<MarketStatusCard[]>([]);
   const [rankingStocks, setRankingStocks] = useState<RankingStock[]>([]);
   const [myContest, setMyContest] = useState<MyContestView | null>(null);
+  const [contestView, setContestView] = useState<ContestHomeView | null>(null);
   const [loading, setLoading] = useState(true);
 
   const getPath = (path: string) => (isContestMode ? getContestPath(path) : path);
-  // 일반 모드는 실데이터(요약), 대회 모드는 mock 자산 표시
   const normalAsset = summaryAsset ?? EMPTY_ASSET;
+  const contestTitle = contestView?.title ?? '참여 대회';
 
   useEffect(() => {
     let cancelled = false;
@@ -190,8 +196,27 @@ export function HomePage() {
 
     const tasks: Promise<unknown>[] = [marketTask, rankingTask];
 
-    // 일반 모드 전용 데이터 (대회 모드는 다음 패스)
-    if (!isContestMode) {
+    if (isContestMode && contestId) {
+      // 대회 모드: 대회 상세로 내 총자산/순위/제목 (contest-service)
+      const detailTask = contestsApi
+        .getContest(Number(contestId))
+        .then((d) => {
+          if (cancelled || !d) return;
+          const year = (d.startAt ?? '').slice(0, 4);
+          const title = d.title ?? '참여 대회';
+          setContestView({
+            title: year ? `${year}년 ${title}` : title,
+            total: formatWon(Number(d.myTotalAsset ?? 0)),
+            change: formatSignedWon(Number(d.myProfitAmount ?? 0)),
+            rate: formatSignedRate(Number(d.myProfitRate ?? 0)),
+            rank: Number(d.myRank ?? 0),
+            participants: Number(d.participantCount ?? 0),
+          });
+        })
+        .catch(() => {});
+
+      tasks.push(detailTask);
+    } else {
       const summaryTask = portfolioApi
         .getSummary()
         .then((s) => {
@@ -238,17 +263,21 @@ export function HomePage() {
     return () => {
       cancelled = true;
     };
-  }, [isContestMode]);
+  }, [isContestMode, contestId]);
 
-  const handleWithdrawContest = () => {
-    if (!contest) {
+  const handleWithdrawContest = async () => {
+    if (!contestId) {
       return;
     }
 
-    // TODO: 대회 모드 연동 패스에서 contestsApi.leaveContest(contestId)로 교체
-    console.log('mock contest withdraw:', contest.id);
-    setIsWithdrawModalOpen(false);
-    navigate('/contests', { replace: true });
+    setIsWithdrawing(true);
+    try {
+      await contestsApi.leaveContest(Number(contestId));
+      setIsWithdrawModalOpen(false);
+      navigate('/contests', { replace: true });
+    } finally {
+      setIsWithdrawing(false);
+    }
   };
 
   return (
@@ -262,7 +291,7 @@ export function HomePage() {
           <div className="min-w-0">
             <p className="text-xs font-semibold text-blue-100">내 총 자산</p>
             <p className="mt-2 text-2xl font-extrabold">
-              {isContestMode ? mockAsset.total : normalAsset.total}
+              {isContestMode ? (contestView?.total ?? '-') : normalAsset.total}
             </p>
             <p className="mt-1 text-xs text-blue-100">
               {isContestMode ? contestTitle : `${normalAsset.change} (${normalAsset.rate})`}
@@ -272,10 +301,12 @@ export function HomePage() {
             <div className="shrink-0 rounded-2xl bg-white/15 px-4 py-3 text-right">
               <p className="text-[11px] font-bold text-blue-100">현재 순위</p>
               <p className="mt-1 text-2xl font-extrabold leading-none">
-                {activeContest.rank}
-                <span className="ml-1 text-sm font-bold text-blue-100">
-                  / {activeContest.participants}
-                </span>
+                {contestView ? `${contestView.rank}위` : '-'}
+                {contestView ? (
+                  <span className="ml-1 text-sm font-bold text-blue-100">
+                    / {contestView.participants}명
+                  </span>
+                ) : null}
               </p>
             </div>
           ) : null}
@@ -403,7 +434,7 @@ export function HomePage() {
 
       <Modal
         cancelText="계속 참여"
-        confirmText="대회 포기"
+        confirmText={isWithdrawing ? '처리 중...' : '대회 포기'}
         confirmVariant="danger"
         description="대회를 포기하면 현재 순위와 거래 기록은 더 이상 대회 랭킹에 반영되지 않습니다. 일반 화면으로 이동만 하려면 하단의 나가기를 사용해 주세요."
         isOpen={isWithdrawModalOpen}
