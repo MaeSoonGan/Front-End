@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -9,10 +9,13 @@ import {
   Megaphone,
   Monitor,
   FileText,
+  LogOut,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { useAlertCount } from '../../contexts/AlertCountContext';
+import { getAdminInfo, clearAdminAuth } from '../../utils/adminAuth';
+import { clearTokens } from '../../utils/tokenStorage';
 
 interface NavItem {
   label: string;
@@ -78,6 +81,19 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({ isOpen }: AdminSidebarProps) {
   const { alertCount } = useAlertCount();
+  const navigate = useNavigate();
+  const admin = getAdminInfo();
+  const adminName = admin?.nickname || admin?.loginId || '관리자';
+  const adminRole = (admin?.role ?? '').replace(/_/g, ' ') || 'ADMIN';
+
+  const handleLogout = () => {
+    if (!window.confirm('로그아웃하시겠습니까?')) {
+      return;
+    }
+    clearAdminAuth();
+    clearTokens();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <aside
@@ -131,16 +147,27 @@ export function AdminSidebar({ isOpen }: AdminSidebarProps) {
           ))}
         </nav>
 
-        {/* 하단 계정 정보 */}
+        {/* 하단 계정 정보 + 로그아웃 */}
         <div className="border-t border-slate-200 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1565C0] text-sm font-bold text-white">
-              A
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1565C0] text-sm font-bold text-white">
+                {adminName.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-slate-900">{adminName}</p>
+                <p className="truncate text-xs text-slate-500">{adminRole}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-medium text-slate-900">admin01</p>
-              <p className="text-xs text-slate-500">SUPER ADMIN</p>
-            </div>
+            <button
+              aria-label="로그아웃"
+              className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-red-500"
+              onClick={handleLogout}
+              title="로그아웃"
+              type="button"
+            >
+              <LogOut size={18} />
+            </button>
           </div>
         </div>
       </div>

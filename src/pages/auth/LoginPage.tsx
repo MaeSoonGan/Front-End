@@ -5,8 +5,10 @@ import { Card } from '../../components/common/Card';
 import { PasswordInput } from '../../components/common/PasswordInput';
 import { TextInput } from '../../components/common/TextInput';
 import { authApi } from '../../api/auth/auth';
+import { adminAuthApi } from '../../api/admin/auth';
 import { parseApiError } from '../../api/parseApiError';
-import { saveTokens } from '../../utils/tokenStorage';
+import { saveTokens, clearTokens } from '../../utils/tokenStorage';
+import { saveAdminAuth, clearAdminAuth } from '../../utils/adminAuth';
 import loginLogo from '../../assets/login-logo-transparent.png';
 
 interface LoginErrors {
@@ -44,11 +46,26 @@ export function LoginPage() {
 
     setIsLoading(true);
     try {
+      // 1) 일반 회원 로그인
       const data = await authApi.login({ userId: username, password, keepLogin: keepLoggedIn });
+      clearAdminAuth();
       saveTokens(data.accessToken, data.refreshToken, keepLoggedIn);
       navigate('/home', { replace: true });
-    } catch (error) {
-      setErrors({ server: parseApiError(error) });
+    } catch (userError) {
+      // 2) 회원 로그인 실패 → 같은 자격으로 admin 로그인 시도
+      try {
+        const admin = await adminAuthApi.login({ loginId: username, password });
+        clearTokens(); // 유저 토큰 제거(admin 토큰이 우선되도록)
+        saveAdminAuth(admin.token, {
+          loginId: admin.loginId,
+          nickname: admin.nickname,
+          role: admin.role,
+        });
+        navigate('/admin', { replace: true });
+      } catch {
+        // 둘 다 실패 → 회원 로그인 에러 메시지 노출
+        setErrors({ server: parseApiError(userError) });
+      }
     } finally {
       setIsLoading(false);
     }
