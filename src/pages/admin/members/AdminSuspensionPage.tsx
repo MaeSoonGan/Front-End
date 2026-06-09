@@ -6,6 +6,7 @@ import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 import { TextInput } from '../../../components/common/TextInput';
 import { membersApi } from '../../../api/admin/members';
+import { downloadCsv } from '../../../utils/download';
 
 type SuspensionType = 'MANUAL' | 'AUTO';
 type SuspensionStatus = 'SUSPENDED' | 'RELEASED';
@@ -190,9 +191,7 @@ export function AdminSuspensionPage() {
         startDate: dateFrom || undefined,
         endDate:   dateTo || undefined,
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'suspensions.csv'; a.click();
-      URL.revokeObjectURL(url);
+      downloadCsv(blob, 'suspensions');
     } catch (e) { console.error(e); }
   }
 

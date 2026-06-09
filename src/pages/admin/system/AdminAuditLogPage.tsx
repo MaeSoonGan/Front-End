@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { getPaginationPages } from '../../../utils/pagination';
@@ -6,6 +6,7 @@ import { Card } from '../../../components/common/Card';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 import { systemApi } from '../../../api/admin/system';
+import { downloadCsv } from '../../../utils/download';
 
 type SearchType = 'all' | 'action' | 'target';
 
@@ -190,11 +191,28 @@ export function AdminAuditLogPage() {
     setCurrentPage(1);
   }
 
+  async function handleCsvExport() {
+    try {
+      const blob = await systemApi.exportAuditLogs({
+        keyword:   appliedKeyword || undefined,
+        startDate: startDate || undefined,
+        endDate:   endDate || undefined,
+        type:      typeFilter || undefined,
+        adminId:   adminFilter ? Number(adminFilter) : undefined,
+      });
+      downloadCsv(blob, 'audit-logs');
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  const handleCsvExportRef = useRef(handleCsvExport);
+  useEffect(() => { handleCsvExportRef.current = handleCsvExport; });
+
   const safePage   = Math.min(currentPage, totalPages);
   const ghostCount = PAGE_SIZE - Math.max(logs.length, logs.length === 0 ? 1 : 0);
 
 useAdminPageActions(
-    <Button variant="secondary" className="h-9 gap-1.5 text-sm">
+    <Button variant="secondary" className="h-9 gap-1.5 text-sm" onClick={() => handleCsvExportRef.current()}>
       <Download size={14} />
       CSV 내보내기
     </Button>

@@ -5,6 +5,7 @@ import { Card } from '../../../components/common/Card';
 import { Button } from '../../../components/common/Button';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { membersApi } from '../../../api/admin/members';
+import { downloadCsv } from '../../../utils/download';
 
 type PaymentType = '이벤트 당첨' | '보상' | '상금' | '기타';
 type SortField = 'amount' | 'paidAt' | null;
@@ -116,9 +117,7 @@ export function AdminSeedMoneyPage() {
   async function handleCsvExport() {
     try {
       const blob = await membersApi.exportSeedPayments();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'seed-payments.csv'; a.click();
-      URL.revokeObjectURL(url);
+      downloadCsv(blob, 'seed-payments');
     } catch (e) { console.error(e); }
   }
 

@@ -6,6 +6,7 @@ import { Card } from '../../../components/common/Card';
 import { PageHeader } from '../../../components/common/PageHeader';
 import { Button } from '../../../components/common/Button';
 import { contestsApi } from '../../../api/admin/contests';
+import { downloadCsv } from '../../../utils/download';
 
 type ContestStatus = 'ONGOING' | 'CLOSING_SOON' | 'SCHEDULED' | 'ENDED';
 type ParticipantStatus = 'NORMAL' | 'EXCLUDED';
@@ -200,6 +201,16 @@ export function AdminContestDetailPage() {
       .catch(console.error);
   }, [contestId]);
 
+  async function handleCsvExport() {
+    if (!contestId) return;
+    try {
+      const blob = await contestsApi.exportRankings(Number(contestId), { keyword: search.trim() || undefined });
+      downloadCsv(blob, `contest-${contestId}-rankings`);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return participants.filter(p => {
@@ -327,7 +338,7 @@ export function AdminContestDetailPage() {
                 <Button variant="danger" className="h-9 text-sm" onClick={() => { setConfirmReason(''); setConfirmAction('cancel'); }}>대회 취소</Button>
               </>
             )}
-            {contest.status === 'ENDED' && <Button variant="secondary" className="h-9 text-sm">결과 내보내기</Button>}
+            {contest.status === 'ENDED' && <Button variant="secondary" className="h-9 text-sm" onClick={handleCsvExport}>결과 내보내기</Button>}
           </div>
         }
       />
@@ -399,7 +410,7 @@ export function AdminContestDetailPage() {
               </select>
               <input type="text" placeholder={searchType === 'nickname' ? '닉네임 검색' : searchType === 'email' ? '이메일 검색' : '닉네임/이메일 검색'} value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} className="h-9 w-44 px-3 text-sm focus:outline-none" />
             </div>
-            <Button variant="secondary" className="h-9 gap-1.5 text-sm"><Download size={14} />CSV 내보내기</Button>
+            <Button variant="secondary" className="h-9 gap-1.5 text-sm" onClick={handleCsvExport}><Download size={14} />CSV 내보내기</Button>
           </div>
         </div>
 

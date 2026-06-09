@@ -9,6 +9,7 @@ import { cn } from '../../../utils/cn';
 import { getPaginationPages } from '../../../utils/pagination';
 import type { StatusTone } from '../../../types/common';
 import { membersApi } from '../../../api/admin/members';
+import { downloadCsv } from '../../../utils/download';
 
 // ---- Types ----
 
@@ -195,10 +196,7 @@ const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
         startDate: dateFrom || undefined,
         endDate:   dateTo || undefined,
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'members.csv'; a.click();
-      URL.revokeObjectURL(url);
+      downloadCsv(blob, 'members');
     } catch (e) {
       console.error(e);
     }
