@@ -27,6 +27,6 @@ export const portfolioApi = {
   getProfitHistory: (period: string = '1M') =>
     client.get('/api/portfolio/profit-history', { params: { period } }).then(r => r.data.data),
 
-  resetSeedMoney: (data: { holdingsAndCashResetAgreed: boolean; irreversibleAgreed: boolean }) =>
+  resetSeedMoney: (data: { contestId?: number; holdingsAndCashResetAgreed: boolean; irreversibleAgreed: boolean }) =>
     client.post('/api/portfolio/seed-money/reset', data).then(r => r.data.data),
 };

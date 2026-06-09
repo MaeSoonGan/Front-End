@@ -1,16 +1,15 @@
 import type { ExecutionHistoryItem } from '../../types/balance';
-import { cn } from '../../utils/cn';
 
 interface ExecutionItemCardProps {
   execution: ExecutionHistoryItem;
   onCancelExecution: (id: string) => void;
 }
 
-const statusClassName = {
-  FILLED: 'bg-emerald-100 text-emerald-700',
-  PARTIAL: 'bg-sky-100 text-[#1565C0]',
-  OPEN: 'bg-amber-100 text-amber-700',
-  CANCELLED: 'bg-slate-100 text-slate-500',
+const statusLabel = {
+  FILLED: '체결완료',
+  PARTIAL: '부분체결',
+  OPEN: '미체결',
+  CANCELLED: '취소',
 };
 
 function formatWon(value: number) {
@@ -32,8 +31,14 @@ export function ExecutionItemCard({ execution, onCancelExecution }: ExecutionIte
             {execution.orderType} · {execution.orderedAt}
           </p>
         </div>
-        <span className={cn('rounded-full px-2 py-1 text-[10px] font-extrabold', statusClassName[execution.status])}>
-          {execution.status}
+        <span
+          className={`rounded-full px-2 py-1 text-[10px] font-extrabold ${
+            execution.status === 'CANCELLED'
+              ? 'bg-red-100 text-red-500'
+              : 'bg-[#E8F0FA] text-[#1565C0]'
+          }`}
+        >
+          {statusLabel[execution.status]}
         </span>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-bold text-[#6C88A4]">
@@ -42,7 +47,6 @@ export function ExecutionItemCard({ execution, onCancelExecution }: ExecutionIte
         <p>체결수량 {execution.filledQuantity}주</p>
         <p>미체결 {execution.remainingQuantity}주</p>
         <p>주문번호 {execution.orderNumber}</p>
-        <p>원주문 {execution.originalOrderNumber ?? '-'}</p>
       </div>
       {canCancel ? (
         <button

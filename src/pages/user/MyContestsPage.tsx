@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Modal } from '../../components/common/Modal';
 import { MyContestCard } from '../../components/user/MyContestCard';
@@ -7,58 +6,41 @@ import { MyContestTabs } from '../../components/user/MyContestTabs';
 import type { MyContestTab } from '../../components/user/MyContestTabs';
 import { contestsApi } from '../../api/user/contests';
 import { parseApiError } from '../../api/parseApiError';
-import { getPaginationPages } from '../../utils/pagination';
 import type { MyContestItem } from '../../types/contest';
 
-const PAGE_SIZE = 2;
-
-// 카드 영역 높이 고정을 위한 투명 placeholder 카드 (실제 카드와 동일 구조)
-function createGhostContest(status: MyContestTab, index: number): MyContestItem {
-  return {
-    contestId: `ghost-${index}`,
-    title: ' ',
-    status,
-    startAt: '2024-01-01',
-    endAt: '2024-01-01',
-    seedMoney: 0,
-    myRank: 0,
-    totalParticipants: 0,
-    profitRate: 0,
-    profitAmount: 0,
-    currentAsset: 0,
-    topRankers: [
-      { rank: 1, nickname: ' ', profitRate: 0 },
-      { rank: 2, nickname: ' ', profitRate: 0 },
-      { rank: 3, nickname: ' ', profitRate: 0 },
-    ],
-  };
-}
+const PAGE_SIZE = 10;
 
 export function MyContestsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get('tab') === 'ENDED' ? 'ENDED' : 'ACTIVE';
   const [activeTab, setActiveTab] = useState<MyContestTab>(initialTab);
   const [contests, setContests] = useState<MyContestItem[]>([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [hasMore, setHasMore] = useState(false);
   const [withdrawTarget, setWithdrawTarget] = useState<MyContestItem | null>(null);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
-  const safePage = Math.min(currentPage, totalPages);
+  const pageRef = useRef(0);
+  const loadingRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchContests = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await contestsApi.getMyContests({
-        status: activeTab,
-        page: currentPage - 1,
-        size: PAGE_SIZE,
-      });
-      setContests(
+  const loadContests = useCallback(
+    async (reset: boolean) => {
+      if (loadingRef.current) return;
+      loadingRef.current = true;
+      const nextPage = reset ? 0 : pageRef.current + 1;
+      if (reset) setLoading(true);
+      else setLoadingMore(true);
+      try {
+        const data = await contestsApi.getMyContests({
+          status: activeTab,
+          page: nextPage,
+          size: PAGE_SIZE,
+        });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (data.content ?? []).map((c: any) => ({
+        const items: MyContestItem[] = (data.content ?? []).map((c: any) => ({
           contestId: String(c.contestId),
           title: c.title ?? '',
           status: c.status === 'ENDED' ? 'ENDED' : 'ACTIVE',
@@ -76,24 +58,47 @@ export function MyContestsPage() {
             nickname: t.nickname ?? '',
             profitRate: Number(t.profitRate ?? 0),
           })),
-        })),
-      );
-      setTotalPages(data.totalPages && data.totalPages > 0 ? data.totalPages : 1);
-      setError('');
-    } catch (e) {
-      setError(parseApiError(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [activeTab, currentPage]);
+        }));
+        pageRef.current = nextPage;
+        setContests((prev) => (reset ? items : [...prev, ...items]));
+        const totalPages = data.totalPages && data.totalPages > 0 ? data.totalPages : 1;
+        setHasMore(nextPage + 1 < totalPages);
+        setError('');
+      } catch (e) {
+        setError(parseApiError(e));
+      } finally {
+        if (reset) setLoading(false);
+        else setLoadingMore(false);
+        loadingRef.current = false;
+      }
+    },
+    [activeTab],
+  );
 
+  // 탭 변경 시 처음부터 다시 로드
   useEffect(() => {
-    fetchContests();
-  }, [fetchContests]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadContests(true);
+  }, [loadContests]);
+
+  // 무한 스크롤: 하단 sentinel이 보이면 다음 페이지 로드
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+          loadContests(false);
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadContests]);
 
   const handleChangeTab = (tab: MyContestTab) => {
     setActiveTab(tab);
-    setCurrentPage(1);
     const nextSearchParams = new URLSearchParams(searchParams);
 
     if (tab === 'ACTIVE') {
@@ -113,13 +118,9 @@ export function MyContestsPage() {
     setIsWithdrawing(true);
     try {
       await contestsApi.leaveContest(Number(withdrawTarget.contestId));
+      // 포기한 대회는 목록에서 즉시 제거 (스크롤 위치 유지)
+      setContests((prev) => prev.filter((c) => c.contestId !== withdrawTarget.contestId));
       setWithdrawTarget(null);
-      // 마지막 페이지의 마지막 항목을 포기한 경우 이전 페이지로 이동
-      if (contests.length === 1 && currentPage > 1) {
-        setCurrentPage((p) => p - 1);
-      } else {
-        await fetchContests();
-      }
     } catch (e) {
       setError(parseApiError(e));
       setWithdrawTarget(null);
@@ -146,11 +147,11 @@ export function MyContestsPage() {
                 onWithdraw={setWithdrawTarget}
               />
             ))}
-            {Array.from({ length: PAGE_SIZE - contests.length }).map((_, i) => (
-              <div key={`ghost-${i}`} aria-hidden className="invisible">
-                <MyContestCard contest={createGhostContest(activeTab, i)} onWithdraw={() => {}} />
-              </div>
-            ))}
+            {/* 무한 스크롤 감지용 sentinel */}
+            <div ref={sentinelRef} aria-hidden className="h-1" />
+            {loadingMore && (
+              <p className="py-3 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
+            )}
           </>
         ) : (
           <div className="rounded-2xl border border-blue-100 bg-white px-4 py-12 text-center shadow-sm">
@@ -165,55 +166,6 @@ export function MyContestsPage() {
           </div>
         )}
       </section>
-
-      {!loading && !error && contests.length > 0 && (
-        <div className="mt-auto flex items-center justify-center gap-1 pt-5">
-          <button
-            className="cursor-pointer rounded p-1 text-[#6C88A4] hover:bg-blue-50 disabled:cursor-default disabled:opacity-40"
-            disabled={safePage === 1}
-            onClick={() => setCurrentPage(1)}
-            type="button"
-          >
-            <ChevronsLeft size={16} />
-          </button>
-          <button
-            className="cursor-pointer rounded p-1 text-[#6C88A4] hover:bg-blue-50 disabled:cursor-default disabled:opacity-40"
-            disabled={safePage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            type="button"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          {getPaginationPages(safePage, totalPages).map((page) => (
-            <button
-              className={`min-w-7 cursor-pointer rounded px-2 py-1 text-xs font-bold ${
-                safePage === page ? 'bg-[#1565C0] text-white' : 'text-[#6C88A4] hover:bg-blue-50'
-              }`}
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              type="button"
-            >
-              {page}
-            </button>
-          ))}
-          <button
-            className="cursor-pointer rounded p-1 text-[#6C88A4] hover:bg-blue-50 disabled:cursor-default disabled:opacity-40"
-            disabled={safePage === totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            type="button"
-          >
-            <ChevronRight size={16} />
-          </button>
-          <button
-            className="cursor-pointer rounded p-1 text-[#6C88A4] hover:bg-blue-50 disabled:cursor-default disabled:opacity-40"
-            disabled={safePage === totalPages}
-            onClick={() => setCurrentPage(totalPages)}
-            type="button"
-          >
-            <ChevronsRight size={16} />
-          </button>
-        </div>
-      )}
 
       <Modal
         cancelText="취소"

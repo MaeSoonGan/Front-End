@@ -1,4 +1,3 @@
-import { Search } from 'lucide-react';
 import type { BalanceTradeHistoryItem, TradeSide } from '../../types/balance';
 import { cn } from '../../utils/cn';
 
@@ -12,7 +11,6 @@ interface BalanceTradeHistoryTabProps {
   onChangeStartDate: (value: string) => void;
   onChangeEndDate: (value: string) => void;
   onChangeSide: (value: TradeFilter) => void;
-  onSearch: () => void;
 }
 
 function formatWon(value: number) {
@@ -27,7 +25,6 @@ export function BalanceTradeHistoryTab({
   onChangeStartDate,
   onChangeEndDate,
   onChangeSide,
-  onSearch,
 }: BalanceTradeHistoryTabProps) {
   // 날짜/구분 필터는 백엔드 조회로 처리되므로, 여기선 받은 trades를 그대로 표시
   const filteredTrades = trades;
@@ -56,9 +53,9 @@ export function BalanceTradeHistoryTab({
           value={endDate}
         />
       </div>
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3">
         <select
-          className="h-11 flex-1 rounded-xl border border-blue-100 bg-white px-3 text-sm font-extrabold text-slate-950 outline-none"
+          className="h-11 w-full rounded-xl border border-blue-100 bg-white px-3 text-sm font-extrabold text-slate-950 outline-none"
           onChange={(event) => onChangeSide(event.target.value as TradeFilter)}
           value={side}
         >
@@ -66,14 +63,6 @@ export function BalanceTradeHistoryTab({
           <option value="BUY">매수</option>
           <option value="SELL">매도</option>
         </select>
-        <button
-          aria-label="조회"
-          className="flex h-11 w-11 items-center justify-center rounded-xl border border-blue-100 bg-white text-[#6C88A4] transition hover:bg-[#F0F6FF]"
-          onClick={onSearch}
-          type="button"
-        >
-          <Search size={18} strokeWidth={2.5} />
-        </button>
       </div>
 
       <section className="mt-4 grid grid-cols-3 gap-2">
@@ -109,10 +98,8 @@ export function BalanceTradeHistoryTab({
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-bold text-[#6C88A4]">
                   <p>수량 {trade.quantity}주</p>
-                  <p>단가 {formatWon(trade.unitPrice)}</p>
-                  <p>정산 {formatWon(trade.settlementAmount)}</p>
-                  <p>수수료 {formatWon(trade.fee)}</p>
-                  <p>거래세 {formatWon(trade.tax)}</p>
+                  <p>체결가 {formatWon(trade.unitPrice)}</p>
+                  <p>거래금액 {formatWon(trade.settlementAmount)}</p>
                 </div>
               </article>
             );

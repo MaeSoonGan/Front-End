@@ -54,6 +54,10 @@ function getTitle(pathname: string, search: string) {
     return '종목 상세';
   }
 
+  if (pathname.startsWith('/notices/')) {
+    return '공지사항';
+  }
+
   return pageTitles[pathname] ?? 'FISA Invest';
 }
 
@@ -70,6 +74,7 @@ export function UserHeader() {
     isContestMode &&
     (titlePathname === '/balance' ||
       titlePathname === '/watchlist' ||
+      titlePathname === '/market' ||
       titlePathname === '/ranking');
   const canGoBack =
     pathname === '/more' ||
@@ -82,6 +87,7 @@ export function UserHeader() {
     canGoBackInContestMode ||
     titlePathname === '/ranking' ||
     titlePathname === '/notices' ||
+    titlePathname.startsWith('/notices/') ||
     titlePathname === '/notifications' ||
     titlePathname === '/notifications/settings' ||
     titlePathname === '/profile/edit' ||
@@ -258,10 +264,24 @@ export function UserHeader() {
 
                     const searchParams = new URLSearchParams(search);
 
+                    if (pathname === '/market') {
+                      const from = searchParams.get('from');
+                      navigate(from === 'balance' ? '/balance' : from === 'watchlist' ? '/watchlist' : '/home');
+                      return;
+                    }
+
+                    navigate('/home');
+                    return;
+                  }
+
+                  if (isContestMode && titlePathname === '/market') {
+                    const from = new URLSearchParams(search).get('from');
                     navigate(
-                      pathname === '/market' && searchParams.get('from') === 'balance'
-                        ? '/balance'
-                        : '/home',
+                      from === 'balance'
+                        ? getContestPath('/balance')
+                        : from === 'watchlist'
+                          ? getContestPath('/watchlist')
+                          : getContestPath('/home'),
                     );
                     return;
                   }
@@ -283,6 +303,11 @@ export function UserHeader() {
                     } else {
                       navigate(isContestMode ? getContestPath('/more') : '/more');
                     }
+                    return;
+                  }
+
+                  if (titlePathname.startsWith('/notices/')) {
+                    navigate(isContestMode ? getContestPath('/notices') : '/notices');
                     return;
                   }
 

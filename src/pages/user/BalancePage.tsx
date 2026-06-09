@@ -173,7 +173,6 @@ export function BalancePage() {
   const [tradeFrom, setTradeFrom] = useState(() => ymdDaysAgo(0));
   const [tradeTo, setTradeTo] = useState(() => ymdDaysAgo(0));
   const [tradeSide, setTradeSide] = useState<'ALL' | TradeSide>('ALL');
-  const [tradeReload, setTradeReload] = useState(0);
 
   // 체결내역 필터 (날짜 = 백엔드 조회, 상태 = 클라이언트 필터)
   const [executionDate, setExecutionDate] = useState(() => ymdDaysAgo(0));
@@ -255,7 +254,7 @@ export function BalancePage() {
     return () => {
       cancelled = true;
     };
-  }, [isContestMode, contestId, tradeFrom, tradeTo, tradeSide, tradeReload]);
+  }, [isContestMode, contestId, tradeFrom, tradeTo, tradeSide]);
 
   // 체결내역 — 선택 날짜의 주문 조회 (상태 필터는 탭에서 클라이언트 처리)
   useEffect(() => {
@@ -325,7 +324,6 @@ export function BalancePage() {
           onChangeEndDate={setTradeTo}
           onChangeSide={setTradeSide}
           onChangeStartDate={setTradeFrom}
-          onSearch={() => setTradeReload((n) => n + 1)}
           side={tradeSide}
           startDate={tradeFrom}
           trades={trades}

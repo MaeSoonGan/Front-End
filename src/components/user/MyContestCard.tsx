@@ -44,8 +44,8 @@ export function MyContestCard({ contest, onWithdraw }: MyContestCardProps) {
   const isProfit = contest.profitRate >= 0;
 
   const handleGoContest = () => {
-    // TODO: 대회 홈 화면 API 연동 후 해당 대회의 시드머니/보유자산 기준 데이터를 조회합니다.
-    navigate(`/contests/${contest.contestId}/home`);
+    // 나가기 시 다시 '참여 중인 대회' 목록으로 돌아오도록 출처를 전달
+    navigate(`/contests/${contest.contestId}/home`, { state: { from: '/my-contests' } });
   };
 
   return (

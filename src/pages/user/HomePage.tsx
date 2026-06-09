@@ -39,6 +39,7 @@ interface MyContestView {
   rank: number;
   participants: number;
   myAsset: string;
+  period: string;
   badge: string;
   statusLabel: string;
   notStarted: boolean;
@@ -145,7 +146,18 @@ function daysFromToday(dateStr: string | null | undefined) {
   return Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
 }
 
-// 시작 전이면 "시작까지", 진행 중이면 "마감까지" D-day를 직관적으로 표기
+// 대회 기간 표기: "2026.06.07 ~ 2026.06.29"
+function formatPeriod(startAt: string | null | undefined, endAt: string | null | undefined) {
+  const ymd = (s: string | null | undefined) => (s ? s.split('T')[0].replace(/-/g, '.') : '');
+  const start = ymd(startAt);
+  const end = ymd(endAt);
+  if (!start && !end) {
+    return '';
+  }
+  return `${start} ~ ${end}`;
+}
+
+// 시작 전이면 "시작까지", 진행 중이면 "종료까지" 남은 일수를 표기
 function toContestBadge(
   status: string | null | undefined,
   startAt: string | null | undefined,
@@ -156,7 +168,7 @@ function toContestBadge(
   if (notStarted) {
     const d = daysFromToday(startAt) ?? 0;
     return {
-      badge: d > 0 ? `시작 D-${d}` : '오늘 시작',
+      badge: d > 0 ? `시작까지 ${d}일` : '오늘 시작',
       statusLabel: '시작 예정',
       notStarted: true,
     };
@@ -165,7 +177,7 @@ function toContestBadge(
   const daysToEnd = daysFromToday(endAt);
   let badge = '';
   if (daysToEnd !== null) {
-    badge = daysToEnd > 0 ? `마감 D-${daysToEnd}` : daysToEnd === 0 ? '오늘 마감' : '종료';
+    badge = daysToEnd > 0 ? `종료까지 ${daysToEnd}일` : daysToEnd === 0 ? '오늘 종료' : '종료';
   }
   return { badge, statusLabel: '진행 중', notStarted: false };
 }
@@ -326,6 +338,7 @@ export function HomePage() {
                 rank: Number(c.myRank ?? 0),
                 participants: Number(c.totalParticipants ?? 0),
                 myAsset: formatWon(Number(c.currentAsset ?? 0)),
+                period: formatPeriod(c.startAt, c.endAt),
                 badge,
                 statusLabel,
                 notStarted,
@@ -367,7 +380,7 @@ export function HomePage() {
   return (
     <PageContainer>
       <button
-        className="w-full rounded-2xl bg-gradient-to-br from-[#1565C0] to-[#4F8ED9] p-5 text-left text-white shadow-sm transition hover:shadow-md"
+        className="w-full cursor-pointer rounded-2xl bg-gradient-to-br from-[#1565C0] to-[#4F8ED9] p-5 text-left text-white shadow-sm transition hover:shadow-md"
         onClick={() => navigate(getPath('/balance'))}
         type="button"
       >
@@ -437,7 +450,7 @@ export function HomePage() {
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-extrabold text-slate-950">실시간 순위</h2>
           <button
-            className="text-xs font-bold text-[#6C88A4] transition hover:text-[#1565C0]"
+            className="cursor-pointer text-xs font-bold text-[#6C88A4] transition hover:text-[#1565C0]"
             onClick={() => navigate(getPath('/market-ranking'))}
             type="button"
           >
@@ -479,7 +492,7 @@ export function HomePage() {
                     </div>
                     <button
                       aria-label={favorite ? '관심종목 해제' : '관심종목 등록'}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-[#F0F6FF]"
+                      className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-full hover:bg-[#F0F6FF]"
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleWatch(stock.code);
@@ -506,8 +519,8 @@ export function HomePage() {
             {myContests.map((contest) => (
               <button
                 key={contest.id}
-                className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]"
-                onClick={() => navigate(`/contests/${contest.id}/home`)}
+                className="w-full cursor-pointer rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]"
+                onClick={() => navigate(`/contests/${contest.id}/home`, { state: { from: '/' } })}
                 type="button"
               >
                 <div className="flex items-start justify-between gap-3">
@@ -516,6 +529,9 @@ export function HomePage() {
                       {contest.statusLabel}
                     </p>
                     <p className="mt-1 text-base font-extrabold text-slate-950">{contest.title}</p>
+                    {contest.period ? (
+                      <p className="mt-1 text-xs font-bold text-[#6C88A4]">🗓️ {contest.period}</p>
+                    ) : null}
                   </div>
                   {contest.badge ? (
                     <span
@@ -553,7 +569,7 @@ export function HomePage() {
         <section className="mt-5">
           <h2 className="mb-3 text-base font-extrabold text-slate-950">대회 관리</h2>
           <Button
-            className="h-12 w-full rounded-xl bg-red-500 text-sm font-extrabold text-white shadow-sm hover:bg-red-600"
+            className="h-12 w-full cursor-pointer rounded-xl bg-red-500 text-sm font-extrabold text-white shadow-sm hover:bg-red-600"
             onClick={() => setIsWithdrawModalOpen(true)}
             variant="danger"
           >
