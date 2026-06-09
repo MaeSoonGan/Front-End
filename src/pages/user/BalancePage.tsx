@@ -13,6 +13,7 @@ import type {
   BalanceSummary,
   BalanceTab,
   BalanceTradeHistoryItem,
+  ExecutionFilterType,
   ExecutionHistoryItem,
   ExecutionStatus,
   HoldingItem,
@@ -84,16 +85,18 @@ function toOrderTypeLabel(orderType: string): '지정가' | '시장가' {
 }
 
 function toExecutionStatus(status: string): ExecutionStatus {
-  switch (status) {
+  switch ((status ?? '').toUpperCase()) {
     case 'FILLED':
       return 'FILLED';
+    case 'PARTIALLY_FILLED':
     case 'PARTIAL':
       return 'PARTIAL';
+    case 'ACCEPTED':
     case 'OPEN':
     case 'PENDING':
       return 'OPEN';
     default:
-      // CANCELLED, CANCELED, CANCEL_REQUESTED, CANCEL_FAILED, REJECTED 등
+      // CANCELED, CANCELLED, CANCEL_REQUESTED, CANCEL_FAILED, REJECTED 등
       return 'CANCELLED';
   }
 }
@@ -172,6 +175,10 @@ export function BalancePage() {
   const [tradeSide, setTradeSide] = useState<'ALL' | TradeSide>('ALL');
   const [tradeReload, setTradeReload] = useState(0);
 
+  // 체결내역 필터 (날짜 = 백엔드 조회, 상태 = 클라이언트 필터)
+  const [executionDate, setExecutionDate] = useState(() => ymdDaysAgo(0));
+  const [executionFilter, setExecutionFilter] = useState<ExecutionFilterType>('ALL');
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -219,17 +226,7 @@ export function BalancePage() {
             if (!cancelled) setProfitTrend([]);
           });
 
-    const executionsTask = orderApi
-      .getOrders({ contestId: cid })
-      .then((data) => {
-        if (cancelled) return;
-        setExecutions((data?.content ?? []).map(toExecutionItem));
-      })
-      .catch(() => {
-        if (!cancelled) setExecutions([]);
-      });
-
-    Promise.all([summaryTask, holdingsTask, profitTask, executionsTask]).finally(() => {
+    Promise.all([summaryTask, holdingsTask, profitTask]).finally(() => {
       if (!cancelled) setLoading(false);
     });
 
@@ -259,6 +256,23 @@ export function BalancePage() {
       cancelled = true;
     };
   }, [isContestMode, contestId, tradeFrom, tradeTo, tradeSide, tradeReload]);
+
+  // 체결내역 — 선택 날짜의 주문 조회 (상태 필터는 탭에서 클라이언트 처리)
+  useEffect(() => {
+    let cancelled = false;
+    const cid = isContestMode && contestId ? Number(contestId) : undefined;
+    orderApi
+      .getOrders({ contestId: cid, date: executionDate })
+      .then((data) => {
+        if (!cancelled) setExecutions((data?.content ?? []).map(toExecutionItem));
+      })
+      .catch(() => {
+        if (!cancelled) setExecutions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isContestMode, contestId, executionDate]);
 
   const handleChangeTab = (tab: BalanceTab) => {
     setActiveTab(tab);
@@ -317,7 +331,13 @@ export function BalancePage() {
           trades={trades}
         />
       ) : (
-        <BalanceExecutionHistoryTab executions={executions} />
+        <BalanceExecutionHistoryTab
+          date={executionDate}
+          executions={executions}
+          filter={executionFilter}
+          onChangeDate={setExecutionDate}
+          onChangeFilter={setExecutionFilter}
+        />
       )}
     </div>
   );

@@ -1,37 +1,45 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ExecutionFilterType, ExecutionHistoryItem } from '../../types/balance';
 import { ExecutionFilterTabs } from './ExecutionFilterTabs';
 import { ExecutionItemCard } from './ExecutionItemCard';
 
 interface BalanceExecutionHistoryTabProps {
   executions: ExecutionHistoryItem[];
+  date: string;
+  filter: ExecutionFilterType;
+  onChangeDate: (value: string) => void;
+  onChangeFilter: (value: ExecutionFilterType) => void;
 }
 
-export function BalanceExecutionHistoryTab({ executions }: BalanceExecutionHistoryTabProps) {
-  const [filter, setFilter] = useState<ExecutionFilterType>('ALL');
+export function BalanceExecutionHistoryTab({
+  executions,
+  date,
+  filter,
+  onChangeDate,
+  onChangeFilter,
+}: BalanceExecutionHistoryTabProps) {
+  // 날짜는 백엔드 조회로 처리되므로, 여기선 상태(체결/미체결)만 클라이언트 필터
   const [executionItems, setExecutionItems] = useState(executions);
-  const [searchDate, setSearchDate] = useState('2026-05-21');
+  useEffect(() => {
+    setExecutionItems(executions);
+  }, [executions]);
+
   const filteredExecutions = useMemo(
     () =>
       executionItems.filter((execution) => {
-        const executionDate = execution.orderedAt.slice(0, 10).replaceAll('.', '-');
-        const isDateMatched = executionDate === searchDate;
-
-        if (!isDateMatched) {
-          return false;
-        }
-
         if (filter === 'ALL') {
           return true;
         }
 
         if (filter === 'FILLED') {
-          return execution.status === 'FILLED' || execution.status === 'PARTIAL';
+          // 체결 = 완전 체결(잔량 0), 취소 제외
+          return execution.remainingQuantity === 0 && execution.status !== 'CANCELLED';
         }
 
+        // 미체결 = 잔량 남음(부분체결 포함), 취소 제외
         return execution.remainingQuantity > 0 && execution.status !== 'CANCELLED';
       }),
-    [executionItems, filter, searchDate],
+    [executionItems, filter],
   );
 
   const handleCancelExecution = (id: string) => {
@@ -50,12 +58,12 @@ export function BalanceExecutionHistoryTab({ executions }: BalanceExecutionHisto
   return (
     <section className="px-4 pb-24 pt-4">
       <div className="grid grid-cols-[1fr_1fr] gap-3">
-        <ExecutionFilterTabs activeFilter={filter} onChangeFilter={setFilter} />
+        <ExecutionFilterTabs activeFilter={filter} onChangeFilter={onChangeFilter} />
         <input
           className="min-w-0 rounded-xl border border-blue-100 bg-white px-3 py-3 text-center text-sm font-extrabold text-slate-950 outline-none"
-          onChange={(event) => setSearchDate(event.target.value)}
+          onChange={(event) => onChangeDate(event.target.value)}
           type="date"
-          value={searchDate}
+          value={date}
         />
       </div>
 
