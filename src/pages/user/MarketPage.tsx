@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MarketTabs } from '../../components/user/MarketTabs';
 import { OrderBottomSheet } from '../../components/user/OrderBottomSheet';
+import { useMarketSocket } from '../../hooks/useMarketSocket';
 import { OrderBookList } from '../../components/user/OrderBookList';
 import { StockChartSection } from '../../components/user/StockChartSection';
 import { StockInfoGrid } from '../../components/user/StockInfoGrid';
@@ -134,8 +135,34 @@ export function MarketPage() {
       .catch(() => {});
   }, [stockCode]);
 
-  const summary = apiSummary;
-  const orderBook = apiOrderBook ?? { askOrders: [], bidOrders: [] };
+  // 실시간 시세 + 호가 구독 (현재 보는 종목)
+  const { prices: livePrices, orderbooks: liveOrderbooks } = useMarketSocket(
+    stockCode ? [stockCode] : [],
+    { orderbookCodes: stockCode ? [stockCode] : [] },
+  );
+  const live = stockCode ? livePrices[stockCode] : undefined;
+  const liveOrderbook = stockCode ? liveOrderbooks[stockCode] : undefined;
+
+  const summary: StockSummary | null = apiSummary
+    ? live
+      ? {
+          ...apiSummary,
+          currentPrice: live.currentPrice,
+          changeAmount: live.changePrice,
+          changeRate: live.changeRate,
+          volume: live.volume ? live.volume.toLocaleString('ko-KR') : apiSummary.volume,
+          highPrice: live.high || apiSummary.highPrice,
+          lowPrice: live.low || apiSummary.lowPrice,
+          openPrice: live.open || apiSummary.openPrice,
+        }
+      : apiSummary
+    : null;
+  const orderBook = liveOrderbook
+    ? {
+        askOrders: liveOrderbook.asks.map((l) => ({ price: l.price, quantity: l.quantity, changeRate: 0 })),
+        bidOrders: liveOrderbook.bids.map((l) => ({ price: l.price, quantity: l.quantity, changeRate: 0 })),
+      }
+    : apiOrderBook ?? { askOrders: [], bidOrders: [] };
 
   const orderStock: OrderStockInfo | null = summary
     ? {

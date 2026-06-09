@@ -44,6 +44,13 @@ function pad(value: number): string {
   return String(value).padStart(2, '0');
 }
 
+// N일 전 날짜를 'YYYY-MM-DD'로
+function ymdDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 // ISO → 'YYYY.MM.DD'
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return '';
@@ -159,6 +166,12 @@ export function BalancePage() {
   const [executions, setExecutions] = useState<ExecutionHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 매매내역 필터 (날짜/구분) — 백엔드 조회에 사용
+  const [tradeFrom, setTradeFrom] = useState(() => ymdDaysAgo(0));
+  const [tradeTo, setTradeTo] = useState(() => ymdDaysAgo(0));
+  const [tradeSide, setTradeSide] = useState<'ALL' | TradeSide>('ALL');
+  const [tradeReload, setTradeReload] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -206,16 +219,6 @@ export function BalancePage() {
             if (!cancelled) setProfitTrend([]);
           });
 
-    const tradesTask = orderApi
-      .getTrades({ contestId: cid })
-      .then((data) => {
-        if (cancelled) return;
-        setTrades((data?.content ?? []).map(toTradeItem));
-      })
-      .catch(() => {
-        if (!cancelled) setTrades([]);
-      });
-
     const executionsTask = orderApi
       .getOrders({ contestId: cid })
       .then((data) => {
@@ -226,7 +229,7 @@ export function BalancePage() {
         if (!cancelled) setExecutions([]);
       });
 
-    Promise.all([summaryTask, holdingsTask, profitTask, tradesTask, executionsTask]).finally(() => {
+    Promise.all([summaryTask, holdingsTask, profitTask, executionsTask]).finally(() => {
       if (!cancelled) setLoading(false);
     });
 
@@ -234,6 +237,28 @@ export function BalancePage() {
       cancelled = true;
     };
   }, [isContestMode, contestId]);
+
+  // 매매내역 — 날짜/구분 필터로 백엔드 조회 (필터 변경 시 재조회)
+  useEffect(() => {
+    let cancelled = false;
+    const cid = isContestMode && contestId ? Number(contestId) : undefined;
+    orderApi
+      .getTrades({
+        contestId: cid,
+        from: tradeFrom,
+        to: tradeTo,
+        side: tradeSide === 'ALL' ? undefined : tradeSide,
+      })
+      .then((data) => {
+        if (!cancelled) setTrades((data?.content ?? []).map(toTradeItem));
+      })
+      .catch(() => {
+        if (!cancelled) setTrades([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isContestMode, contestId, tradeFrom, tradeTo, tradeSide, tradeReload]);
 
   const handleChangeTab = (tab: BalanceTab) => {
     setActiveTab(tab);
@@ -281,7 +306,16 @@ export function BalancePage() {
           ) : null}
         </section>
       ) : activeTab === 'trades' ? (
-        <BalanceTradeHistoryTab trades={trades} />
+        <BalanceTradeHistoryTab
+          endDate={tradeTo}
+          onChangeEndDate={setTradeTo}
+          onChangeSide={setTradeSide}
+          onChangeStartDate={setTradeFrom}
+          onSearch={() => setTradeReload((n) => n + 1)}
+          side={tradeSide}
+          startDate={tradeFrom}
+          trades={trades}
+        />
       ) : (
         <BalanceExecutionHistoryTab executions={executions} />
       )}

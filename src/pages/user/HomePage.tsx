@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../components/common/Button';
 import { Modal } from '../../components/common/Modal';
@@ -7,6 +8,7 @@ import { useContestMode } from '../../contexts/ContestModeContext';
 import { marketApi } from '../../api/user/market';
 import { portfolioApi } from '../../api/user/portfolio';
 import { contestsApi } from '../../api/user/contests';
+import { useMarketSocket } from '../../hooks/useMarketSocket';
 
 interface AssetView {
   total: string;
@@ -156,6 +158,46 @@ export function HomePage() {
   const getPath = (path: string) => (isContestMode ? getContestPath(path) : path);
   const normalAsset = summaryAsset ?? EMPTY_ASSET;
   const contestTitle = contestView?.title ?? '참여 대회';
+
+  // 실시간 순위 종목 가격 + KOSPI/KOSDAQ 지수 구독
+  const { prices: livePrices, indices: liveIndices } = useMarketSocket(
+    rankingStocks.map((stock) => stock.code),
+    { indexMarkets: ['KOSPI', 'KOSDAQ'] },
+  );
+
+  // 관심종목 상태 (하트 토글)
+  const [watchset, setWatchset] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    marketApi
+      .getWatchlist('domestic')
+      .then((data) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const codes = (data?.items ?? data?.stocks ?? []).map((i: any) => i.code ?? i.stockCode);
+        setWatchset(new Set(codes.filter(Boolean)));
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleWatch = async (code: string) => {
+    const has = watchset.has(code);
+    setWatchset((prev) => {
+      const next = new Set(prev);
+      if (has) next.delete(code);
+      else next.add(code);
+      return next;
+    });
+    try {
+      if (has) await marketApi.deleteWatchlist(code);
+      else await marketApi.addWatchlist(code);
+    } catch {
+      setWatchset((prev) => {
+        const next = new Set(prev);
+        if (has) next.add(code);
+        else next.delete(code);
+        return next;
+      });
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -326,57 +368,91 @@ export function HomePage() {
       </button>
 
       <section className="mt-4 grid grid-cols-3 gap-3">
-        {marketStatus.map((status) => (
-          <div
-            className="rounded-xl border border-blue-100 bg-white px-3 py-4 text-center shadow-sm"
-            key={status.title}
-          >
-            <div className="mx-auto flex h-6 w-6 items-center justify-center text-base">
-              {status.icon}
+        {marketStatus.map((status) => {
+          // KOSPI/KOSDAQ는 ws 실시간 지수로 덮어씀 (없으면 기존 값)
+          const live = liveIndices[status.title];
+          const value = live ? formatIndexValue(live.value) : status.value;
+          const changeRate = live ? formatSignedRate(live.changeRate) : status.changeRate;
+          return (
+            <div
+              className="rounded-xl border border-blue-100 bg-white px-3 py-4 text-center shadow-sm"
+              key={status.title}
+            >
+              <div className="mx-auto flex h-6 w-6 items-center justify-center text-base">
+                {status.icon}
+              </div>
+              <p className="mt-2 text-xs font-bold text-[#6C88A4]">{status.title}</p>
+              <p className="mt-1 text-lg font-extrabold leading-5 text-slate-950">{value}</p>
+              <p className={`mt-1 text-xs font-bold ${getChangeClass(changeRate)}`}>
+                {changeRate}
+              </p>
             </div>
-            <p className="mt-2 text-xs font-bold text-[#6C88A4]">{status.title}</p>
-            <p className="mt-1 text-lg font-extrabold leading-5 text-slate-950">
-              {status.value}
-            </p>
-            <p className={`mt-1 text-xs font-bold ${getChangeClass(status.changeRate)}`}>
-              {status.changeRate}
-            </p>
-          </div>
-        ))}
+          );
+        })}
       </section>
 
       <section className="mt-5">
-        <h2 className="mb-3 text-base font-extrabold text-slate-950">실시간 순위</h2>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-extrabold text-slate-950">실시간 순위</h2>
+          <button
+            className="text-xs font-bold text-[#6C88A4] transition hover:text-[#1565C0]"
+            onClick={() => navigate(getPath('/market-ranking'))}
+            type="button"
+          >
+            더보기 ›
+          </button>
+        </div>
         {loading && rankingStocks.length === 0 ? (
           <p className="py-6 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
         ) : rankingStocks.length === 0 ? (
           <p className="py-6 text-center text-xs font-bold text-[#A3B4C6]">순위 정보가 없습니다.</p>
         ) : (
           <div className="space-y-2">
-            {rankingStocks.map((stock) => (
-              <button
-                className="flex w-full items-center justify-between rounded-xl border border-blue-100 bg-white px-4 py-3 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]"
-                key={stock.code}
-                onClick={() => navigate(`${getPath('/market')}?stockCode=${stock.code}`)}
-                type="button"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E5F4FF] text-xs font-bold text-[#1565C0]">
-                    {stock.name.slice(0, 1)}
-                  </span>
-                  <div>
-                    <p className="text-sm font-bold text-slate-950">{stock.name}</p>
-                    <p className="text-xs text-[#A3B4C6]">{stock.code}</p>
+            {rankingStocks.map((stock) => {
+              const live = livePrices[stock.code];
+              const price = live ? formatPrice(live.currentPrice) : stock.price;
+              const changeRate = live ? formatSignedRate(live.changeRate) : stock.changeRate;
+              const favorite = watchset.has(stock.code);
+              return (
+                <div
+                  className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-blue-100 bg-white px-4 py-3 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]"
+                  key={stock.code}
+                  onClick={() => navigate(`${getPath('/market')}?stockCode=${stock.code}`)}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E5F4FF] text-xs font-bold text-[#1565C0]">
+                      {stock.name.slice(0, 1)}
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-slate-950">{stock.name}</p>
+                      <p className="text-xs text-[#A3B4C6]">{stock.code}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-slate-950">{price}</p>
+                      <p className={`text-xs font-bold ${getChangeClass(changeRate)}`}>
+                        {changeRate}
+                      </p>
+                    </div>
+                    <button
+                      aria-label={favorite ? '관심종목 해제' : '관심종목 등록'}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-[#F0F6FF]"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleWatch(stock.code);
+                      }}
+                      type="button"
+                    >
+                      <Heart
+                        size={18}
+                        className={favorite ? 'fill-red-500 text-red-500' : 'fill-transparent text-[#A3B4C6]'}
+                      />
+                    </button>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-slate-950">{stock.price}</p>
-                  <p className={`text-xs font-bold ${getChangeClass(stock.changeRate)}`}>
-                    {stock.changeRate}
-                  </p>
-                </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>

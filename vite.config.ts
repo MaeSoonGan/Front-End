@@ -22,6 +22,13 @@ export default defineConfig({
         target: 'http://localhost:8086',
         changeOrigin: true,
       },
+      // 실시간 시세 websocket (market-realtime-service). 로컬은 port-forward한 포트로.
+      // 배포/다른 포트는 VITE_MARKET_WS_URL 환경변수로 직접 지정 가능.
+      '/ws/market': {
+        target: 'http://localhost:8090',
+        ws: true,
+        changeOrigin: true,
+      },
       // 대회 계좌는 order-service(8084)에 있으므로 contest-service보다 먼저 매칭
       '^/api/contests/[^/]+/account': {
         target: 'http://localhost:8084',
@@ -32,6 +39,14 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/api/portfolio': {
+        target: 'http://localhost:8084',
+        changeOrigin: true,
+      },
+      '/api/orders': {
+        target: 'http://localhost:8084',
+        changeOrigin: true,
+      },
+      '/api/trades': {
         target: 'http://localhost:8084',
         changeOrigin: true,
       },

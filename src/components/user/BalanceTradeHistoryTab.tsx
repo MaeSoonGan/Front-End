@@ -1,33 +1,36 @@
 import { Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
 import type { BalanceTradeHistoryItem, TradeSide } from '../../types/balance';
 import { cn } from '../../utils/cn';
 
+type TradeFilter = 'ALL' | TradeSide;
+
 interface BalanceTradeHistoryTabProps {
   trades: BalanceTradeHistoryItem[];
+  startDate: string;
+  endDate: string;
+  side: TradeFilter;
+  onChangeStartDate: (value: string) => void;
+  onChangeEndDate: (value: string) => void;
+  onChangeSide: (value: TradeFilter) => void;
+  onSearch: () => void;
 }
-
-type TradeFilter = 'ALL' | TradeSide;
 
 function formatWon(value: number) {
   return `${value.toLocaleString('ko-KR')}원`;
 }
 
-export function BalanceTradeHistoryTab({ trades }: BalanceTradeHistoryTabProps) {
-  const [sideFilter, setSideFilter] = useState<TradeFilter>('ALL');
-  const [startDate, setStartDate] = useState('2026-05-01');
-  const [endDate, setEndDate] = useState('2026-05-21');
-  const filteredTrades = useMemo(
-    () =>
-      trades.filter((trade) => {
-        const tradeDate = trade.tradeDate.replaceAll('.', '-');
-        const isSideMatched = sideFilter === 'ALL' || trade.side === sideFilter;
-        const isDateMatched = tradeDate >= startDate && tradeDate <= endDate;
-
-        return isSideMatched && isDateMatched;
-      }),
-    [endDate, sideFilter, startDate, trades],
-  );
+export function BalanceTradeHistoryTab({
+  trades,
+  startDate,
+  endDate,
+  side,
+  onChangeStartDate,
+  onChangeEndDate,
+  onChangeSide,
+  onSearch,
+}: BalanceTradeHistoryTabProps) {
+  // 날짜/구분 필터는 백엔드 조회로 처리되므로, 여기선 받은 trades를 그대로 표시
+  const filteredTrades = trades;
   const buyQuantity = filteredTrades
     .filter((trade) => trade.side === 'BUY')
     .reduce((sum, trade) => sum + trade.quantity, 0);
@@ -41,14 +44,14 @@ export function BalanceTradeHistoryTab({ trades }: BalanceTradeHistoryTabProps) 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <input
           className="min-w-0 rounded-xl border border-blue-100 bg-white px-3 py-3 text-center text-sm font-extrabold text-slate-950 outline-none"
-          onChange={(event) => setStartDate(event.target.value)}
+          onChange={(event) => onChangeStartDate(event.target.value)}
           type="date"
           value={startDate}
         />
         <span className="text-[#6C88A4]">~</span>
         <input
           className="min-w-0 rounded-xl border border-blue-100 bg-white px-3 py-3 text-center text-sm font-extrabold text-slate-950 outline-none"
-          onChange={(event) => setEndDate(event.target.value)}
+          onChange={(event) => onChangeEndDate(event.target.value)}
           type="date"
           value={endDate}
         />
@@ -56,14 +59,19 @@ export function BalanceTradeHistoryTab({ trades }: BalanceTradeHistoryTabProps) 
       <div className="mt-3 flex gap-2">
         <select
           className="h-11 flex-1 rounded-xl border border-blue-100 bg-white px-3 text-sm font-extrabold text-slate-950 outline-none"
-          onChange={(event) => setSideFilter(event.target.value as TradeFilter)}
-          value={sideFilter}
+          onChange={(event) => onChangeSide(event.target.value as TradeFilter)}
+          value={side}
         >
           <option value="ALL">전체</option>
           <option value="BUY">매수</option>
           <option value="SELL">매도</option>
         </select>
-        <button className="flex h-11 w-11 items-center justify-center rounded-xl border border-blue-100 bg-white text-[#6C88A4]" type="button">
+        <button
+          aria-label="조회"
+          className="flex h-11 w-11 items-center justify-center rounded-xl border border-blue-100 bg-white text-[#6C88A4] transition hover:bg-[#F0F6FF]"
+          onClick={onSearch}
+          type="button"
+        >
           <Search size={18} strokeWidth={2.5} />
         </button>
       </div>
