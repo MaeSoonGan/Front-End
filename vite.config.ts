@@ -22,6 +22,11 @@ export default defineConfig({
         target: 'http://localhost:8086',
         changeOrigin: true,
       },
+      // 대회 계좌는 order-service(8084)에 있으므로 contest-service보다 먼저 매칭
+      '^/api/contests/[^/]+/account': {
+        target: 'http://localhost:8084',
+        changeOrigin: true,
+      },
       '/api/contests': {
         target: 'http://localhost:8082',
         changeOrigin: true,
