@@ -9,6 +9,7 @@ import { marketApi } from '../../api/user/market';
 import { portfolioApi } from '../../api/user/portfolio';
 import { contestsApi } from '../../api/user/contests';
 import { useMarketSocket } from '../../hooks/useMarketSocket';
+import { cn } from '../../utils/cn';
 
 interface AssetView {
   total: string;
@@ -38,7 +39,9 @@ interface MyContestView {
   rank: number;
   participants: number;
   myAsset: string;
-  endDate: string;
+  badge: string;
+  statusLabel: string;
+  notStarted: boolean;
 }
 
 interface ContestHomeView {
@@ -121,25 +124,50 @@ function toStatusCard(data: any): MarketStatusCard {
 }
 
 // 종료일(endAt) → D-day 표시
-function toDDay(endAt: string | null | undefined) {
+function isContestEnded(endAt: string | null | undefined) {
   if (!endAt) {
-    return '';
+    return false;
   }
-
   const end = new Date(`${endAt.split('T')[0]}T00:00:00`);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const diffDays = Math.ceil((end.getTime() - today.getTime()) / 86_400_000);
+  // 종료일이 오늘보다 이전이면 종료된 대회
+  return end.getTime() < today.getTime();
+}
 
-  if (diffDays > 0) {
-    return `D-${diffDays}`;
+function daysFromToday(dateStr: string | null | undefined) {
+  if (!dateStr) {
+    return null;
+  }
+  const target = new Date(`${dateStr.split('T')[0]}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.ceil((target.getTime() - today.getTime()) / 86_400_000);
+}
+
+// 시작 전이면 "시작까지", 진행 중이면 "마감까지" D-day를 직관적으로 표기
+function toContestBadge(
+  status: string | null | undefined,
+  startAt: string | null | undefined,
+  endAt: string | null | undefined,
+): { badge: string; statusLabel: string; notStarted: boolean } {
+  const notStarted = status === 'SCHEDULED';
+
+  if (notStarted) {
+    const d = daysFromToday(startAt) ?? 0;
+    return {
+      badge: d > 0 ? `시작 D-${d}` : '오늘 시작',
+      statusLabel: '시작 예정',
+      notStarted: true,
+    };
   }
 
-  if (diffDays === 0) {
-    return 'D-DAY';
+  const daysToEnd = daysFromToday(endAt);
+  let badge = '';
+  if (daysToEnd !== null) {
+    badge = daysToEnd > 0 ? `마감 D-${daysToEnd}` : daysToEnd === 0 ? '오늘 마감' : '종료';
   }
-
-  return '종료';
+  return { badge, statusLabel: '진행 중', notStarted: false };
 }
 
 export function HomePage() {
@@ -151,7 +179,7 @@ export function HomePage() {
   const [summaryAsset, setSummaryAsset] = useState<AssetView | null>(null);
   const [marketStatus, setMarketStatus] = useState<MarketStatusCard[]>([]);
   const [rankingStocks, setRankingStocks] = useState<RankingStock[]>([]);
-  const [myContest, setMyContest] = useState<MyContestView | null>(null);
+  const [myContests, setMyContests] = useState<MyContestView[]>([]);
   const [contestView, setContestView] = useState<ContestHomeView | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -274,25 +302,39 @@ export function HomePage() {
         .catch(() => {});
 
       const myContestTask = contestsApi
-        .getMyContests({ status: 'ACTIVE', page: 0, size: 1 })
+        .getMyContests({ status: 'ACTIVE', page: 0, size: 50 })
         .then((data) => {
           if (cancelled) return;
-          const first = (data?.content ?? [])[0];
-          if (!first) {
-            setMyContest(null);
-            return;
-          }
-          setMyContest({
-            id: String(first.contestId),
-            title: first.title ?? '',
-            rank: Number(first.myRank ?? 0),
-            participants: Number(first.totalParticipants ?? 0),
-            myAsset: formatWon(Number(first.currentAsset ?? 0)),
-            endDate: toDDay(first.endAt),
+          // 홈 "참여 중" 목록에는 실제 진행 중 대회만 표시.
+          // 대회 상태(c.status)를 신뢰: SCHEDULED(시작 예정)·ENDED(종료) 제외.
+          // status가 갱신 안 된 채 종료일만 지난 경우도 대비해 endAt도 함께 확인.
+          const list = (data?.content ?? []).filter((c) => {
+            if (c.status === 'ENDED' || isContestEnded(c.endAt)) {
+              return false;
+            }
+            if (c.status === 'SCHEDULED') {
+              return false;
+            }
+            return true;
           });
+          setMyContests(
+            list.map((c) => {
+              const { badge, statusLabel, notStarted } = toContestBadge(c.status, c.startAt, c.endAt);
+              return {
+                id: String(c.contestId),
+                title: c.title ?? '',
+                rank: Number(c.myRank ?? 0),
+                participants: Number(c.totalParticipants ?? 0),
+                myAsset: formatWon(Number(c.currentAsset ?? 0)),
+                badge,
+                statusLabel,
+                notStarted,
+              };
+            }),
+          );
         })
         .catch(() => {
-          if (!cancelled) setMyContest(null);
+          if (!cancelled) setMyContests([]);
         });
 
       tasks.push(summaryTask, myContestTask);
@@ -457,41 +499,53 @@ export function HomePage() {
         )}
       </section>
 
-      {!isContestMode && myContest ? (
+      {!isContestMode && myContests.length > 0 ? (
         <section className="mt-5">
           <h2 className="mb-3 text-base font-extrabold text-slate-950">참여 중인 대회</h2>
-          <button
-            className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]"
-            onClick={() => navigate(`/contests/${myContest.id}/home`)}
-            type="button"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold text-[#1565C0]">참여 중</p>
-                <p className="mt-1 text-base font-extrabold text-slate-950">{myContest.title}</p>
-              </div>
-              {myContest.endDate ? (
-                <span className="rounded-full bg-[#E5F4FF] px-3 py-1 text-xs font-bold text-[#1565C0]">
-                  {myContest.endDate}
-                </span>
-              ) : null}
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="rounded-xl bg-[#F0F6FF] p-3">
-                <p className="text-xs text-[#6C88A4]">내 자산</p>
-                <p className="mt-1 text-sm font-bold text-slate-950">{myContest.myAsset}</p>
-              </div>
-              <div className="rounded-xl bg-[#F0F6FF] p-3">
-                <p className="text-xs text-[#6C88A4]">대회 순위</p>
-                <p className="mt-1 text-sm font-bold text-[#1565C0]">
-                  {myContest.rank}위
-                  <span className="ml-1 text-xs font-medium text-[#6C88A4]">
-                    / {myContest.participants}명
-                  </span>
-                </p>
-              </div>
-            </div>
-          </button>
+          <div className="space-y-3">
+            {myContests.map((contest) => (
+              <button
+                key={contest.id}
+                className="w-full rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]"
+                onClick={() => navigate(`/contests/${contest.id}/home`)}
+                type="button"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className={cn('text-xs font-bold', contest.notStarted ? 'text-[#6C88A4]' : 'text-[#1565C0]')}>
+                      {contest.statusLabel}
+                    </p>
+                    <p className="mt-1 text-base font-extrabold text-slate-950">{contest.title}</p>
+                  </div>
+                  {contest.badge ? (
+                    <span
+                      className={cn(
+                        'rounded-full px-3 py-1 text-xs font-bold',
+                        contest.notStarted ? 'bg-slate-100 text-[#6C88A4]' : 'bg-[#E5F4FF] text-[#1565C0]',
+                      )}
+                    >
+                      {contest.badge}
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-[#F0F6FF] p-3">
+                    <p className="text-xs text-[#6C88A4]">내 자산</p>
+                    <p className="mt-1 text-sm font-bold text-slate-950">{contest.myAsset}</p>
+                  </div>
+                  <div className="rounded-xl bg-[#F0F6FF] p-3">
+                    <p className="text-xs text-[#6C88A4]">대회 순위</p>
+                    <p className="mt-1 text-sm font-bold text-[#1565C0]">
+                      {contest.rank}위
+                      <span className="ml-1 text-xs font-medium text-[#6C88A4]">
+                        / {contest.participants}명
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
         </section>
       ) : null}
 

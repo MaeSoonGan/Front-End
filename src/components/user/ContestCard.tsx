@@ -48,7 +48,8 @@ export function ContestCard({ contest, isJoining, onJoin }: ContestCardProps) {
   const navigate = useNavigate();
   const hasJoined = contest.isJoined;
   // 참가 가능 여부는 백엔드 판단(joinable)을 따른다.
-  const canJoin = contest.joinable && !hasJoined;
+  // 단, 시작 전(SCHEDULED) 대회는 참가 불가 — "개최 예정" 버튼이 join을 호출하지 않도록 명시적으로 차단.
+  const canJoin = contest.joinable && !hasJoined && contest.status !== 'SCHEDULED';
   // 참가했고 진행 중인 대회는 입장 가능
   const canEnter = hasJoined && contest.status === 'ACTIVE';
 
