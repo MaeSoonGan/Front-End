@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Search } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Search } from 'lucide-react';
 import { ContestCard } from '../../components/user/ContestCard';
 import { contestsApi } from '../../api/user/contests';
 import { parseApiError } from '../../api/parseApiError';
-import { getPaginationPages } from '../../utils/pagination';
 import type { ContestListItem, ContestStatus, ContestStockType } from '../../types/contest';
 import { cn } from '../../utils/cn';
 
@@ -17,7 +16,7 @@ const CONTEST_FILTER_OPTIONS: Array<{ label: string; value: ContestFilter }> = [
   { label: '마감', value: 'ENDED' },
 ];
 
-const CONTEST_PAGE_SIZE = 3;
+const CONTEST_PAGE_SIZE = 10;
 
 // 백엔드 status → 프론트 ContestStatus 매핑 (CLOSING_SOON은 진행중으로 표시)
 function toContestStatus(status: string): ContestStatus {
@@ -32,49 +31,37 @@ function toStockType(stockType: string | null | undefined): ContestStockType {
   return stockType as ContestStockType;
 }
 
-// 카드 영역 높이 고정을 위한 투명 placeholder 카드 (실제 카드와 동일 구조)
-function createGhostContest(index: number): ContestListItem {
-  return {
-    id: `ghost-${index}`,
-    title: ' ',
-    stockType: '전체 종목',
-    status: 'ENDED',
-    startAt: '2024-01-01',
-    endAt: '2024-01-01',
-    currentParticipants: 0,
-    maxParticipants: null,
-    seedMoney: 0,
-    isJoined: false,
-    joinable: false,
-    joinDisabledReason: null,
-  };
-}
-
 export function ContestListPage() {
   const [contests, setContests] = useState<ContestListItem[]>([]);
-  const [totalPages, setTotalPages] = useState(1);
   const [joiningContestId, setJoiningContestId] = useState<string | null>(null);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [appliedKeyword, setAppliedKeyword] = useState('');
   const [activeFilter, setActiveFilter] = useState<ContestFilter>('ALL');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // 초기/필터 변경 로딩
+  const [loadingMore, setLoadingMore] = useState(false); // 다음 페이지 로딩
   const [error, setError] = useState('');
+  const [hasMore, setHasMore] = useState(false);
 
-  const safePage = Math.min(currentPage, totalPages);
+  const pageRef = useRef(0); // 마지막으로 불러온 페이지(0-based)
+  const loadingRef = useRef(false); // 중복 요청 방지
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchContests = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await contestsApi.getContests({
-        keyword: appliedKeyword || undefined,
-        status: activeFilter,
-        page: currentPage - 1,
-        size: CONTEST_PAGE_SIZE,
-      });
-      setContests(
+  const loadContests = useCallback(
+    async (reset: boolean) => {
+      if (loadingRef.current) return;
+      loadingRef.current = true;
+      const nextPage = reset ? 0 : pageRef.current + 1;
+      if (reset) setLoading(true);
+      else setLoadingMore(true);
+      try {
+        const data = await contestsApi.getContests({
+          keyword: appliedKeyword || undefined,
+          status: activeFilter,
+          page: nextPage,
+          size: CONTEST_PAGE_SIZE,
+        });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (data.content ?? []).map((c: any) => ({
+        const items: ContestListItem[] = (data.content ?? []).map((c: any) => ({
           id: String(c.contestId),
           title: c.title ?? '',
           stockType: toStockType(c.stockType),
@@ -87,39 +74,66 @@ export function ContestListPage() {
           isJoined: Boolean(c.joined),
           joinable: Boolean(c.joinable),
           joinDisabledReason: c.joinDisabledReason ?? null,
-        })),
-      );
-      setTotalPages(data.totalPages && data.totalPages > 0 ? data.totalPages : 1);
-      setError('');
-    } catch (e) {
-      setError(parseApiError(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [appliedKeyword, activeFilter, currentPage]);
+        }));
+        pageRef.current = nextPage;
+        setContests((prev) => (reset ? items : [...prev, ...items]));
+        const totalPages = data.totalPages && data.totalPages > 0 ? data.totalPages : 1;
+        setHasMore(nextPage + 1 < totalPages);
+        setError('');
+      } catch (e) {
+        setError(parseApiError(e));
+      } finally {
+        if (reset) setLoading(false);
+        else setLoadingMore(false);
+        loadingRef.current = false;
+      }
+    },
+    [appliedKeyword, activeFilter],
+  );
 
+  // 필터/검색어 변경 시 처음부터 다시 로드
   useEffect(() => {
-    fetchContests();
-  }, [fetchContests]);
+    // 의도된 초기/리셋 로드(내부에서 로딩 상태 set) — 룰 예외
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadContests(true);
+  }, [loadContests]);
 
   // 검색어 디바운스 (입력 후 300ms)
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setAppliedKeyword(searchKeyword.trim());
-      setCurrentPage(1);
     }, 300);
     return () => window.clearTimeout(timer);
   }, [searchKeyword]);
 
+  // 무한 스크롤: 하단 sentinel이 보이면 다음 페이지 로드
   useEffect(() => {
-    setCurrentPage(1);
-  }, [activeFilter]);
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+          loadContests(false);
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadContests]);
 
   const handleJoinContest = async (contestId: string) => {
     setJoiningContestId(contestId);
     try {
       await contestsApi.joinContest(Number(contestId));
-      await fetchContests();
+      // 참가 성공 시 해당 카드만 즉시 갱신(스크롤 위치 유지)
+      setContests((prev) =>
+        prev.map((c) =>
+          c.id === contestId
+            ? { ...c, isJoined: true, joinable: false, currentParticipants: c.currentParticipants + 1 }
+            : c,
+        ),
+      );
     } catch (e) {
       setError(parseApiError(e));
     } finally {
@@ -174,11 +188,11 @@ export function ContestListPage() {
                 onJoin={handleJoinContest}
               />
             ))}
-            {Array.from({ length: CONTEST_PAGE_SIZE - contests.length }).map((_, i) => (
-              <div key={`ghost-${i}`} aria-hidden className="invisible">
-                <ContestCard contest={createGhostContest(i)} isJoining={false} onJoin={() => {}} />
-              </div>
-            ))}
+            {/* 무한 스크롤 감지용 sentinel */}
+            <div ref={sentinelRef} aria-hidden className="h-1" />
+            {loadingMore && (
+              <p className="py-3 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
+            )}
           </>
         ) : (
           <div className="rounded-2xl border border-blue-100 bg-white px-4 py-10 text-center shadow-sm">
@@ -189,55 +203,6 @@ export function ContestListPage() {
           </div>
         )}
       </section>
-
-      {!loading && !error && contests.length > 0 && (
-        <div className="mt-auto flex items-center justify-center gap-1 pt-5">
-          <button
-            className="cursor-pointer rounded p-1 text-[#6C88A4] hover:bg-blue-50 disabled:cursor-default disabled:opacity-40"
-            disabled={safePage === 1}
-            onClick={() => setCurrentPage(1)}
-            type="button"
-          >
-            <ChevronsLeft size={16} />
-          </button>
-          <button
-            className="cursor-pointer rounded p-1 text-[#6C88A4] hover:bg-blue-50 disabled:cursor-default disabled:opacity-40"
-            disabled={safePage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            type="button"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          {getPaginationPages(safePage, totalPages).map((page) => (
-            <button
-              className={`min-w-7 cursor-pointer rounded px-2 py-1 text-xs font-bold ${
-                safePage === page ? 'bg-[#1565C0] text-white' : 'text-[#6C88A4] hover:bg-blue-50'
-              }`}
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              type="button"
-            >
-              {page}
-            </button>
-          ))}
-          <button
-            className="cursor-pointer rounded p-1 text-[#6C88A4] hover:bg-blue-50 disabled:cursor-default disabled:opacity-40"
-            disabled={safePage === totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            type="button"
-          >
-            <ChevronRight size={16} />
-          </button>
-          <button
-            className="cursor-pointer rounded p-1 text-[#6C88A4] hover:bg-blue-50 disabled:cursor-default disabled:opacity-40"
-            disabled={safePage === totalPages}
-            onClick={() => setCurrentPage(totalPages)}
-            type="button"
-          >
-            <ChevronsRight size={16} />
-          </button>
-        </div>
-      )}
     </div>
   );
 }
