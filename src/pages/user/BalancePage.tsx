@@ -7,6 +7,7 @@ import { BalanceTradeHistoryTab } from '../../components/user/BalanceTradeHistor
 import { HoldingStockCard } from '../../components/user/HoldingStockCard';
 import { ProfitTrendChart } from '../../components/user/ProfitTrendChart';
 import { useContestMode } from '../../contexts/ContestModeContext';
+import { useMarketSocket } from '../../hooks/useMarketSocket';
 import { portfolioApi } from '../../api/user/portfolio';
 import { orderApi } from '../../api/user/order';
 import type {
@@ -169,6 +170,37 @@ export function BalancePage() {
   const [executions, setExecutions] = useState<ExecutionHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 보유 종목 실시간 현재가 구독 (현재가만, 호가 X)
+  const { prices: livePrices } = useMarketSocket(holdings.map((h) => h.stockCode));
+  // live 시세로 현재가/평가손익/수익률 재계산 (평단 대비)
+  const liveHoldings: HoldingItem[] = holdings.map((h) => {
+    const live = livePrices[h.stockCode];
+    if (!live || !live.currentPrice) {
+      return h;
+    }
+    const currentPrice = live.currentPrice;
+    const profitAmount = (currentPrice - h.averagePrice) * h.quantity;
+    const profitRate =
+      h.averagePrice > 0 ? ((currentPrice - h.averagePrice) / h.averagePrice) * 100 : 0;
+    return { ...h, currentPrice, profitAmount, profitRate };
+  });
+
+  // 요약 카드도 live 평가금액으로 재계산 (총평가금액 = 예수금 + Σ(live가 × 수량), 수익 = 총자산 - 시드)
+  const liveSummary: BalanceSummary = (() => {
+    if (holdings.length === 0) {
+      return summary;
+    }
+    const liveEvaluation = liveHoldings.reduce((sum, h) => sum + h.currentPrice * h.quantity, 0);
+    const seed = summary.totalEvaluation - summary.profitAmount;
+    const total = summary.deposit + liveEvaluation;
+    return {
+      ...summary,
+      totalEvaluation: total,
+      profitAmount: total - seed,
+      profitRate: seed > 0 ? ((total - seed) / seed) * 100 : 0,
+    };
+  })();
+
   // 매매내역 필터 (날짜/구분) — 백엔드 조회에 사용
   const [tradeFrom, setTradeFrom] = useState(() => ymdDaysAgo(0));
   const [tradeTo, setTradeTo] = useState(() => ymdDaysAgo(0));
@@ -294,7 +326,7 @@ export function BalancePage() {
 
       {activeTab === 'holdings' ? (
         <section className="space-y-5 px-4 pb-24 pt-4">
-          <BalanceSummaryCard summary={summary} />
+          <BalanceSummaryCard summary={liveSummary} />
 
           <section>
             <h2 className="mb-3 text-base font-extrabold text-slate-950">보유 종목</h2>
@@ -304,7 +336,7 @@ export function BalancePage() {
               <p className="py-6 text-center text-xs font-bold text-[#A3B4C6]">보유 중인 종목이 없습니다.</p>
             ) : (
               <div className="space-y-3">
-                {holdings.map((holding) => (
+                {liveHoldings.map((holding) => (
                   <HoldingStockCard holding={holding} key={holding.stockCode} />
                 ))}
               </div>

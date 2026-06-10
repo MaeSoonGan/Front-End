@@ -232,9 +232,6 @@ export function UserHeader() {
                       {item.stockCode}
                     </span>
                   </span>
-                  <span className="text-sm font-extrabold text-[#1565C0]">
-                    {item.currentPrice.toLocaleString('ko-KR')}
-                  </span>
                 </button>
               ))}
             </div>

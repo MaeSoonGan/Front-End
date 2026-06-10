@@ -154,6 +154,8 @@ export function MarketPage() {
           highPrice: live.high || apiSummary.highPrice,
           lowPrice: live.low || apiSummary.lowPrice,
           openPrice: live.open || apiSummary.openPrice,
+          // 전일종가 = 현재가 - 전일대비변동액 (ws에 전일종가 필드가 없어 역산)
+          previousClose: live.currentPrice - live.changePrice,
         }
       : apiSummary
     : null;

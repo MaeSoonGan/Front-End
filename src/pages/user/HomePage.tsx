@@ -189,6 +189,9 @@ export function HomePage() {
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const [summaryAsset, setSummaryAsset] = useState<AssetView | null>(null);
+  const [summaryRaw, setSummaryRaw] = useState<{ cash: number; seed: number } | null>(null);
+  const [assetHoldings, setAssetHoldings] = useState<{ code: string; quantity: number; price: number }[]>([]);
+  const [assetHoldingsLoaded, setAssetHoldingsLoaded] = useState(false);
   const [marketStatus, setMarketStatus] = useState<MarketStatusCard[]>([]);
   const [rankingStocks, setRankingStocks] = useState<RankingStock[]>([]);
   const [myContests, setMyContests] = useState<MyContestView[]>([]);
@@ -196,14 +199,33 @@ export function HomePage() {
   const [loading, setLoading] = useState(true);
 
   const getPath = (path: string) => (isContestMode ? getContestPath(path) : path);
-  const normalAsset = summaryAsset ?? EMPTY_ASSET;
   const contestTitle = contestView?.title ?? '참여 대회';
 
-  // 실시간 순위 종목 가격 + KOSPI/KOSDAQ 지수 구독
+  // 실시간 순위 종목 + 보유 종목 현재가 + KOSPI/KOSDAQ 지수 구독 (단일 ws)
   const { prices: livePrices, indices: liveIndices } = useMarketSocket(
-    rankingStocks.map((stock) => stock.code),
+    Array.from(new Set([...rankingStocks.map((stock) => stock.code), ...assetHoldings.map((h) => h.code)])),
     { indexMarkets: ['KOSPI', 'KOSDAQ'] },
   );
+
+  // 보유 종목 live 평가금액 → 총자산/수익 동적 계산 (예수금 + Σ(live가 × 수량))
+  const liveEvaluation = assetHoldings.reduce(
+    (sum, h) => sum + (livePrices[h.code]?.currentPrice || h.price) * h.quantity,
+    0,
+  );
+  const normalAsset: AssetView =
+    summaryRaw && assetHoldingsLoaded
+      ? {
+          total: formatWon(summaryRaw.cash + liveEvaluation),
+          change: formatSignedWon(summaryRaw.cash + liveEvaluation - summaryRaw.seed),
+          rate: formatSignedRate(
+            summaryRaw.seed > 0
+              ? ((summaryRaw.cash + liveEvaluation - summaryRaw.seed) / summaryRaw.seed) * 100
+              : 0,
+          ),
+          cash: formatWon(summaryRaw.cash),
+          evaluation: formatWon(liveEvaluation),
+        }
+      : summaryAsset ?? EMPTY_ASSET;
 
   // 관심종목 상태 (하트 토글)
   const [watchset, setWatchset] = useState<Set<string>>(new Set());
@@ -310,8 +332,34 @@ export function HomePage() {
             cash: formatWon(Number(s.cashBalance ?? 0)),
             evaluation: formatWon(Number(s.stockValuation ?? 0)),
           });
+          // 총자산 live 계산용 원시값 (시드 = 총자산 - 수익)
+          setSummaryRaw({
+            cash: Number(s.cashBalance ?? 0),
+            seed: Number(s.totalAsset ?? 0) - Number(s.profitAmount ?? 0),
+          });
         })
         .catch(() => {});
+
+      // 보유 종목 (총자산 live 계산용)
+      const assetHoldingsTask = portfolioApi
+        .getHoldings()
+        .then((items) => {
+          if (cancelled) return;
+          setAssetHoldings(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ((items as any[]) ?? [])
+              .map((h) => ({
+                code: h.stockCode ?? '',
+                quantity: Number(h.quantity ?? 0),
+                price: Number(h.currentPrice ?? 0),
+              }))
+              .filter((h) => h.code),
+          );
+          setAssetHoldingsLoaded(true);
+        })
+        .catch(() => {
+          if (!cancelled) setAssetHoldingsLoaded(true);
+        });
 
       const myContestTask = contestsApi
         .getMyContests({ status: 'ACTIVE', page: 0, size: 50 })
@@ -350,7 +398,7 @@ export function HomePage() {
           if (!cancelled) setMyContests([]);
         });
 
-      tasks.push(summaryTask, myContestTask);
+      tasks.push(summaryTask, assetHoldingsTask, myContestTask);
     }
 
     Promise.all(tasks).finally(() => {
