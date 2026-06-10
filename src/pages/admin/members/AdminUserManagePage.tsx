@@ -204,9 +204,12 @@ const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
 
   async function handleSuspendSelected() {
     try {
+      // 감사로그 상세에 정지 대상 회원 이름들이 남도록 reason 구성
+      const names = selectedMembers.map((m) => m.nickname).filter(Boolean).join(', ');
+      const reason = names ? `${names} 정지` : '계정 정지';
       await membersApi.suspendMembers({
         memberIds: selectedIds.map(Number),
-        reason: '관리자 일괄 정지',
+        reason,
       });
       setSelectedIds([]);
       fetchMembers();
