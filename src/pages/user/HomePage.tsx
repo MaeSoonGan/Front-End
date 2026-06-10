@@ -447,15 +447,8 @@ export function HomePage() {
       </section>
 
       <section className="mt-5">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3">
           <h2 className="text-base font-extrabold text-slate-950">실시간 순위</h2>
-          <button
-            className="cursor-pointer text-xs font-bold text-[#6C88A4] transition hover:text-[#1565C0]"
-            onClick={() => navigate(getPath('/market-ranking'))}
-            type="button"
-          >
-            더보기 ›
-          </button>
         </div>
         {loading && rankingStocks.length === 0 ? (
           <p className="py-6 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>

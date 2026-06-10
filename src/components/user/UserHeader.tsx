@@ -16,7 +16,6 @@ const pageTitles: Record<string, string> = {
   '/': '홈',
   '/home': '홈',
   '/market': '시세',
-  '/market-ranking': '실시간 순위',
   '/order': '주문',
   '/contests': '대회',
   '/my-contests': '참여 중인 대회',
@@ -79,7 +78,6 @@ export function UserHeader() {
   const canGoBack =
     pathname === '/more' ||
     pathname === '/market' ||
-    titlePathname === '/market-ranking' ||
     pathname === '/balance' ||
     pathname === '/watchlist' ||
     pathname === '/my-contests' ||
@@ -313,11 +311,6 @@ export function UserHeader() {
 
                   if (titlePathname === '/notices') {
                     navigate(isContestMode ? getContestPath('/more') : '/more');
-                    return;
-                  }
-
-                  if (titlePathname === '/market-ranking') {
-                    navigate(isContestMode ? getContestPath('/home') : '/home');
                     return;
                   }
 

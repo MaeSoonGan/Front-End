@@ -165,7 +165,28 @@ export function useMarketSocket(stockCodes: string[], options: UseMarketSocketOp
       if (reconnectTimer) {
         window.clearTimeout(reconnectTimer);
       }
-      socketRef.current?.close();
+      // 페이지 이동(언마운트) 시: 닫기 전에 현재 구독을 모두 명시적으로 해제해
+      // KIS 실시간 등록 슬롯을 즉시 반납한다 (소켓 close만으론 서버 정리가 늦을 수 있음)
+      const ws = socketRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const priceCodes = Array.from(priceRef.current);
+        const orderbookCodes = Array.from(orderbookRef.current);
+        const markets = Array.from(indexRef.current);
+        try {
+          if (priceCodes.length > 0) {
+            ws.send(JSON.stringify({ action: 'UNSUBSCRIBE_PRICE', stockCodes: priceCodes }));
+          }
+          if (orderbookCodes.length > 0) {
+            ws.send(JSON.stringify({ action: 'UNSUBSCRIBE_ORDERBOOK', stockCodes: orderbookCodes }));
+          }
+          if (markets.length > 0) {
+            ws.send(JSON.stringify({ action: 'UNSUBSCRIBE_INDEX', markets }));
+          }
+        } catch {
+          // 전송 실패는 무시 (close로 서버가 세션 구독을 정리함)
+        }
+      }
+      ws?.close();
       socketRef.current = null;
     };
   }, []);
