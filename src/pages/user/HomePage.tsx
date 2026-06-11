@@ -201,11 +201,8 @@ export function HomePage() {
   const getPath = (path: string) => (isContestMode ? getContestPath(path) : path);
   const contestTitle = contestView?.title ?? '참여 대회';
 
-  // 실시간 순위 종목 + 보유 종목 현재가 + KOSPI/KOSDAQ 지수 구독 (단일 ws)
-  const { prices: livePrices, indices: liveIndices } = useMarketSocket(
-    Array.from(new Set([...rankingStocks.map((stock) => stock.code), ...assetHoldings.map((h) => h.code)])),
-    { indexMarkets: ['KOSPI', 'KOSDAQ'] },
-  );
+  // 보유 종목 현재가만 ws 구독. 순위·지수는 REST 폴링이라 KIS 등록 한도를 쓰지 않음.
+  const { prices: livePrices } = useMarketSocket(assetHoldings.map((h) => h.code));
 
   // 보유 종목 live 평가금액 → 총자산/수익 동적 계산 (예수금 + Σ(live가 × 수량))
   const liveEvaluation = assetHoldings.reduce(
@@ -226,6 +223,64 @@ export function HomePage() {
           evaluation: formatWon(liveEvaluation),
         }
       : summaryAsset ?? EMPTY_ASSET;
+
+  // 실시간 조회상위 순위 (market-realtime-service API) — 상위 3종목, 15초 폴링
+  useEffect(() => {
+    let cancelled = false;
+    const fetchRanking = () => {
+      marketApi
+        .getHtsTopViewRanking()
+        .then((res) => {
+          if (cancelled) return;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const items: any[] = res?.items ?? [];
+          setRankingStocks(
+            items.slice(0, 3).map((it) => ({
+              name: it.stockName ?? '',
+              code: it.stockCode ?? '',
+              price: formatPrice(Number(it.currentPrice ?? 0)),
+              changeRate: formatSignedRate(Number(it.changeRate ?? 0)),
+            })),
+          );
+        })
+        .catch(() => {
+          // 폴링 실패(캐시 없음 등)는 기존 값 유지
+        });
+    };
+    fetchRanking();
+    const timer = window.setInterval(fetchRanking, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  // 코스피/코스닥 지수 + 장 상태 (REST 폴링, 15초) — ws 미사용
+  useEffect(() => {
+    let cancelled = false;
+    const fetchStatus = () => {
+      Promise.all([
+        marketApi.getRealtimeIndices().catch(() => []),
+        marketApi.getStatus().catch(() => null),
+      ]).then(([indices, status]) => {
+        if (cancelled) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const list: any[] = Array.isArray(indices) ? indices : [];
+        const find = (market: string) => list.find((i) => i.market === market);
+        setMarketStatus([
+          toIndexCard('KOSPI', '📊', find('KOSPI')),
+          toIndexCard('KOSDAQ', '📉', find('KOSDAQ')),
+          toStatusCard(status),
+        ]);
+      });
+    };
+    fetchStatus();
+    const timer = window.setInterval(fetchStatus, 15000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   // 관심종목 상태 (하트 토글)
   const [watchset, setWatchset] = useState<Set<string>>(new Set());
@@ -265,40 +320,8 @@ export function HomePage() {
     let cancelled = false;
     setLoading(true);
 
-    // 시장 지수 + 장 상태 (일반/대회 공통)
-    const marketTask = Promise.all([
-      marketApi.getIndex('KOSPI').catch(() => null),
-      marketApi.getIndex('KOSDAQ').catch(() => null),
-      marketApi.getStatus().catch(() => null),
-    ]).then(([kospi, kosdaq, status]) => {
-      if (cancelled) return;
-      setMarketStatus([
-        toIndexCard('KOSPI', '📊', kospi),
-        toIndexCard('KOSDAQ', '📉', kosdaq),
-        toStatusCard(status),
-      ]);
-    });
-
-    // 실시간 순위 (공통)
-    const rankingTask = marketApi
-      .getRanking()
-      .then((items) => {
-        if (cancelled) return;
-        setRankingStocks(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (items ?? []).slice(0, 5).map((it: any) => ({
-            name: it.name ?? '',
-            code: it.code ?? '',
-            price: formatPrice(Number(it.price ?? 0)),
-            changeRate: formatSignedRate(Number(it.changeRate ?? 0)),
-          })),
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setRankingStocks([]);
-      });
-
-    const tasks: Promise<unknown>[] = [marketTask, rankingTask];
+    // 시장 지수 + 장 상태 + 실시간 순위는 별도 폴링 effect에서 처리(아래)
+    const tasks: Promise<unknown>[] = [];
 
     if (isContestMode && contestId) {
       // 대회 모드: 대회 상세로 내 총자산/순위/제목 (contest-service)
@@ -472,10 +495,8 @@ export function HomePage() {
 
       <section className="mt-4 grid grid-cols-3 gap-3">
         {marketStatus.map((status) => {
-          // KOSPI/KOSDAQ는 ws 실시간 지수로 덮어씀 (없으면 기존 값)
-          const live = liveIndices[status.title];
-          const value = live ? formatIndexValue(live.value) : status.value;
-          const changeRate = live ? formatSignedRate(live.changeRate) : status.changeRate;
+          const value = status.value;
+          const changeRate = status.changeRate;
           return (
             <div
               className="rounded-xl border border-blue-100 bg-white px-3 py-4 text-center shadow-sm"

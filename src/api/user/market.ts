@@ -13,6 +13,18 @@ export const marketApi = {
   getRanking: (type?: string) =>
     client.get('/api/market/ranking', { params: type ? { type } : undefined }).then(r => r.data.data),
 
+  // 실시간 조회상위 랭킹 (market-realtime-service, Redis 캐시) — success/data 래퍼 없이 DTO 직접 반환
+  getHtsTopViewRanking: () =>
+    client.get('/api/market/ranking/hts-top-view').then(r => r.data),
+
+  // 코스피/코스닥 지수 (market-realtime-service, REST 폴링용) — 래퍼 없이 배열 직접 반환
+  getRealtimeIndices: () =>
+    client.get('/api/market/indices').then(r => r.data),
+
+  // 코스피/코스닥 지수 (market-realtime-service, REST 폴링용) — 래퍼 없이 배열 직접 반환
+  getRealtimeIndices: () =>
+    client.get('/api/market/indices').then(r => r.data),
+
   // 종목 현재가
   getStockPrice: (code: string) =>
     client.get(`/api/stocks/${code}/price`).then(r => r.data.data),

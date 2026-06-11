@@ -27,8 +27,8 @@ export function RealtimeRecoveryModal() {
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40">
       <div className="flex flex-col items-center gap-3 rounded-2xl bg-white px-8 py-7 shadow-xl">
         <div className="h-9 w-9 animate-spin rounded-full border-[3px] border-[#1565C0] border-t-transparent" />
-        <p className="text-sm font-extrabold text-slate-900">실시간 시세 복구 중...</p>
-        <p className="text-xs font-bold text-[#6C88A4]">구독 한도를 초기화하고 있어요. 잠시만 기다려주세요.</p>
+        <p className="text-sm font-extrabold text-slate-900">로딩 중...</p>
+        <p className="text-xs font-bold text-[#6C88A4]">잠시만 기다려주세요.</p>
       </div>
     </div>
   );
