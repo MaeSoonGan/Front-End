@@ -47,4 +47,6 @@ export interface NotificationItem {
   displayTime: string;
   isRead: boolean;
   createdAt: string;
+  targetType?: string;
+  targetId?: number;
 }
