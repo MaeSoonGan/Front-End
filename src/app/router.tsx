@@ -45,6 +45,7 @@ import { ContestRankingPage } from '../pages/user/ContestRankingPage';
 import { ExecutionHistoryPage } from '../pages/user/ExecutionHistoryPage';
 import { HomePage } from '../pages/user/HomePage';
 import { MarketPage } from '../pages/user/MarketPage';
+import { MarketRankingPage } from '../pages/user/MarketRankingPage';
 import { MorePage } from '../pages/user/MorePage';
 import { MyContestsPage } from '../pages/user/MyContestsPage';
 import { NoticePage } from '../pages/user/NoticePage';
@@ -74,6 +75,7 @@ export const router = createBrowserRouter([
       { path: '/home', element: <HomePage /> },
       { path: '/balance', element: <BalancePage /> },
       { path: '/market', element: <MarketPage /> },
+      { path: '/market-ranking', element: <MarketRankingPage /> },
       { path: '/order', element: <OrderPage /> },
       { path: '/watchlist', element: <WatchlistPage /> },
       { path: '/my-contests', element: <MyContestsPage /> },
@@ -83,6 +85,7 @@ export const router = createBrowserRouter([
       { path: '/contests/:contestId/home', element: <HomePage /> },
       { path: '/contests/:contestId/balance', element: <BalancePage /> },
       { path: '/contests/:contestId/market', element: <MarketPage /> },
+      { path: '/contests/:contestId/market-ranking', element: <MarketRankingPage /> },
       { path: '/contests/:contestId/watchlist', element: <WatchlistPage /> },
       { path: '/contests/:contestId/more', element: <MorePage /> },
       { path: '/contests/:contestId/ranking', element: <ContestRankingPage /> },

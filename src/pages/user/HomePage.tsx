@@ -9,6 +9,7 @@ import { marketApi } from '../../api/user/market';
 import { portfolioApi } from '../../api/user/portfolio';
 import { contestsApi } from '../../api/user/contests';
 import { useMarketSocket } from '../../hooks/useMarketSocket';
+import { useLiveContestRank } from '../../hooks/useLiveContestRank';
 import { cn } from '../../utils/cn';
 
 interface AssetView {
@@ -27,6 +28,7 @@ interface MarketStatusCard {
 }
 
 interface RankingStock {
+  rank: number;
   name: string;
   code: string;
   price: string;
@@ -224,6 +226,16 @@ export function HomePage() {
         }
       : summaryAsset ?? EMPTY_ASSET;
 
+  // 대회 모드: 내 live 수익률로 실시간 순위 계산 (다른 참여자는 mock 고정)
+  const liveContestProfitRate =
+    isContestMode && summaryRaw && assetHoldingsLoaded && summaryRaw.seed > 0
+      ? ((summaryRaw.cash + liveEvaluation - summaryRaw.seed) / summaryRaw.seed) * 100
+      : null;
+  const { rank: liveRank, totalParticipants: liveTotalParticipants } = useLiveContestRank(
+    isContestMode && contestId ? Number(contestId) : null,
+    liveContestProfitRate,
+  );
+
   // 실시간 조회상위 순위 (market-realtime-service API) — 상위 3종목, 15초 폴링
   useEffect(() => {
     let cancelled = false;
@@ -235,7 +247,8 @@ export function HomePage() {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const items: any[] = res?.items ?? [];
           setRankingStocks(
-            items.slice(0, 3).map((it) => ({
+            items.slice(0, 5).map((it, idx) => ({
+              rank: Number(it.rank ?? idx + 1),
               name: it.stockName ?? '',
               code: it.stockCode ?? '',
               price: formatPrice(Number(it.currentPrice ?? 0)),
@@ -324,9 +337,10 @@ export function HomePage() {
     const tasks: Promise<unknown>[] = [];
 
     if (isContestMode && contestId) {
-      // 대회 모드: 대회 상세로 내 총자산/순위/제목 (contest-service)
+      const cid = Number(contestId);
+      // 대회 상세: 순위/제목/참여자 (총자산은 아래 계좌+보유종목으로 live 계산)
       const detailTask = contestsApi
-        .getContest(Number(contestId))
+        .getContest(cid)
         .then((d) => {
           if (cancelled || !d) return;
           const year = (d.startAt ?? '').slice(0, 4);
@@ -342,7 +356,39 @@ export function HomePage() {
         })
         .catch(() => {});
 
-      tasks.push(detailTask);
+      // 대회 계좌(예수금/시드) — 총자산 live 계산용 (잔고 페이지와 동일 기준)
+      const accountTask = portfolioApi
+        .getContestAccount(cid)
+        .then((s) => {
+          if (cancelled || !s) return;
+          const total = Number(s.currentAsset ?? 0);
+          const profit = Number(s.profitAmount ?? 0);
+          setSummaryRaw({ cash: Number(s.cashBalance ?? 0), seed: total - profit });
+        })
+        .catch(() => {});
+
+      // 대회 보유 종목 — 총자산 live 계산 + ws 구독
+      const holdingsTask = portfolioApi
+        .getHoldings(cid)
+        .then((items) => {
+          if (cancelled) return;
+          setAssetHoldings(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ((items as any[]) ?? [])
+              .map((h) => ({
+                code: h.stockCode ?? '',
+                quantity: Number(h.quantity ?? 0),
+                price: Number(h.currentPrice ?? 0),
+              }))
+              .filter((h) => h.code),
+          );
+          setAssetHoldingsLoaded(true);
+        })
+        .catch(() => {
+          if (!cancelled) setAssetHoldingsLoaded(true);
+        });
+
+      tasks.push(detailTask, accountTask, holdingsTask);
     } else {
       const summaryTask = portfolioApi
         .getSummary()
@@ -459,7 +505,7 @@ export function HomePage() {
           <div className="min-w-0">
             <p className="text-xs font-semibold text-blue-100">내 총 자산</p>
             <p className="mt-2 text-2xl font-extrabold">
-              {isContestMode ? (contestView?.total ?? '-') : normalAsset.total}
+              {normalAsset.total}
             </p>
             <p className="mt-1 text-xs text-blue-100">
               {isContestMode ? contestTitle : `${normalAsset.change} (${normalAsset.rate})`}
@@ -469,10 +515,10 @@ export function HomePage() {
             <div className="shrink-0 rounded-2xl bg-white/15 px-4 py-3 text-right">
               <p className="text-[11px] font-bold text-blue-100">현재 순위</p>
               <p className="mt-1 text-2xl font-extrabold leading-none">
-                {contestView ? `${contestView.rank}위` : '-'}
-                {contestView ? (
+                {(liveRank ?? contestView?.rank) ? `${liveRank ?? contestView?.rank}위` : '-'}
+                {(liveTotalParticipants || contestView?.participants) ? (
                   <span className="ml-1 text-sm font-bold text-blue-100">
-                    / {contestView.participants}명
+                    / {liveTotalParticipants || contestView?.participants}명
                   </span>
                 ) : null}
               </p>
@@ -516,8 +562,15 @@ export function HomePage() {
       </section>
 
       <section className="mt-5">
-        <div className="mb-3">
+        <div className="mb-3 flex items-center justify-between">
           <h2 className="text-base font-extrabold text-slate-950">실시간 순위</h2>
+          <button
+            className="cursor-pointer text-xs font-bold text-[#1565C0] hover:underline"
+            onClick={() => navigate(getPath('/market-ranking'))}
+            type="button"
+          >
+            더보기 ›
+          </button>
         </div>
         {loading && rankingStocks.length === 0 ? (
           <p className="py-6 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
@@ -537,8 +590,8 @@ export function HomePage() {
                   onClick={() => navigate(`${getPath('/market')}?stockCode=${stock.code}`)}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E5F4FF] text-xs font-bold text-[#1565C0]">
-                      {stock.name.slice(0, 1)}
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E5F4FF] text-sm font-extrabold text-[#1565C0]">
+                      {stock.rank}
                     </span>
                     <div>
                       <p className="text-sm font-bold text-slate-950">{stock.name}</p>

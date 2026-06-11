@@ -27,10 +27,6 @@ function formatVolume(value: number) {
   return value.toLocaleString('ko-KR');
 }
 
-function formatBarVolume(value: number) {
-  return value >= 1000 ? `${(value / 1000).toFixed(1)}K` : String(value);
-}
-
 export function VolumeBarChart({ chartData }: VolumeBarChartProps) {
   const volumeScrollRef = useRef<HTMLDivElement>(null);
   const maxVolume = Math.max(...chartData.map((point) => point.volume));
@@ -89,27 +85,14 @@ export function VolumeBarChart({ chartData }: VolumeBarChartProps) {
             const height = chartHeight - chartPadding - y;
 
             return (
-              <g key={`${point.date}-${index}`}>
-                <rect
-                  fill={point.direction === 'rise' ? '#EF4444' : '#3B82F6'}
-                  height={Math.max(height, 10)}
-                  width={barWidth}
-                  x={centerX - barWidth / 2}
-                  y={y}
-                />
-                {index % 3 === 0 || point.date ? (
-                  <text
-                    fill="#6C88A4"
-                    fontSize="9"
-                    fontWeight="700"
-                    textAnchor="middle"
-                    x={centerX}
-                    y={Math.max(y - 5, 12)}
-                  >
-                    {formatBarVolume(point.volume)}
-                  </text>
-                ) : null}
-              </g>
+              <rect
+                key={`${point.date}-${index}`}
+                fill={point.direction === 'rise' ? '#EF4444' : '#3B82F6'}
+                height={Math.max(height, 10)}
+                width={barWidth}
+                x={centerX - barWidth / 2}
+                y={y}
+              />
             );
           })}
           {chartData.map((point, index) => {

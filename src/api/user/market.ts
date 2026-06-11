@@ -33,6 +33,10 @@ export const marketApi = {
   getStockDailyInfo: (code: string) =>
     client.get(`/api/stocks/${code}/daily-info`).then(r => r.data.data),
 
+  // 종목 차트 캔들 (period D/W/M, range/from/to)
+  getStockChart: (code: string, params?: { period?: string; range?: string; from?: string; to?: string }) =>
+    client.get(`/api/stocks/${code}/chart`, { params }).then(r => r.data.data),
+
   // 종목 호가
   getStockOrderbook: (code: string) =>
     client.get(`/api/stocks/${code}/orderbook`).then(r => r.data.data),

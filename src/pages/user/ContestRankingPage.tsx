@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { PageContainer } from '../../components/common/PageContainer';
 import { ContestRankingList } from '../../components/user/ContestRankingList';
 import { ContestRankingSummaryCard } from '../../components/user/ContestRankingSummaryCard';
 import { contestsApi } from '../../api/user/contests';
+import { portfolioApi } from '../../api/user/portfolio';
+import { useMarketSocket } from '../../hooks/useMarketSocket';
+import { useLiveContestRank } from '../../hooks/useLiveContestRank';
 import { parseApiError } from '../../api/parseApiError';
 import type { ContestRankingItem } from '../../types/contest';
 
@@ -33,6 +36,8 @@ export function ContestRankingPage() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [liveBase, setLiveBase] = useState<{ cash: number; seed: number } | null>(null);
+  const [liveHoldings, setLiveHoldings] = useState<{ code: string; quantity: number; price: number }[]>([]);
 
   const isMyContestRanking = pathname.startsWith('/my-contests/');
   const hasMoreRanking = page + 1 < totalPages;
@@ -138,6 +143,79 @@ export function ContestRankingPage() {
     return () => observer.disconnect();
   }, [hasMoreRanking, loadMore]);
 
+  // 진행 중 대회 + 참여자면: 내 대회 계좌/보유종목 로드 → 실시간 순위 계산용
+  useEffect(() => {
+    if (!contestId || isEnded) {
+      setLiveBase(null);
+      setLiveHoldings([]);
+      return;
+    }
+    const id = Number(contestId);
+    let cancelled = false;
+    Promise.all([
+      portfolioApi.getContestAccount(id).catch(() => null),
+      portfolioApi.getHoldings(id).catch(() => null),
+    ]).then(([acc, holdings]) => {
+      if (cancelled) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const a = acc as any;
+      setLiveBase(a ? { cash: Number(a.cashBalance ?? 0), seed: Number(a.currentAsset ?? 0) - Number(a.profitAmount ?? 0) } : null);
+      setLiveHoldings(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ((holdings as any[]) ?? [])
+          .map((h) => ({ code: h.stockCode ?? '', quantity: Number(h.quantity ?? 0), price: Number(h.currentPrice ?? 0) }))
+          .filter((h) => h.code),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [contestId, isEnded]);
+
+  const { prices: livePrices } = useMarketSocket(liveHoldings.map((h) => h.code));
+  const liveEvaluation = liveHoldings.reduce(
+    (sum, h) => sum + (livePrices[h.code]?.currentPrice || h.price) * h.quantity,
+    0,
+  );
+  const myLiveProfitRate =
+    liveBase && liveBase.seed > 0
+      ? ((liveBase.cash + liveEvaluation - liveBase.seed) / liveBase.seed) * 100
+      : null;
+  const { rank: liveRank, participants, myNickname, snapshotRate } = useLiveContestRank(
+    !isEnded && contestId ? Number(contestId) : null,
+    myLiveProfitRate,
+  );
+
+  // 라이브 리스트 사용 가능 여부 (진행 중 + 참여자 + 스냅샷 준비됨)
+  const usingLiveList =
+    !isEnded && snapshotRate != null && !!myNickname && participants.length > 0;
+
+  // 내 순위 카드: 실시간 값으로 덮어쓰기 (계산 가능할 때만)
+  const displayMyRanking: ContestRankingItem =
+    usingLiveList && liveRank != null && liveBase
+      ? {
+          ...myRanking,
+          rank: liveRank,
+          profitRate: snapshotRate ?? myRanking.profitRate,
+          profitAmount: liveBase.cash + liveEvaluation - liveBase.seed,
+        }
+      : myRanking;
+
+  // 라이브 리스트: 내 수익률 스냅샷으로 내 행을 갱신 → 수익률 내림차순 정렬 → 순위 재부여(주기마다 내 카드 이동)
+  const displayList: ContestRankingItem[] = useMemo(() => {
+    if (!usingLiveList) return rankingList;
+    const merged = participants.map((p) =>
+      p.nickname === myNickname ? { ...p, profitRate: snapshotRate as number } : p,
+    );
+    merged.sort((a, b) => b.profitRate - a.profitRate);
+    return merged.map((p, i) => ({
+      rank: i + 1,
+      nickname: p.nickname,
+      profitAmount: p.profitAmount,
+      profitRate: p.profitRate,
+    }));
+  }, [usingLiveList, participants, myNickname, snapshotRate, rankingList]);
+
   return (
     <PageContainer className="min-h-full bg-[#F3F7FC] pb-0 pt-3">
       {isMyContestRanking ? (
@@ -168,17 +246,17 @@ export function ContestRankingPage() {
       ) : (
         <div className="space-y-4 pb-4">
           <ContestRankingSummaryCard
-            myRanking={myRanking}
+            myRanking={displayMyRanking}
             totalParticipants={totalParticipants}
           />
-          <ContestRankingList myRank={myRanking.rank} rankingList={rankingList} />
-          {hasMoreRanking ? (
+          <ContestRankingList myRank={displayMyRanking.rank} rankingList={displayList} />
+          {!usingLiveList && hasMoreRanking ? (
             <div ref={loadMoreRef} className="py-3 text-center">
               <p className="text-xs font-bold text-[#6C88A4]">
                 {isLoadingMore ? '다음 순위를 불러오는 중...' : '아래로 스크롤하면 더 불러와요'}
               </p>
             </div>
-          ) : rankingList.length > 0 ? (
+          ) : displayList.length > 0 ? (
             <div className="py-3 text-center">
               <p className="text-xs font-bold text-[#A3B4C6]">마지막 순위입니다.</p>
             </div>
