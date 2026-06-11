@@ -2,8 +2,10 @@ import { useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { ContestModeBanner } from '../components/user/ContestModeBanner';
 import { BottomNavigation } from '../components/user/BottomNavigation';
+import { RealtimeRecoveryModal } from '../components/common/RealtimeRecoveryModal';
 import { UserHeader } from '../components/user/UserHeader';
 import { ContestModeProvider } from '../contexts/ContestModeContext';
+import { resetMarketSocket } from '../hooks/useMarketSocket';
 import { isAuthenticated } from '../utils/tokenStorage';
 
 export function UserLayout() {
@@ -24,6 +26,8 @@ export function UserLayout() {
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
     window.scrollTo({ top: 0 });
+    // 페이지 이동 시 실시간 소스 초기화(누적 구독 비우기 → 한도 초과 예방)
+    resetMarketSocket();
   }, [location.pathname]);
 
   return (
@@ -38,6 +42,7 @@ export function UserLayout() {
           <BottomNavigation />
         </div>
       </div>
+      <RealtimeRecoveryModal />
     </ContestModeProvider>
   );
 }

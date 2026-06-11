@@ -80,6 +80,9 @@ class MarketSocketManager {
   };
   private snapshot: MarketSnapshot = { prices: {}, indices: {}, orderbooks: {} };
   private readonly listeners = new Set<(snapshot: MarketSnapshot) => void>();
+  // 복구(한도 초과 → 재연결) 상태: 데이터 구독과 무관하게 수동(passive) 리스너로 구독
+  private recovering = false;
+  private readonly statusListeners = new Set<(recovering: boolean) => void>();
 
   getSnapshot(): MarketSnapshot {
     return this.snapshot;
@@ -98,6 +101,29 @@ class MarketSocketManager {
   removeListener(listener: (snapshot: MarketSnapshot) => void): void {
     this.listeners.delete(listener);
     this.scheduleIdleCloseIfUnused();
+  }
+
+  // 복구 상태 리스너 (연결을 강제하지 않음 — 전역 모달용)
+  getRecovering(): boolean {
+    return this.recovering;
+  }
+
+  addStatusListener(listener: (recovering: boolean) => void): void {
+    this.statusListeners.add(listener);
+  }
+
+  removeStatusListener(listener: (recovering: boolean) => void): void {
+    this.statusListeners.delete(listener);
+  }
+
+  private setRecovering(recovering: boolean): void {
+    if (this.recovering === recovering) {
+      return;
+    }
+    this.recovering = recovering;
+    for (const listener of this.statusListeners) {
+      listener(recovering);
+    }
   }
 
   // 구독 획득: ref-count 증가, 0→1인 키만 실제 SUBSCRIBE 전송
@@ -142,6 +168,15 @@ class MarketSocketManager {
       this.send(CHANNEL_ACTIONS[channel].unsub, channel, toUnsubscribe);
     }
     this.scheduleIdleCloseIfUnused();
+  }
+
+  // 페이지 이동 시 호출: pod에 RESET 전송 → KIS 재연결로 누적 등록 초기화.
+  // 연결돼 있을 때만 의미가 있으므로 OPEN 상태에서만 전송한다.
+  reset(): void {
+    const ws = this.ws;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ action: 'RESET' }));
+    }
   }
 
   private hasSubscriptions(): boolean {
@@ -236,6 +271,12 @@ class MarketSocketManager {
   private handleMessage(event: MessageEvent): void {
     try {
       const msg = JSON.parse(event.data);
+
+      if (msg.type === 'REALTIME_STATUS') {
+        this.setRecovering(Boolean(msg.data?.recovering));
+        return;
+      }
+
       const d = msg.data;
       if (!d) {
         return;
@@ -305,6 +346,15 @@ class MarketSocketManager {
 const marketSocketManager = new MarketSocketManager();
 
 /**
+ * 페이지 이동 시 실시간 소스(KIS) 연결을 초기화한다.
+ * 누적된 구독 등록을 비워 한도 초과(MAX SUBSCRIBE OVER)를 예방한다.
+ * 백엔드가 복구 상태(REALTIME_STATUS)를 보내므로 복구 모달이 자동으로 표시/해제된다.
+ */
+export function resetMarketSocket(): void {
+  marketSocketManager.reset();
+}
+
+/**
  * market-realtime-service(/ws/market)에 연결해 실시간 현재가/지수/호가를 구독한다.
  * - 연결은 앱 전체에서 1개만 공유(MarketSocketManager). 페이지 이동 시 구독만 추가/해제된다.
  * - stockCodes(현재가) / options.indexMarkets(지수) / options.orderbookCodes(호가)가
@@ -357,4 +407,18 @@ export function useMarketSocket(stockCodes: string[], options: UseMarketSocketOp
   }, [orderbookKey]);
 
   return { prices: snapshot.prices, indices: snapshot.indices, orderbooks: snapshot.orderbooks };
+}
+
+/**
+ * 실시간 수신 복구(한도 초과 → KIS 재연결) 진행 여부.
+ * 연결을 강제하지 않으므로 전역 어디서나(예: 복구 모달) 부담 없이 구독 가능.
+ */
+export function useRealtimeRecovery(): boolean {
+  const [recovering, setRecovering] = useState<boolean>(() => marketSocketManager.getRecovering());
+  useEffect(() => {
+    const listener = (next: boolean) => setRecovering(next);
+    marketSocketManager.addStatusListener(listener);
+    return () => marketSocketManager.removeStatusListener(listener);
+  }, []);
+  return recovering;
 }

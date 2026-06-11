@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { WatchlistGuideBanner } from '../../components/user/WatchlistGuideBanner';
 import { WatchlistStockCard } from '../../components/user/WatchlistStockCard';
 import { WatchlistTabs } from '../../components/user/WatchlistTabs';
+import { useMarketSocket } from '../../hooks/useMarketSocket';
 import { marketApi } from '../../api/user/market';
 import { parseApiError } from '../../api/parseApiError';
 import type { WatchlistMarketType, WatchlistStockItem } from '../../types/watchlist';
@@ -46,6 +47,15 @@ export function WatchlistPage() {
     fetchWatchlist();
   }, [fetchWatchlist]);
 
+  // 관심종목 실시간 시세 구독 (현재가만 — 호가/지수 X)
+  const { prices: livePrices } = useMarketSocket(watchlistItems.map((item) => item.stockCode));
+  const liveItems: WatchlistStockItem[] = watchlistItems.map((item) => {
+    const live = livePrices[item.stockCode];
+    return live
+      ? { ...item, currentPrice: live.currentPrice, changeRate: live.changeRate }
+      : item;
+  });
+
   const handleRemoveWatchlist = async (id: string) => {
     try {
       await marketApi.deleteWatchlist(id);
@@ -78,9 +88,9 @@ export function WatchlistPage() {
           <p className="py-16 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
         ) : error ? (
           <p className="py-16 text-center text-xs font-bold text-red-500">{error}</p>
-        ) : watchlistItems.length > 0 ? (
+        ) : liveItems.length > 0 ? (
           <div className="space-y-3">
-            {watchlistItems.map((stock) => (
+            {liveItems.map((stock) => (
               <WatchlistStockCard
                 key={stock.id}
                 onRemove={handleRemoveWatchlist}
