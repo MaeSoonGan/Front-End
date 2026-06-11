@@ -100,6 +100,7 @@ export function AdminSuspensionPage() {
         endDate:   dateTo || undefined,
         page:      currentPage - 1,
         size:      PAGE_SIZE,
+        sort:      sortDir ? `processedAt,${sortDir}` : undefined,
       });
       setRecords(
         (data.content ?? []).map((r: any) => ({
@@ -110,14 +111,15 @@ export function AdminSuspensionPage() {
           reason:           r.reason ?? '',
           adminName:        r.adminName ?? '',
           processedAt:      isoToProcessedAt(r.createdAt),
-          status:           (r.status === 'ACTIVE' ? 'SUSPENDED' : 'RELEASED') as SuspensionStatus,
+          // 백엔드 active 값은 'SUSPENDED'(legacy 'ACTIVE' 가능) → 'RELEASED'가 아니면 정지로 처리
+          status:           (r.status === 'RELEASED' ? 'RELEASED' : 'SUSPENDED') as SuspensionStatus,
         }))
       );
       setTotalPages(data.totalPages ?? 1);
     } catch (e) {
       console.error(e);
     }
-  }, [appliedSearch, dateFrom, dateTo, currentPage]);
+  }, [appliedSearch, dateFrom, dateTo, currentPage, sortDir]);
 
   useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
@@ -127,7 +129,7 @@ export function AdminSuspensionPage() {
         total:              data.totalSuspensionCount ?? 0,
         currentlySuspended: data.activeSuspensionCount ?? 0,
         thisMonth:          data.todaySuspensionCount ?? 0,
-        autoSuspended:      0,
+        autoSuspended:      data.autoSuspendedCount ?? 0,
       }))
       .catch(console.error);
   }, []);
@@ -135,12 +137,9 @@ export function AdminSuspensionPage() {
   const filtered = useMemo(() => {
     let result = [...records];
     if (typeFilter !== 'ALL') result = result.filter(r => r.type === typeFilter);
-    if (sortDir) result = [...result].sort((a, b) => {
-      const cmp = a.processedAt.localeCompare(b.processedAt);
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
+    // 정렬은 서버에서 전체 데이터 기준으로 처리됨(fetchRecords의 sort 파라미터)
     return result;
-  }, [records, typeFilter, sortDir]);
+  }, [records, typeFilter]);
 
   const safePage = Math.min(currentPage, totalPages);
   const paginated = filtered;

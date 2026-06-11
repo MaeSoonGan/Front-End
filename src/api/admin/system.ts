@@ -13,6 +13,9 @@ export const systemApi = {
   ignoreAlert: (alertId: number, data?: { reason?: string }) =>
     client.patch(`/api/admin/monitoring/alerts/${alertId}/ignore`, data).then(r => r.data.data),
 
+  releaseAlert: (alertId: number, data?: { reason?: string }) =>
+    client.patch(`/api/admin/monitoring/alerts/${alertId}/release`, data).then(r => r.data.data),
+
   getMaintenance: () =>
     client.get('/api/admin/system/maintenance').then(r => r.data.data),
 

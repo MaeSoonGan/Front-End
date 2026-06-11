@@ -108,7 +108,6 @@ export function AdminContestDetailPage() {
   const [contest, setContest]   = useState<ContestDetail | null>(null);
   const [loading, setLoading]   = useState(true);
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [totalPages, setTotalPages]     = useState(1);
   const [rankStats, setRankStats]       = useState<RankingStats>({ normalCount: 0, excludedCount: 0, profitCount: 0, lossCount: 0, avgProfitRate: 0, topNickname: '-', topProfitRate: 0 });
 
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -157,11 +156,8 @@ export function AdminContestDetailPage() {
   const fetchRankings = useCallback(async () => {
     if (!contestId) return;
     try {
-      const data = await contestsApi.getRankings(Number(contestId), {
-        keyword: search || undefined,
-        page: currentPage - 1,
-        size: PAGE_SIZE,
-      });
+      // 전체 참가자를 받아 클라이언트에서 검색/정렬/페이지네이션 (전체 데이터 기준 정렬)
+      const data = await contestsApi.getRankings(Number(contestId), { page: 0, size: 1000 });
       setParticipants(
         (data.content ?? []).map((r: any) => ({
           id:           String(r.memberId),
@@ -176,11 +172,10 @@ export function AdminContestDetailPage() {
           rank:         r.isExcluded ? null : (r.rankNo ?? null),
         }))
       );
-      setTotalPages(data.totalPages ?? 1);
     } catch (e) {
       console.error(e);
     }
-  }, [contestId, currentPage, search]);
+  }, [contestId]);
 
   useEffect(() => { fetchRankings(); }, [fetchRankings]);
 
@@ -233,6 +228,7 @@ export function AdminContestDetailPage() {
     });
   }, [filtered, sortKey, sortDir]);
 
+  const totalPages = Math.max(1, Math.ceil(ranked.length / PAGE_SIZE));
   const paginated = ranked.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   function handleSort(key: SortKey) {

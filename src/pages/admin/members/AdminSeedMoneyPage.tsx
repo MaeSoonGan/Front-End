@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Download, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertTriangle, Search, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { getPaginationPages } from '../../../utils/pagination';
 import { Card } from '../../../components/common/Card';
@@ -84,7 +84,11 @@ export function AdminSeedMoneyPage() {
 
   const fetchPayments = useCallback(async () => {
     try {
-      const data = await membersApi.getSeedPayments({ page: currentPage - 1, size: PAGE_SIZE });
+      const data = await membersApi.getSeedPayments({
+        page: currentPage - 1,
+        size: PAGE_SIZE,
+        sort: sortField && sortDir ? `${sortField},${sortDir}` : undefined,
+      });
       setPayments(
         (data.content ?? []).map((p: any) => ({
           id:                String(p.seedHistoryId),
@@ -98,7 +102,7 @@ export function AdminSeedMoneyPage() {
       );
       setTotalPages(data.totalPages ?? 1);
     } catch (e) { console.error(e); }
-  }, [currentPage]);
+  }, [currentPage, sortField, sortDir]);
 
   useEffect(() => { fetchPayments(); }, [fetchPayments]);
 
@@ -130,15 +134,8 @@ export function AdminSeedMoneyPage() {
 
   const actualAmount = amount ? Number(amount) * 10000 : 0;
 
-  const sortedPayments = useMemo(() => {
-    if (!sortField || !sortDir) return payments;
-    return [...payments].sort((a, b) => {
-      const dir = sortDir === 'asc' ? 1 : -1;
-      if (sortField === 'amount') return dir * (a.amount - b.amount);
-      if (sortField === 'paidAt') return dir * a.paidAt.localeCompare(b.paidAt);
-      return 0;
-    });
-  }, [payments, sortField, sortDir]);
+  // 정렬은 서버에서 전체 데이터 기준으로 처리됨(fetchPayments의 sort 파라미터)
+  const sortedPayments = payments;
 
   const safePage = Math.min(currentPage, totalPages);
   const paginated = sortedPayments;

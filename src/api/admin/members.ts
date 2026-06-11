@@ -4,7 +4,7 @@ export const membersApi = {
   getMemberSummary: () =>
     client.get('/api/admin/members/summary').then(r => r.data.data),
 
-  getMembers: (params?: { keyword?: string; status?: string; startDate?: string; endDate?: string; page?: number; size?: number }) =>
+  getMembers: (params?: { keyword?: string; status?: string; startDate?: string; endDate?: string; page?: number; size?: number; sort?: string }) =>
     client.get('/api/admin/members', { params }).then(r => r.data.data),
 
   getMember: (memberId: number) =>
@@ -22,7 +22,7 @@ export const membersApi = {
   getSuspensionSummary: () =>
     client.get('/api/admin/members/suspensions/summary').then(r => r.data.data),
 
-  getSuspensions: (params?: { keyword?: string; status?: string; startDate?: string; endDate?: string; page?: number; size?: number }) =>
+  getSuspensions: (params?: { keyword?: string; status?: string; startDate?: string; endDate?: string; page?: number; size?: number; sort?: string }) =>
     client.get('/api/admin/members/suspensions', { params }).then(r => r.data.data),
 
   getSuspension: (suspensionId: number) =>
@@ -37,7 +37,7 @@ export const membersApi = {
   getSeedPaymentSummary: () =>
     client.get('/api/admin/members/seed-payments/summary').then(r => r.data.data),
 
-  getSeedPayments: (params?: { keyword?: string; status?: string; startDate?: string; endDate?: string; page?: number; size?: number }) =>
+  getSeedPayments: (params?: { keyword?: string; status?: string; startDate?: string; endDate?: string; page?: number; size?: number; sort?: string }) =>
     client.get('/api/admin/members/seed-payments', { params }).then(r => r.data.data),
 
   paySeedMoney: (data: { memberIds: number[]; contestId?: number; amount: number; reason: string }) =>
