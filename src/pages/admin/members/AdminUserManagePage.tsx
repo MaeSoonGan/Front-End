@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Download, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Card } from '../../../components/common/Card';
@@ -9,6 +9,7 @@ import { cn } from '../../../utils/cn';
 import { getPaginationPages } from '../../../utils/pagination';
 import type { StatusTone } from '../../../types/common';
 import { membersApi } from '../../../api/admin/members';
+import { downloadCsv } from '../../../utils/download';
 
 // ---- Types ----
 
@@ -58,11 +59,6 @@ function joinedAtToIso(joinedAt: string): string {
   return `20${yy}-${mm}-${dd}`;
 }
 
-function parseAsset(asset: string | null): number {
-  if (!asset) return -1;
-  const m = asset.match(/^([\d.]+)M원$/);
-  return m ? parseFloat(m[1]) : 0;
-}
 
 function SortIcon({ field, currentField, dir }: { field: SortField; currentField: SortField | null; dir: SortDir }) {
   if (currentField !== field || !dir) return <ChevronsUpDown size={13} className="ml-1 inline opacity-30" />;
@@ -99,6 +95,7 @@ const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
         endDate:    dateTo || undefined,
         page:       currentPage - 1,
         size:       ITEMS_PER_PAGE,
+        sort:       sortField && sortDir ? `${sortField},${sortDir}` : undefined,
       });
       setMembers(
         (data.content ?? []).map((m: any) => ({
@@ -118,7 +115,7 @@ const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
     } catch (e) {
       console.error(e);
     }
-  }, [appliedSearch, statusFilter, dateFrom, dateTo, currentPage]);
+  }, [appliedSearch, statusFilter, dateFrom, dateTo, currentPage, sortField, sortDir]);
 
   useEffect(() => { fetchMembers(); }, [fetchMembers]);
 
@@ -133,22 +130,8 @@ const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
       .catch(console.error);
   }, []);
 
-  const filteredMembers = useMemo(() => {
-    if (sortField && sortDir) {
-      return [...members].sort((a, b) => {
-        const dir = sortDir === 'asc' ? 1 : -1;
-        switch (sortField) {
-          case 'joinedAt':      return dir * a.joinedAt.localeCompare(b.joinedAt);
-          case 'contestCount':  return dir * (a.contestCount - b.contestCount);
-          case 'totalAsset':    return dir * (parseAsset(a.totalAsset) - parseAsset(b.totalAsset));
-          case 'profitRate':    return dir * ((a.profitRate ?? -Infinity) - (b.profitRate ?? -Infinity));
-          case 'loginFailCount': return dir * (a.loginFailCount - b.loginFailCount);
-          default:              return 0;
-        }
-      });
-    }
-    return members;
-  }, [members, sortField, sortDir]);
+  // 정렬은 서버에서 전체 데이터 기준으로 처리됨(fetchMembers의 sort 파라미터)
+  const filteredMembers = members;
 
   const selectedMembers = members.filter(m => selectedIds.includes(m.id));
   const hasSelectedMembers = selectedIds.length > 0;
@@ -162,6 +145,7 @@ const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
     !isAllSelected && filteredMembers.some(m => selectedIds.includes(m.id));
 
   function handleSort(field: SortField) {
+    setCurrentPage(1); // 정렬 변경 시 전체 정렬 기준 첫 페이지부터
     if (sortField !== field) {
       setSortField(field);
       setSortDir('asc');
@@ -195,10 +179,7 @@ const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
         startDate: dateFrom || undefined,
         endDate:   dateTo || undefined,
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = 'members.csv'; a.click();
-      URL.revokeObjectURL(url);
+      downloadCsv(blob, 'members');
     } catch (e) {
       console.error(e);
     }
@@ -206,9 +187,12 @@ const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
 
   async function handleSuspendSelected() {
     try {
+      // 감사로그 상세에 정지 대상 회원 이름들이 남도록 reason 구성
+      const names = selectedMembers.map((m) => m.nickname).filter(Boolean).join(', ');
+      const reason = names ? `${names} 정지` : '계정 정지';
       await membersApi.suspendMembers({
         memberIds: selectedIds.map(Number),
-        reason: '관리자 일괄 정지',
+        reason,
       });
       setSelectedIds([]);
       fetchMembers();
@@ -497,7 +481,13 @@ const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
 <SeedMoneyModal
         isOpen={isSeedModalOpen}
         targetCount={selectedIds.length}
+        memberIds={selectedIds.map(Number)}
         onClose={() => setIsSeedModalOpen(false)}
+        onSuccess={() => {
+          setIsSeedModalOpen(false);
+          setSelectedIds([]);
+          fetchMembers();
+        }}
       />
     </div>
   );

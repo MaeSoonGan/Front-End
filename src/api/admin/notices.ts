@@ -1,7 +1,7 @@
 import client from '../client';
 
 export const noticesApi = {
-  getNotices: (params?: { keyword?: string; status?: string; page?: number; size?: number }) =>
+  getNotices: (params?: { keyword?: string; status?: string; page?: number; size?: number; sort?: string }) =>
     client.get('/api/admin/notices', { params }).then(r => r.data.data),
 
   getNotice: (noticeId: number) =>

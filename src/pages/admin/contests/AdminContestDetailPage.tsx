@@ -6,6 +6,7 @@ import { Card } from '../../../components/common/Card';
 import { PageHeader } from '../../../components/common/PageHeader';
 import { Button } from '../../../components/common/Button';
 import { contestsApi } from '../../../api/admin/contests';
+import { downloadCsv } from '../../../utils/download';
 
 type ContestStatus = 'ONGOING' | 'CLOSING_SOON' | 'SCHEDULED' | 'ENDED';
 type ParticipantStatus = 'NORMAL' | 'EXCLUDED';
@@ -107,7 +108,6 @@ export function AdminContestDetailPage() {
   const [contest, setContest]   = useState<ContestDetail | null>(null);
   const [loading, setLoading]   = useState(true);
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [totalPages, setTotalPages]     = useState(1);
   const [rankStats, setRankStats]       = useState<RankingStats>({ normalCount: 0, excludedCount: 0, profitCount: 0, lossCount: 0, avgProfitRate: 0, topNickname: '-', topProfitRate: 0 });
 
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -156,11 +156,8 @@ export function AdminContestDetailPage() {
   const fetchRankings = useCallback(async () => {
     if (!contestId) return;
     try {
-      const data = await contestsApi.getRankings(Number(contestId), {
-        keyword: search || undefined,
-        page: currentPage - 1,
-        size: PAGE_SIZE,
-      });
+      // 전체 참가자를 받아 클라이언트에서 검색/정렬/페이지네이션 (전체 데이터 기준 정렬)
+      const data = await contestsApi.getRankings(Number(contestId), { page: 0, size: 1000 });
       setParticipants(
         (data.content ?? []).map((r: any) => ({
           id:           String(r.memberId),
@@ -175,11 +172,10 @@ export function AdminContestDetailPage() {
           rank:         r.isExcluded ? null : (r.rankNo ?? null),
         }))
       );
-      setTotalPages(data.totalPages ?? 1);
     } catch (e) {
       console.error(e);
     }
-  }, [contestId, currentPage, search]);
+  }, [contestId]);
 
   useEffect(() => { fetchRankings(); }, [fetchRankings]);
 
@@ -199,6 +195,16 @@ export function AdminContestDetailPage() {
       })
       .catch(console.error);
   }, [contestId]);
+
+  async function handleCsvExport() {
+    if (!contestId) return;
+    try {
+      const blob = await contestsApi.exportRankings(Number(contestId), { keyword: search.trim() || undefined });
+      downloadCsv(blob, `contest-${contestId}-rankings`);
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -222,6 +228,7 @@ export function AdminContestDetailPage() {
     });
   }, [filtered, sortKey, sortDir]);
 
+  const totalPages = Math.max(1, Math.ceil(ranked.length / PAGE_SIZE));
   const paginated = ranked.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   function handleSort(key: SortKey) {
@@ -327,7 +334,7 @@ export function AdminContestDetailPage() {
                 <Button variant="danger" className="h-9 text-sm" onClick={() => { setConfirmReason(''); setConfirmAction('cancel'); }}>대회 취소</Button>
               </>
             )}
-            {contest.status === 'ENDED' && <Button variant="secondary" className="h-9 text-sm">결과 내보내기</Button>}
+            {contest.status === 'ENDED' && <Button variant="secondary" className="h-9 text-sm" onClick={handleCsvExport}>결과 내보내기</Button>}
           </div>
         }
       />
@@ -399,7 +406,7 @@ export function AdminContestDetailPage() {
               </select>
               <input type="text" placeholder={searchType === 'nickname' ? '닉네임 검색' : searchType === 'email' ? '이메일 검색' : '닉네임/이메일 검색'} value={search} onChange={e => { setSearch(e.target.value); setCurrentPage(1); }} className="h-9 w-44 px-3 text-sm focus:outline-none" />
             </div>
-            <Button variant="secondary" className="h-9 gap-1.5 text-sm"><Download size={14} />CSV 내보내기</Button>
+            <Button variant="secondary" className="h-9 gap-1.5 text-sm" onClick={handleCsvExport}><Download size={14} />CSV 내보내기</Button>
           </div>
         </div>
 
