@@ -357,7 +357,7 @@ export function UserHeader() {
               className="flex min-w-0 items-center text-base font-extrabold text-[#1565C0]"
               to={isContestMode ? getContestPath('/home') : '/home'}
             >
-              {isHome ? (
+              {isHome || pageTitle === 'FISA Invest' ? (
                 <img
                   alt="매순간 매도 먼저"
                   className="h-8 w-auto object-contain"

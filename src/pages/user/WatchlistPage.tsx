@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { WatchlistGuideBanner } from '../../components/user/WatchlistGuideBanner';
 import { WatchlistStockCard } from '../../components/user/WatchlistStockCard';
 import { WatchlistTabs } from '../../components/user/WatchlistTabs';
-import { useMarketSocket } from '../../hooks/useMarketSocket';
 import { marketApi } from '../../api/user/market';
 import { parseApiError } from '../../api/parseApiError';
 import type { WatchlistMarketType, WatchlistStockItem } from '../../types/watchlist';
@@ -13,14 +12,17 @@ export function WatchlistPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchWatchlist = useCallback(async () => {
+  // 가격은 ws 대신 RDS 스냅샷(getWatchlist)에서 주기 폴링으로 갱신 (실시간 순위와 동일 방식)
+  const fetchWatchlist = useCallback(async (silent = false) => {
     // 해외는 백엔드 미지원 → 조회 생략
     if (activeMarket === 'OVERSEAS') {
       setWatchlistItems([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       const data = await marketApi.getWatchlist('domestic');
       setWatchlistItems(
@@ -37,24 +39,25 @@ export function WatchlistPage() {
       );
       setError('');
     } catch (e) {
-      setError(parseApiError(e));
+      if (!silent) {
+        setError(parseApiError(e));
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [activeMarket]);
 
   useEffect(() => {
     fetchWatchlist();
-  }, [fetchWatchlist]);
-
-  // 관심종목 실시간 시세 구독 (현재가만 — 호가/지수 X)
-  const { prices: livePrices } = useMarketSocket(watchlistItems.map((item) => item.stockCode));
-  const liveItems: WatchlistStockItem[] = watchlistItems.map((item) => {
-    const live = livePrices[item.stockCode];
-    return live
-      ? { ...item, currentPrice: live.currentPrice, changeRate: live.changeRate }
-      : item;
-  });
+    if (activeMarket === 'OVERSEAS') {
+      return;
+    }
+    // 주기 폴링(15초)으로 스냅샷 가격 갱신 — 로딩 표시 없이 조용히
+    const timer = window.setInterval(() => fetchWatchlist(true), 15000);
+    return () => window.clearInterval(timer);
+  }, [fetchWatchlist, activeMarket]);
 
   const handleRemoveWatchlist = async (id: string) => {
     try {
@@ -88,9 +91,9 @@ export function WatchlistPage() {
           <p className="py-16 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
         ) : error ? (
           <p className="py-16 text-center text-xs font-bold text-red-500">{error}</p>
-        ) : liveItems.length > 0 ? (
+        ) : watchlistItems.length > 0 ? (
           <div className="space-y-3">
-            {liveItems.map((stock) => (
+            {watchlistItems.map((stock) => (
               <WatchlistStockCard
                 key={stock.id}
                 onRemove={handleRemoveWatchlist}

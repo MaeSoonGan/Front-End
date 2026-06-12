@@ -2,11 +2,12 @@ import type { ContestRankingItem as ContestRankingItemType } from '../../types/c
 import { ContestRankingItem } from './ContestRankingItem';
 
 interface ContestRankingListProps {
-  myRank?: number;
+  myMemberId?: number;
+  myNickname?: string;
   rankingList: ContestRankingItemType[];
 }
 
-export function ContestRankingList({ myRank, rankingList }: ContestRankingListProps) {
+export function ContestRankingList({ myMemberId, myNickname, rankingList }: ContestRankingListProps) {
   if (rankingList.length === 0) {
     return (
       <div className="rounded-2xl border border-blue-100 bg-white px-4 py-10 text-center shadow-sm">
@@ -21,7 +22,11 @@ export function ContestRankingList({ myRank, rankingList }: ContestRankingListPr
       {/* TODO: GET /api/contests/{contestId}/ranking?page=0&size=20 연동 후 페이지 단위로 확장합니다. */}
       {rankingList.map((item) => (
         <ContestRankingItem
-          isMine={item.rank === myRank}
+          isMine={
+            myMemberId != null
+              ? item.memberId === myMemberId
+              : !!myNickname && item.nickname === myNickname
+          }
           item={item}
           key={`${item.rank}-${item.nickname}`}
         />

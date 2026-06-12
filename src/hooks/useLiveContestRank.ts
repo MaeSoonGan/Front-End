@@ -6,6 +6,7 @@ export interface LiveRankParticipant {
   nickname: string;
   profitRate: number;
   profitAmount: number;
+  memberId?: number;
 }
 
 /**
@@ -22,6 +23,7 @@ export function useLiveContestRank(
   const [participants, setParticipants] = useState<LiveRankParticipant[]>([]);
   const [totalParticipants, setTotalParticipants] = useState(0);
   const [myNickname, setMyNickname] = useState<string | undefined>(undefined);
+  const [myMemberId, setMyMemberId] = useState<number | undefined>(undefined);
   const [snapshotRate, setSnapshotRate] = useState<number | null>(null);
 
   const rateRef = useRef(myLiveProfitRate);
@@ -33,11 +35,13 @@ export function useLiveContestRank(
       setParticipants([]);
       setTotalParticipants(0);
       setMyNickname(undefined);
+      setMyMemberId(undefined);
       return;
     }
     let cancelled = false;
     Promise.all([
-      contestsApi.getRankings(contestId, { page: 0, size: 500 }).catch(() => null),
+      // size 상한이 100 → 한 번에 최대 100명(현재 대회 규모 내). 그 이상이면 페이지네이션 필요.
+      contestsApi.getRankings(contestId, { page: 0, size: 100 }).catch(() => null),
       contestsApi.getMyRanking(contestId).catch(() => null),
     ]).then(([rankings, mine]) => {
       if (cancelled) return;
@@ -49,11 +53,14 @@ export function useLiveContestRank(
           nickname: r.nickname ?? '',
           profitRate: Number(r.profitRate ?? 0),
           profitAmount: Number(r.profitAmount ?? 0),
+          memberId: r.memberId != null ? Number(r.memberId) : undefined,
         })),
       );
       setTotalParticipants(rankings?.totalElements ?? list.length);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       setMyNickname((mine as any)?.nickname);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      setMyMemberId((mine as any)?.memberId != null ? Number((mine as any).memberId) : undefined);
     });
     return () => {
       cancelled = true;
@@ -67,15 +74,25 @@ export function useLiveContestRank(
     return () => window.clearInterval(timer);
   }, [refreshMs]);
 
+  // 내 수익률이 처음 준비되면(마운트 시 null이었던 경우) 30초 안 기다리고 즉시 1회 반영
+  useEffect(() => {
+    if (snapshotRate == null && myLiveProfitRate != null) {
+      setSnapshotRate(myLiveProfitRate);
+    }
+  }, [myLiveProfitRate, snapshotRate]);
+
+  // 나를 제외한 다른 참여자 수익률 — memberId 우선(정확), 없으면 nickname
   const otherRates = useMemo(
     () =>
       participants
-        .filter((p) => !myNickname || p.nickname !== myNickname)
+        .filter((p) =>
+          myMemberId != null ? p.memberId !== myMemberId : !myNickname || p.nickname !== myNickname,
+        )
         .map((p) => p.profitRate),
-    [participants, myNickname],
+    [participants, myMemberId, myNickname],
   );
 
   const rank = snapshotRate == null ? null : otherRates.filter((r) => r > snapshotRate).length + 1;
 
-  return { rank, totalParticipants, participants, myNickname, snapshotRate };
+  return { rank, totalParticipants, participants, myNickname, myMemberId, snapshotRate };
 }

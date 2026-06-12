@@ -579,9 +579,9 @@ export function HomePage() {
         ) : (
           <div className="space-y-2">
             {rankingStocks.map((stock) => {
-              const live = livePrices[stock.code];
-              const price = live ? formatPrice(live.currentPrice) : stock.price;
-              const changeRate = live ? formatSignedRate(live.changeRate) : stock.changeRate;
+              // 순위는 REST(15초 폴링) 값만 사용 — ws 실시간 시세 오버레이 안 함(종목 상세에서만 실시간)
+              const price = stock.price;
+              const changeRate = stock.changeRate;
               const favorite = watchset.has(stock.code);
               return (
                 <div

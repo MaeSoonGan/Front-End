@@ -22,6 +22,7 @@ export interface ContestRankingItem {
   nickname: string;
   profitAmount: number;
   profitRate: number;
+  memberId?: number;
 }
 
 export type ContestMyRanking = ContestRankingItem;

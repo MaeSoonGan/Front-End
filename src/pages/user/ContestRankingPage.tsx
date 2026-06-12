@@ -48,6 +48,7 @@ export function ContestRankingPage() {
     nickname: r.nickname ?? '',
     profitAmount: Number(r.profitAmount ?? 0),
     profitRate: Number(r.profitRate ?? 0),
+    memberId: r.memberId != null ? Number(r.memberId) : undefined,
   });
 
   // 내 순위 응답(MyRankingResponse) → 요약 카드용 매핑
@@ -59,6 +60,7 @@ export function ContestRankingPage() {
         nickname: mine.nickname ?? '나',
         profitAmount: Number(mine.profitAmount ?? 0),
         profitRate: Number(mine.profitRate ?? 0),
+        memberId: mine.memberId != null ? Number(mine.memberId) : undefined,
       });
     } else {
       setMyRanking(EMPTY_MY_RANKING);
@@ -181,31 +183,43 @@ export function ContestRankingPage() {
     liveBase && liveBase.seed > 0
       ? ((liveBase.cash + liveEvaluation - liveBase.seed) / liveBase.seed) * 100
       : null;
-  const { rank: liveRank, participants, myNickname, snapshotRate } = useLiveContestRank(
+  const { rank: liveRank, participants, myNickname, myMemberId, snapshotRate } = useLiveContestRank(
     !isEnded && contestId ? Number(contestId) : null,
     myLiveProfitRate,
   );
 
   // 라이브 리스트 사용 가능 여부 (진행 중 + 참여자 + 스냅샷 준비됨)
   const usingLiveList =
-    !isEnded && snapshotRate != null && !!myNickname && participants.length > 0;
+    !isEnded && snapshotRate != null && (myMemberId != null || !!myNickname) && participants.length > 0;
 
-  // 내 순위 카드: 실시간 값으로 덮어쓰기 (계산 가능할 때만)
+  // 내 순위 카드: 홈 카드와 동일하게 라이브 값을 직접 사용 (usingLiveList 게이트 X)
+  // → 라이브 수익률(보유종목 평가) + liveRank가 계산되면 바로 반영, 안 되면 서버값 폴백
   const displayMyRanking: ContestRankingItem =
-    usingLiveList && liveRank != null && liveBase
+    liveRank != null && snapshotRate != null && liveBase
       ? {
           ...myRanking,
           rank: liveRank,
-          profitRate: snapshotRate ?? myRanking.profitRate,
-          profitAmount: liveBase.cash + liveEvaluation - liveBase.seed,
+          profitRate: snapshotRate,
+          profitAmount: (snapshotRate / 100) * liveBase.seed,
         }
       : myRanking;
 
   // 라이브 리스트: 내 수익률 스냅샷으로 내 행을 갱신 → 수익률 내림차순 정렬 → 순위 재부여(주기마다 내 카드 이동)
   const displayList: ContestRankingItem[] = useMemo(() => {
     if (!usingLiveList) return rankingList;
+    const isMine = (p: { memberId?: number; nickname: string }) =>
+      myMemberId != null ? p.memberId === myMemberId : !!myNickname && p.nickname === myNickname;
+    // 내 행: 수익률·수익금·순위를 모두 같은 스냅샷 기준으로(일관). 수익금 = 스냅샷 수익률 × 시드
+    const myProfitAmount =
+      liveBase && snapshotRate != null ? (snapshotRate / 100) * liveBase.seed : null;
     const merged = participants.map((p) =>
-      p.nickname === myNickname ? { ...p, profitRate: snapshotRate as number } : p,
+      isMine(p)
+        ? {
+            ...p,
+            profitRate: snapshotRate as number,
+            profitAmount: myProfitAmount ?? p.profitAmount,
+          }
+        : p,
     );
     merged.sort((a, b) => b.profitRate - a.profitRate);
     return merged.map((p, i) => ({
@@ -213,8 +227,9 @@ export function ContestRankingPage() {
       nickname: p.nickname,
       profitAmount: p.profitAmount,
       profitRate: p.profitRate,
+      memberId: p.memberId,
     }));
-  }, [usingLiveList, participants, myNickname, snapshotRate, rankingList]);
+  }, [usingLiveList, participants, myMemberId, myNickname, snapshotRate, liveBase, liveEvaluation, rankingList]);
 
   return (
     <PageContainer className="min-h-full bg-[#F3F7FC] pb-0 pt-3">
@@ -249,7 +264,11 @@ export function ContestRankingPage() {
             myRanking={displayMyRanking}
             totalParticipants={totalParticipants}
           />
-          <ContestRankingList myRank={displayMyRanking.rank} rankingList={displayList} />
+          <ContestRankingList
+            myMemberId={myRanking.memberId}
+            myNickname={myRanking.nickname}
+            rankingList={displayList}
+          />
           {!usingLiveList && hasMoreRanking ? (
             <div ref={loadMoreRef} className="py-3 text-center">
               <p className="text-xs font-bold text-[#6C88A4]">

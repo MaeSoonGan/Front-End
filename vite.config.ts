@@ -50,15 +50,7 @@ export default defineConfig({
         target: 'http://localhost:8084',
         changeOrigin: true,
       },
-      // 실시간 조회상위 랭킹/지수는 market-realtime-service(8090)에 있음 → /api/market(8085)보다 먼저 매칭
-      '/api/market/ranking/hts-top-view': {
-        target: 'http://localhost:8090',
-        changeOrigin: true,
-      },
-      '/api/market/indices': {
-        target: 'http://localhost:8090',
-        changeOrigin: true,
-      },
+      // 순위(hts-top-view)·지수(indices)는 market-service(8085, RDS 스냅샷)로 → 별도 override 없이 아래 /api/market 규칙으로 매칭
       '/api/market': {
         target: 'http://localhost:8085',
         changeOrigin: true,
