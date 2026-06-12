@@ -12,9 +12,14 @@ const client = axios.create({
 });
 
 client.interceptors.request.use(config => {
-  // 사용자 로그인 토큰 우선, 없으면 admin 토큰으로 폴백
-  const token = getAccessToken() ?? localStorage.getItem('adminToken') ?? 'admin-token';
-  config.headers.Authorization = `Bearer ${token}`;
+  // 사용자 로그인 토큰 우선, 없으면 admin 토큰. 둘 다 없으면 헤더 미부착
+  // (더미 'admin-token' 폴백 제거 — 실제 인증 서버(EKS)는 더미 토큰을 거부해 403 발생)
+  const token = getAccessToken() ?? localStorage.getItem('adminToken');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    delete config.headers.Authorization;
+  }
   return config;
 });
 

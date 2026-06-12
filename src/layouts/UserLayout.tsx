@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { ContestModeBanner } from '../components/user/ContestModeBanner';
+import { MaintenanceBanner } from '../components/user/MaintenanceBanner';
 import { BottomNavigation } from '../components/user/BottomNavigation';
 import { RealtimeRecoveryModal } from '../components/common/RealtimeRecoveryModal';
 import { UserHeader } from '../components/user/UserHeader';
@@ -35,6 +36,7 @@ export function UserLayout() {
       <div className="app-cursor min-h-screen bg-slate-100 sm:flex sm:items-center sm:justify-center sm:px-4 sm:py-10">
         <div className="relative flex min-h-screen w-full flex-col overflow-hidden bg-[#F3F7FC] sm:min-h-[720px] sm:max-w-md sm:rounded-3xl sm:shadow-xl">
           <UserHeader />
+          <MaintenanceBanner />
           <ContestModeBanner />
           <main ref={mainRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             <Outlet />

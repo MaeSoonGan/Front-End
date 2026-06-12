@@ -6,6 +6,7 @@ import { Card } from '../../../components/common/Card';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 import { contestsApi } from '../../../api/admin/contests';
+import { parseApiError } from '../../../api/parseApiError';
 
 type ContestStatus = 'ONGOING' | 'CLOSING_SOON' | 'SCHEDULED' | 'ENDED';
 type TabFilter = 'ALL' | 'ONGOING' | 'SCHEDULED' | 'ENDED';
@@ -121,6 +122,7 @@ export function AdminContestManagePage() {
   const [editingId, setEditingId]         = useState<string | null>(null);
   const [form, setForm]                   = useState<FormState>({ ...EMPTY_FORM });
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [confirmError, setConfirmError]   = useState('');
 
   const fetchContests = useCallback(async () => {
     setLoading(true);
@@ -188,6 +190,7 @@ export function AdminContestManagePage() {
   }
 
   async function handleConfirm() {
+    setConfirmError('');
     try {
       const payload = {
         title:           form.name,
@@ -195,7 +198,7 @@ export function AdminContestManagePage() {
         seedMoney:       (Number(form.seedMoney) || 0) * 10000,
         maxParticipants: form.maxParticipants ? Number(form.maxParticipants) : undefined,
         stockType:       form.category === '전체' ? undefined : form.category,
-        profitCriteria:  form.profitStandard,
+        profitCriteria:  'RATE',
         startAt:         form.startDate ? `${form.startDate}T00:00:00` : undefined,
         endAt:           form.endDate ? `${form.endDate}T23:59:59` : undefined,
       };
@@ -212,7 +215,7 @@ export function AdminContestManagePage() {
       setIsFormOpen(false);
       fetchContests();
     } catch (e) {
-      console.error(e);
+      setConfirmError(parseApiError(e));
     }
   }
 
@@ -248,7 +251,6 @@ export function AdminContestManagePage() {
                 { label: '기간',      value: `${toDisplayDate(form.startDate)} ~ ${toDisplayDate(form.endDate)}` },
                 { label: '시드머니',  value: `${Number(form.seedMoney).toLocaleString('ko-KR')}만원` },
                 { label: '최대 인원', value: form.maxParticipants ? `${form.maxParticipants}명` : '무제한' },
-                { label: '수익 기준', value: form.profitStandard },
               ].map(({ label, value }) => (
                 <div key={label} className="flex gap-2">
                   <span className="w-20 shrink-0 text-slate-500">{label}</span>
@@ -256,6 +258,9 @@ export function AdminContestManagePage() {
                 </div>
               ))}
             </div>
+            {confirmError ? (
+              <p className="mb-3 rounded-md bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600">{confirmError}</p>
+            ) : null}
             <div className="flex justify-end gap-2">
               <Button variant="brand" onClick={handleConfirm} className="cursor-pointer">{editingId ? '수정' : '생성'}</Button>
               <Button variant="secondary" onClick={() => setIsConfirmOpen(false)} className="cursor-pointer">취소</Button>
@@ -386,13 +391,6 @@ export function AdminContestManagePage() {
                     <label className="mb-1 block text-sm font-medium text-slate-700">최대 참여 인원</label>
                     <input type="number" placeholder="공백 시 무제한" value={form.maxParticipants} onChange={e => setForm(f => ({ ...f, maxParticipants: e.target.value }))} className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none" />
                   </div>
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">수익률 산정 기준</label>
-                  <select value={form.profitStandard} onChange={e => setForm(f => ({ ...f, profitStandard: e.target.value as ProfitStandard }))} className="h-10 w-full rounded-md border border-slate-300 px-3 text-sm focus:border-[#1565C0] focus:outline-none">
-                    <option value="수익률">수익률 기준 (%)</option>
-                    <option value="금액">금액 기준 (원)</option>
-                  </select>
                 </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">대회 설명</label>

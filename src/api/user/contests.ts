@@ -35,4 +35,8 @@ export const contestsApi = {
   // 마감 대회 결과
   getContestResult: (contestId: number, params?: { page?: number; size?: number }) =>
     client.get(`/api/contests/${contestId}/result`, { params }).then(r => r.data.data),
+
+  // 대회에서 거래 가능한 종목 (전체 대회는 전 종목, 제한 대회는 지정 종목만)
+  getContestStocks: (contestId: number, params?: { keyword?: string; market?: string; page?: number; size?: number }) =>
+    client.get(`/api/contests/${contestId}/stocks`, { params }).then(r => r.data.data),
 };

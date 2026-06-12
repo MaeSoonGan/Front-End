@@ -6,8 +6,10 @@ import { OrderStockCard } from './OrderStockCard';
 import { OrderSummaryCard } from './OrderSummaryCard';
 import { OrderTypeToggle } from './OrderTypeToggle';
 import { useContestMode } from '../../contexts/ContestModeContext';
+import { useMaintenanceStatus } from '../../hooks/useMaintenanceStatus';
 import { portfolioApi } from '../../api/user/portfolio';
 import { orderApi } from '../../api/user/order';
+import { contestsApi } from '../../api/user/contests';
 import { parseApiError } from '../../api/parseApiError';
 import type { OrderFormState, OrderSide, OrderStockInfo, OrderType } from '../../types/order';
 import { cn } from '../../utils/cn';
@@ -77,6 +79,7 @@ export function OrderBottomSheet({
 }: OrderBottomSheetProps) {
   const { contestId, isContestMode } = useContestMode();
   const contestIdNum = isContestMode && contestId ? Number(contestId) : undefined;
+  const maintenance = useMaintenanceStatus();
 
   const getInitialFormState = (side: OrderSide = initialSide): OrderFormState => ({
     side,
@@ -90,6 +93,32 @@ export function OrderBottomSheet({
   const [submitting, setSubmitting] = useState(false);
   const [availableBalance, setAvailableBalance] = useState(0);
   const [holdingQuantity, setHoldingQuantity] = useState(0);
+  // 대회 모드: 이 종목이 대회에서 거래 가능한지(전체 대회면 항상 true, 제한 대회면 지정 종목만)
+  const [tradableInContest, setTradableInContest] = useState(true);
+
+  useEffect(() => {
+    if (!isOpen || contestIdNum == null) {
+      setTradableInContest(true);
+      return;
+    }
+    let cancelled = false;
+    contestsApi
+      .getContestStocks(contestIdNum, { keyword: stock.stockCode, size: 50 })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((res: any) => {
+        if (cancelled) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const items: any[] = res?.content ?? res?.items ?? [];
+        setTradableInContest(items.some((it) => (it.code ?? it.stockCode) === stock.stockCode));
+      })
+      .catch(() => {
+        // 조회 실패 시 막지 않음(서버가 STOCK_NOT_TRADABLE로 최종 검증)
+        if (!cancelled) setTradableInContest(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, contestIdNum, stock.stockCode]);
 
   // 주문창 열릴 때 주문가능금액(대회/일반) + 보유(매도가능)수량 조회
   useEffect(() => {
@@ -147,6 +176,16 @@ export function OrderBottomSheet({
   };
 
   const handleSubmitOrder = async () => {
+    if (maintenance) {
+      setErrorMessage('점검 중에는 주문할 수 없습니다.');
+      setSuccessMessage('');
+      return;
+    }
+    if (!tradableInContest) {
+      setErrorMessage('이 대회에서는 거래할 수 없는 종목입니다.');
+      setSuccessMessage('');
+      return;
+    }
     const nextErrorMessage = getOrderError({
       availableBalance,
       estimatedTotal,
@@ -234,16 +273,34 @@ export function OrderBottomSheet({
             holdingQuantity={holdingQuantity}
           />
 
+          {maintenance ? (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-700">
+              점검 중에는 주문할 수 없습니다.
+            </p>
+          ) : !tradableInContest ? (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-700">
+              이 대회에서는 거래할 수 없는 종목입니다.
+            </p>
+          ) : null}
+
           <button
             className={cn(
               'h-12 w-full rounded-xl text-sm font-extrabold text-white shadow-sm transition disabled:opacity-60',
               isBuy ? 'bg-red-500 hover:bg-red-600' : 'bg-[#1565C0] hover:bg-blue-700',
             )}
-            disabled={submitting}
+            disabled={submitting || maintenance || !tradableInContest}
             onClick={handleSubmitOrder}
             type="button"
           >
-            {submitting ? '처리 중...' : isBuy ? '매수 주문' : '매도 주문'}
+            {maintenance
+              ? '점검 중 (주문 불가)'
+              : !tradableInContest
+                ? '대회 거래 불가 종목'
+                : submitting
+                  ? '처리 중...'
+                  : isBuy
+                    ? '매수 주문'
+                    : '매도 주문'}
           </button>
         </div>
       </section>
