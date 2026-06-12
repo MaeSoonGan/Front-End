@@ -32,3 +32,12 @@ select {
   }
 }
 }
+
+/* 클릭 가능한 요소 hover 시 포인터 커서 (Tailwind v4 기본 cursor:default 보정).
+   admin 영역은 제외 — .app-cursor 스코프(user/auth/infra 레이아웃에만 부여) */
+.app-cursor button:not(:disabled),
+.app-cursor select:not(:disabled),
+.app-cursor input[type="date"]:not(:disabled),
+.app-cursor [role="button"]:not([aria-disabled="true"]) {
+  cursor: pointer;
+}

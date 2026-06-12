@@ -1,29 +1,26 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { OrderAmountForm } from '../../components/user/OrderAmountForm';
 import { OrderSideTabs } from '../../components/user/OrderSideTabs';
 import { OrderStockCard } from '../../components/user/OrderStockCard';
 import { OrderSummaryCard } from '../../components/user/OrderSummaryCard';
 import { OrderTypeToggle } from '../../components/user/OrderTypeToggle';
-import { orderAccountMock } from '../../mocks/orderMock';
-import { stockMock, stockMocks } from '../../mocks/stockMock';
+import { useContestMode } from '../../contexts/ContestModeContext';
+import { marketApi } from '../../api/user/market';
+import { portfolioApi } from '../../api/user/portfolio';
+import { orderApi } from '../../api/user/order';
+import { parseApiError } from '../../api/parseApiError';
 import type { OrderFormState, OrderSide, OrderStockInfo, OrderType } from '../../types/order';
 import { cn } from '../../utils/cn';
 
-function getInitialSide(side: string | null): OrderSide {
-  return side === 'SELL' ? 'SELL' : 'BUY';
+const FEE_RATE = 0.0015;
+
+interface StockView extends OrderStockInfo {
+  stockId: number;
 }
 
-function getStockInfo(stockCode: string | null): OrderStockInfo {
-  const stock = stockMocks.find((item) => item.summary.stockCode === stockCode) ?? stockMock;
-
-  return {
-    stockName: stock.summary.stockName,
-    stockCode: stock.summary.stockCode,
-    market: 'KOSPI',
-    currentPrice: stock.summary.currentPrice,
-    changeRate: stock.summary.changeRate,
-  };
+function getInitialSide(side: string | null): OrderSide {
+  return side === 'SELL' ? 'SELL' : 'BUY';
 }
 
 function parseNumber(value: string) {
@@ -74,32 +71,111 @@ function getOrderError({
 
 export function OrderPage() {
   const [searchParams] = useSearchParams();
-  const stock = useMemo(() => getStockInfo(searchParams.get('stockCode')), [searchParams]);
-  const getInitialFormState = (side: OrderSide = getInitialSide(searchParams.get('side'))): OrderFormState => ({
-    side,
-    orderType: 'LIMIT',
-    quantity: '',
-    price: String(stock.currentPrice),
-  });
+  const { contestId, isContestMode } = useContestMode();
+  const contestIdNum = isContestMode && contestId ? Number(contestId) : undefined;
+  const stockCode = searchParams.get('stockCode');
+
+  const [stock, setStock] = useState<StockView | null>(null);
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [holdingQuantity, setHoldingQuantity] = useState(0);
+  const [loading, setLoading] = useState(true);
+
   const [formState, setFormState] = useState<OrderFormState>({
     side: getInitialSide(searchParams.get('side')),
     orderType: 'LIMIT',
     quantity: '',
-    price: String(stock.currentPrice),
+    price: '',
   });
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  // 종목 시세 (stockId 포함)
+  useEffect(() => {
+    if (!stockCode) {
+      setLoading(false);
+      return;
+    }
+
+    let active = true;
+    setLoading(true);
+    marketApi
+      .getStockPrice(stockCode)
+      .then((d) => {
+        if (!active || !d) return;
+        const currentPrice = Number(d.price ?? 0);
+        setStock({
+          stockId: Number(d.stockId ?? 0),
+          stockName: d.name ?? '',
+          stockCode: d.code ?? stockCode,
+          market: '',
+          currentPrice,
+          changeRate: Number(d.changeRate ?? 0),
+        });
+        // 지정가 기본 가격 = 현재가 (아직 입력 전일 때만)
+        setFormState((cur) => (cur.price ? cur : { ...cur, price: String(currentPrice) }));
+      })
+      .catch(() => {
+        if (active) setStock(null);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [stockCode]);
+
+  // 주문가능금액(대회/일반) + 보유(매도가능)수량
+  useEffect(() => {
+    if (!stockCode) return;
+    let active = true;
+
+    (contestIdNum != null
+      ? portfolioApi.getContestAccount(contestIdNum)
+      : portfolioApi.getAvailableCash()
+    )
+      .then((d) => {
+        if (active && d) setAvailableBalance(Number(d.availableBalance ?? 0));
+      })
+      .catch(() => {});
+
+    portfolioApi
+      .getHolding(stockCode, contestIdNum)
+      .then((d) => {
+        if (active && d) setHoldingQuantity(Number(d.availableQuantity ?? d.quantity ?? 0));
+      })
+      .catch(() => {
+        if (active) setHoldingQuantity(0);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [stockCode, contestIdNum]);
 
   const quantity = parseNumber(formState.quantity);
-  const orderPrice = formState.orderType === 'MARKET' ? stock.currentPrice : parseNumber(formState.price);
+  const currentPrice = stock?.currentPrice ?? 0;
+  const orderPrice = formState.orderType === 'MARKET' ? currentPrice : parseNumber(formState.price);
   const estimatedAmount = quantity * orderPrice;
-  const fee = Math.round(estimatedAmount * orderAccountMock.feeRate);
+  const fee = Math.round(estimatedAmount * FEE_RATE);
   const estimatedTotal = estimatedAmount + fee;
+  const isBuy = formState.side === 'BUY';
+
+  const resetForm = (side: OrderSide) => {
+    setFormState({
+      side,
+      orderType: 'LIMIT',
+      quantity: '',
+      price: stock ? String(stock.currentPrice) : '',
+    });
+  };
 
   const handleChangeSide = (side: OrderSide) => {
     setErrorMessage('');
     setSuccessMessage('');
-    setFormState(getInitialFormState(side));
+    resetForm(side);
   };
 
   const handleChangeOrderType = (orderType: OrderType) => {
@@ -108,16 +184,20 @@ export function OrderPage() {
     setFormState((current) => ({
       ...current,
       orderType,
-      price: orderType === 'MARKET' ? String(stock.currentPrice) : current.price,
+      price: orderType === 'MARKET' ? String(currentPrice) : current.price,
     }));
   };
 
-  const handleSubmitOrder = () => {
+  const handleSubmitOrder = async () => {
+    if (!stock) {
+      return;
+    }
+
     const nextErrorMessage = getOrderError({
-      availableBalance: orderAccountMock.availableBalance,
+      availableBalance,
       estimatedTotal,
       formState,
-      holdingQuantity: orderAccountMock.holdingQuantity,
+      holdingQuantity,
       price: orderPrice,
       quantity,
     });
@@ -128,28 +208,50 @@ export function OrderPage() {
       return;
     }
 
-    const orderPayload = {
-      stockCode: stock.stockCode,
-      side: formState.side,
-      orderType: formState.orderType,
-      quantity,
-      price: orderPrice,
-      estimatedAmount,
-      fee,
-    };
-
-    console.log('mock order submit', orderPayload);
-    setErrorMessage('');
-    setSuccessMessage('주문이 접수되었습니다');
-    setFormState(getInitialFormState(formState.side));
+    setSubmitting(true);
+    try {
+      await orderApi.createOrder({
+        contestId: contestIdNum,
+        stockId: stock.stockId,
+        stockCode: stock.stockCode,
+        side: formState.side,
+        orderType: formState.orderType,
+        price: formState.orderType === 'LIMIT' ? orderPrice : undefined,
+        quantity,
+      });
+      setErrorMessage('');
+      setSuccessMessage('주문이 접수되었습니다');
+      resetForm(formState.side);
+    } catch (e) {
+      setErrorMessage(parseApiError(e));
+      setSuccessMessage('');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCloseSuccessModal = () => {
     setSuccessMessage('');
-    setFormState(getInitialFormState(formState.side));
+    resetForm(formState.side);
   };
 
-  const isBuy = formState.side === 'BUY';
+  if (loading) {
+    return (
+      <div className="px-4 pb-24 pt-4">
+        <p className="py-12 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
+      </div>
+    );
+  }
+
+  if (!stock) {
+    return (
+      <div className="px-4 pb-24 pt-4">
+        <p className="py-12 text-center text-xs font-bold text-[#A3B4C6]">
+          종목 정보를 불러올 수 없습니다.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 pb-24 pt-4">
@@ -174,21 +276,22 @@ export function OrderPage() {
           }}
         />
         <OrderSummaryCard
-          availableBalance={orderAccountMock.availableBalance}
+          availableBalance={availableBalance}
           estimatedAmount={estimatedAmount}
           fee={fee}
-          holdingQuantity={orderAccountMock.holdingQuantity}
+          holdingQuantity={holdingQuantity}
         />
 
         <button
           className={cn(
-            'h-12 w-full rounded-xl text-sm font-extrabold text-white shadow-sm transition',
+            'h-12 w-full rounded-xl text-sm font-extrabold text-white shadow-sm transition disabled:opacity-60',
             isBuy ? 'bg-red-500 hover:bg-red-600' : 'bg-[#1565C0] hover:bg-blue-700',
           )}
+          disabled={submitting}
           onClick={handleSubmitOrder}
           type="button"
         >
-          {isBuy ? '매수 주문' : '매도 주문'}
+          {submitting ? '처리 중...' : isBuy ? '매수 주문' : '매도 주문'}
         </button>
       </div>
       {successMessage ? (

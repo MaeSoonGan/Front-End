@@ -5,6 +5,7 @@ import { Card } from '../../../components/common/Card';
 import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 import { contestsApi } from '../../../api/admin/contests';
+import { downloadCsv } from '../../../utils/download';
 
 type RankingStatus = 'NORMAL' | 'EXCLUDED';
 
@@ -129,6 +130,18 @@ export function AdminRankingPage() {
   const handleRefreshRef = useRef(handleRefresh);
   useEffect(() => { handleRefreshRef.current = handleRefresh; });
 
+  async function handleCsvExport() {
+    if (!selectedContestId) return;
+    try {
+      const blob = await contestsApi.exportRankings(Number(selectedContestId));
+      downloadCsv(blob, `contest-${selectedContestId}-rankings`);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  const handleCsvExportRef = useRef(handleCsvExport);
+  useEffect(() => { handleCsvExportRef.current = handleCsvExport; });
+
   const stats = useMemo(() => {
     const normal   = entries.filter(e => e.status === 'NORMAL');
     const excluded = entries.filter(e => e.status === 'EXCLUDED');
@@ -183,7 +196,7 @@ export function AdminRankingPage() {
     <div className="flex items-center gap-2">
       <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-600">정상 랭킹 집계</span>
       <HeaderRefreshTime initial={lastRefreshTime} />
-      <Button variant="secondary" className="h-9 gap-1.5 text-sm"><Download size={14} />CSV 내보내기</Button>
+      <Button variant="secondary" className="h-9 gap-1.5 text-sm" onClick={() => handleCsvExportRef.current()}><Download size={14} />CSV 내보내기</Button>
       <Button variant="brand" className="h-9 gap-1.5 text-sm" onClick={() => handleRefreshRef.current()}><RefreshCw size={14} />수동 갱신</Button>
     </div>
   );

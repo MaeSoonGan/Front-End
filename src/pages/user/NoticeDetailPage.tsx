@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronLeft } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { PageContainer } from '../../components/common/PageContainer';
 import { noticesApi } from '../../api/user/notices';
 import { parseApiError } from '../../api/parseApiError';
@@ -10,6 +9,7 @@ interface NoticeDetail {
   title: string;
   content: string;
   isPinned: boolean;
+  author: string;
   date: string;
 }
 
@@ -22,7 +22,6 @@ function formatDate(iso: string): string {
 
 export function NoticeDetailPage() {
   const { noticeId } = useParams<{ noticeId: string }>();
-  const navigate = useNavigate();
   const [notice, setNotice] = useState<NoticeDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -36,6 +35,7 @@ export function NoticeDetailPage() {
           title: data.title ?? '',
           content: data.content ?? '',
           isPinned: data.isPinned ?? false,
+          author: data.authorName ?? '운영자',
           date: formatDate(data.createdAt),
         });
       })
@@ -45,18 +45,6 @@ export function NoticeDetailPage() {
 
   return (
     <PageContainer className="min-h-full bg-[#F3F7FC] pt-3">
-      <header className="mb-4 flex items-center gap-2">
-        <button
-          aria-label="뒤로가기"
-          className="flex h-8 w-8 items-center justify-center rounded-full text-slate-700 transition hover:bg-blue-50"
-          onClick={() => navigate(-1)}
-          type="button"
-        >
-          <ChevronLeft size={20} strokeWidth={2.5} />
-        </button>
-        <h1 className="text-base font-extrabold text-slate-950">공지사항</h1>
-      </header>
-
       {loading ? (
         <p className="py-10 text-center text-xs font-bold text-[#6C88A4]">공지를 불러오는 중...</p>
       ) : error ? (
@@ -67,7 +55,7 @@ export function NoticeDetailPage() {
             {notice.isPinned ? '📌 ' : ''}{notice.title}
           </p>
           <div className="mt-2 flex items-center gap-2 text-[11px] font-bold text-[#6C88A4]">
-            <span>운영자</span>
+            <span>{notice.author}</span>
             <span>·</span>
             <span>{notice.date}</span>
           </div>

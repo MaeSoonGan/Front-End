@@ -1,20 +1,19 @@
-import { useEffect, useState } from 'react';
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useContestMode } from '../../contexts/ContestModeContext';
 import { noticesApi } from '../../api/user/notices';
 import { parseApiError } from '../../api/parseApiError';
-import { getPaginationPages } from '../../utils/pagination';
 
 interface Notice {
   id: number;
   title: string;
   content: string;
   isPinned: boolean;
+  author: string;
   date: string;
 }
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
 function formatDate(iso: string): string {
   if (!iso) return '';
@@ -27,31 +26,66 @@ export function NoticePage() {
   const navigate = useNavigate();
   const { getContestPath, isContestMode } = useContestMode();
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [totalPages, setTotalPages] = useState(1);
-  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [hasMore, setHasMore] = useState(false);
+
+  const pageRef = useRef(0);
+  const loadingRef = useRef(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const loadNotices = useCallback(async (reset: boolean) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    const nextPage = reset ? 0 : pageRef.current + 1;
+    if (reset) setLoading(true);
+    else setLoadingMore(true);
+    try {
+      const data = await noticesApi.getNotices({ page: nextPage, size: PAGE_SIZE });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const items: Notice[] = (data.content ?? []).map((n: any) => ({
+        id: n.noticeId,
+        title: n.title ?? '',
+        content: n.content ?? '',
+        isPinned: n.isPinned ?? false,
+        author: n.authorName ?? '운영자',
+        date: formatDate(n.createdAt),
+      }));
+      pageRef.current = nextPage;
+      setNotices((prev) => (reset ? items : [...prev, ...items]));
+      const totalPages = data.totalPages && data.totalPages > 0 ? data.totalPages : 1;
+      setHasMore(nextPage + 1 < totalPages);
+      setError('');
+    } catch (e) {
+      setError(parseApiError(e));
+    } finally {
+      if (reset) setLoading(false);
+      else setLoadingMore(false);
+      loadingRef.current = false;
+    }
+  }, []);
 
   useEffect(() => {
-    setLoading(true);
-    noticesApi.getNotices({ page: currentPage - 1, size: PAGE_SIZE })
-      .then(data => {
-        setNotices(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (data.content ?? []).map((n: any) => ({
-            id: n.noticeId,
-            title: n.title ?? '',
-            content: n.content ?? '',
-            isPinned: n.isPinned ?? false,
-            date: formatDate(n.createdAt),
-          })),
-        );
-        setTotalPages(data.totalPages && data.totalPages > 0 ? data.totalPages : 1);
-        setError('');
-      })
-      .catch(e => setError(parseApiError(e)))
-      .finally(() => setLoading(false));
-  }, [currentPage]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadNotices(true);
+  }, [loadNotices]);
+
+  // 무한 스크롤: 하단 sentinel이 보이면 다음 페이지 로드
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+          loadNotices(false);
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadNotices]);
 
   const goDetail = (id: number) => {
     const path = `/notices/${id}`;
@@ -81,7 +115,7 @@ export function NoticePage() {
                       {notice.isPinned ? '📌 ' : ''}{notice.title}
                     </p>
                     <p className="mt-2 truncate text-xs leading-5 text-[#6C88A4]">{notice.content}</p>
-                    <p className="mt-2 text-[11px] font-bold text-slate-900">작성자: 운영자</p>
+                    <p className="mt-2 text-[11px] font-bold text-slate-900">작성자: {notice.author}</p>
                   </div>
                   <span className="shrink-0 text-[11px] font-bold text-slate-900">
                     {notice.date}
@@ -89,65 +123,14 @@ export function NoticePage() {
                 </div>
               </article>
             ))}
-            {Array.from({ length: Math.max(0, PAGE_SIZE - notices.length) }).map((_, i) => (
-              <article key={`ghost-${i}`} aria-hidden className="invisible rounded-2xl border border-blue-100 p-4">
-                <p className="truncate text-sm font-extrabold">&nbsp;</p>
-                <p className="mt-2 truncate text-xs leading-5">&nbsp;</p>
-                <p className="mt-2 text-[11px] font-bold">&nbsp;</p>
-              </article>
-            ))}
+            {/* 무한 스크롤 감지용 sentinel */}
+            <div ref={sentinelRef} aria-hidden className="h-1" />
+            {loadingMore && (
+              <p className="py-3 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
+            )}
           </>
         )}
       </section>
-
-      {!loading && !error && notices.length > 0 && (
-        <div className="mt-auto flex items-center justify-center gap-1 pt-5">
-          <button
-            className="cursor-pointer rounded p-1 text-[#6C88A4] hover:bg-blue-50 disabled:cursor-default disabled:opacity-40"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage(1)}
-            type="button"
-          >
-            <ChevronsLeft size={16} />
-          </button>
-          <button
-            className="cursor-pointer rounded p-1 text-[#6C88A4] hover:bg-blue-50 disabled:cursor-default disabled:opacity-40"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            type="button"
-          >
-            <ChevronLeft size={16} />
-          </button>
-          {getPaginationPages(currentPage, totalPages).map((page) => (
-            <button
-              className={`min-w-7 cursor-pointer rounded px-2 py-1 text-xs font-bold ${
-                currentPage === page ? 'bg-[#1565C0] text-white' : 'text-[#6C88A4] hover:bg-blue-50'
-              }`}
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              type="button"
-            >
-              {page}
-            </button>
-          ))}
-          <button
-            className="cursor-pointer rounded p-1 text-[#6C88A4] hover:bg-blue-50 disabled:cursor-default disabled:opacity-40"
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            type="button"
-          >
-            <ChevronRight size={16} />
-          </button>
-          <button
-            className="cursor-pointer rounded p-1 text-[#6C88A4] hover:bg-blue-50 disabled:cursor-default disabled:opacity-40"
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage(totalPages)}
-            type="button"
-          >
-            <ChevronsRight size={16} />
-          </button>
-        </div>
-      )}
     </div>
   );
 }

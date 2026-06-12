@@ -131,6 +131,7 @@ export function AdminNoticeManagePage() {
         status:  activeTab === 'ALL' ? undefined : activeTab,
         page:    currentPage - 1,
         size:    PAGE_SIZE,
+        sort:    sortDir ? `createdAt,${sortDir}` : undefined,
       });
       setNotices(
         (data.content ?? []).map((n: any) => ({
@@ -151,21 +152,12 @@ export function AdminNoticeManagePage() {
     } finally {
       setLoading(false);
     }
-  }, [appliedSearch, activeTab, currentPage]);
+  }, [appliedSearch, activeTab, currentPage, sortDir]);
 
   useEffect(() => { fetchNotices(); }, [fetchNotices]);
 
-  const filtered = useMemo(() => {
-    return [...notices].sort((a, b) => {
-      const pinOrder = Number(b.isPinned) - Number(a.isPinned);
-      if (pinOrder !== 0) return pinOrder;
-      if (sortDir) {
-        const cmp = a.createdAt.localeCompare(b.createdAt);
-        return sortDir === 'asc' ? cmp : -cmp;
-      }
-      return 0;
-    });
-  }, [notices, sortDir]);
+  // 정렬(고정글 우선 + 작성일)은 서버에서 전체 데이터 기준으로 처리됨(fetchNotices의 sort 파라미터)
+  const filtered = notices;
 
   const safePage   = Math.min(currentPage, totalPages);
   const ghostCount = PAGE_SIZE - Math.max(filtered.length, filtered.length === 0 ? 1 : 0);

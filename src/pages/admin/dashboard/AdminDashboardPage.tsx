@@ -20,7 +20,7 @@ import { membersApi } from '../../../api/admin/members';
 
 // ---- Types ----
 
-type AlertType = 'ABNORMAL_ORDER' | 'DUPLICATE_ORDER';
+type AlertType = 'ABNORMAL_ORDER' | 'DUPLICATE_ORDER' | 'ABNORMAL_MEMBER';
 type ActivityType = 'SUSPEND' | 'SEED' | 'CONTEST' | 'ORDER_CANCEL';
 type ContestStatus = 'ACTIVE' | 'CLOSING_SOON';
 
@@ -72,6 +72,7 @@ interface ActivityItem {
 const ALERT_TYPE_LABEL: Record<AlertType, string> = {
   ABNORMAL_ORDER: '대량 주문 탐지',
   DUPLICATE_ORDER: '중복 주문 탐지',
+  ABNORMAL_MEMBER: '로그인 다수 실패',
 };
 
 const CONTEST_STATUS_TONE: Record<ContestStatus, StatusTone> = {
@@ -129,7 +130,7 @@ export function AdminDashboardPage() {
 
   const [alertConfirm, setAlertConfirm] = useState<{
     alertId: string;
-    action: 'suspend' | 'cancel' | 'dismiss';
+    action: 'release' | 'cancel' | 'dismiss';
     memberId: string;
     orderId?: string;
   } | null>(null);
@@ -203,13 +204,13 @@ export function AdminDashboardPage() {
   const totalActivityPages = Math.max(1, Math.ceil(activities.length / ACTIVITY_PAGE_SIZE));
   const pagedActivities    = activities.slice((activityPage - 1) * ACTIVITY_PAGE_SIZE, activityPage * ACTIVITY_PAGE_SIZE);
 
-  async function handleSuspend(memberId: string) {
+  async function handleRelease(alertId: string) {
     try {
-      await membersApi.suspendMembers({ memberIds: [Number(memberId)], reason: '비정상 탐지 — 관리자 즉시 처리' });
-      setAlerts(prev => prev.filter(a => a.memberId !== memberId));
+      await systemApi.releaseAlert(Number(alertId));
     } catch (e) {
       console.error(e);
     }
+    setAlerts(prev => prev.filter(a => a.id !== alertId));
   }
 
   async function handleDismiss(alertId: string) {
@@ -242,15 +243,15 @@ export function AdminDashboardPage() {
         if (!target) return null;
 
         const ACTION_META = {
-          cancel:  { label: '주문취소', desc: `"${target.memberName}(${target.userId})"의 해당 주문을 강제 취소합니다.`, btnVariant: 'secondary' as const },
-          suspend: { label: '계정정지', desc: `"${target.memberName}(${target.userId})" 계정을 즉시 정지합니다.`,       btnVariant: 'danger'    as const },
-          dismiss: { label: '무시',     desc: '해당 탐지 알림을 목록에서 제거합니다.',                                    btnVariant: 'secondary' as const },
+          cancel:  { label: '주문 취소', desc: `"${target.memberName}(${target.userId})"의 해당 주문을 강제 취소합니다.`,      btnVariant: 'danger'    as const },
+          release: { label: '정지 해제', desc: `"${target.memberName}(${target.userId})"의 자동 정지를 해제하고 로그인 실패를 초기화합니다.`, btnVariant: 'danger' as const },
+          dismiss: { label: '확인',     desc: '해당 탐지 알림을 확인 처리하여 목록에서 제거합니다.',                              btnVariant: 'secondary' as const },
         };
         const meta = ACTION_META[alertConfirm.action];
 
         async function handleConfirm() {
           if (alertConfirm!.action === 'cancel')  handleCancelOrder(alertConfirm!.orderId ?? alertConfirm!.alertId);
-          if (alertConfirm!.action === 'suspend') await handleSuspend(alertConfirm!.memberId);
+          if (alertConfirm!.action === 'release') await handleRelease(alertConfirm!.alertId);
           if (alertConfirm!.action === 'dismiss') await handleDismiss(alertConfirm!.alertId);
           setAlertConfirm(null);
         }
@@ -317,9 +318,14 @@ export function AdminDashboardPage() {
                   <p className="mt-0.5 text-sm text-slate-500">{alert.description}</p>
                 </div>
                 <div className="ml-4 flex shrink-0 gap-2">
-                  <Button variant="secondary" className="h-8 px-3 text-xs" onClick={() => setAlertConfirm({ alertId: alert.id, action: 'cancel', memberId: alert.memberId, orderId: alert.orderId })}>주문취소</Button>
-                  <Button variant="danger" className="h-8 px-3 text-xs" onClick={() => setAlertConfirm({ alertId: alert.id, action: 'suspend', memberId: alert.memberId })}>계정정지</Button>
-                  <Button variant="ghost" className="h-8 border border-slate-300 px-3 text-xs" onClick={() => setAlertConfirm({ alertId: alert.id, action: 'dismiss', memberId: alert.memberId })}>무시</Button>
+                  {alert.orderId ? (
+                    // 거래 관련 비정상 탐지: 주문 취소
+                    <Button variant="danger" className="h-8 px-3 text-xs" onClick={() => setAlertConfirm({ alertId: alert.id, action: 'cancel', memberId: alert.memberId, orderId: alert.orderId })}>주문 취소</Button>
+                  ) : (
+                    // 로그인 관련 비정상 탐지(자동 정지): 정지 해제
+                    <Button variant="danger" className="h-8 px-3 text-xs" onClick={() => setAlertConfirm({ alertId: alert.id, action: 'release', memberId: alert.memberId })}>정지 해제</Button>
+                  )}
+                  <Button variant="ghost" className="h-8 border border-slate-300 px-3 text-xs" onClick={() => setAlertConfirm({ alertId: alert.id, action: 'dismiss', memberId: alert.memberId })}>확인</Button>
                 </div>
               </div>
             ))}

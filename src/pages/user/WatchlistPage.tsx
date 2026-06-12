@@ -12,14 +12,17 @@ export function WatchlistPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const fetchWatchlist = useCallback(async () => {
+  // 가격은 ws 대신 RDS 스냅샷(getWatchlist)에서 주기 폴링으로 갱신 (실시간 순위와 동일 방식)
+  const fetchWatchlist = useCallback(async (silent = false) => {
     // 해외는 백엔드 미지원 → 조회 생략
     if (activeMarket === 'OVERSEAS') {
       setWatchlistItems([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       const data = await marketApi.getWatchlist('domestic');
       setWatchlistItems(
@@ -36,15 +39,25 @@ export function WatchlistPage() {
       );
       setError('');
     } catch (e) {
-      setError(parseApiError(e));
+      if (!silent) {
+        setError(parseApiError(e));
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [activeMarket]);
 
   useEffect(() => {
     fetchWatchlist();
-  }, [fetchWatchlist]);
+    if (activeMarket === 'OVERSEAS') {
+      return;
+    }
+    // 주기 폴링(15초)으로 스냅샷 가격 갱신 — 로딩 표시 없이 조용히
+    const timer = window.setInterval(() => fetchWatchlist(true), 15000);
+    return () => window.clearInterval(timer);
+  }, [fetchWatchlist, activeMarket]);
 
   const handleRemoveWatchlist = async (id: string) => {
     try {

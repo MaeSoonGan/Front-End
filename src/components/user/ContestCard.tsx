@@ -44,39 +44,38 @@ function isParticipantNearlyFull(contest: ContestListItem) {
   return contest.currentParticipants / contest.maxParticipants >= 0.9;
 }
 
-function isContestFull(contest: ContestListItem) {
-  return contest.maxParticipants !== null && contest.currentParticipants >= contest.maxParticipants;
-}
-
 export function ContestCard({ contest, isJoining, onJoin }: ContestCardProps) {
   const navigate = useNavigate();
-  const isFull = isContestFull(contest);
   const hasJoined = contest.isJoined;
-  const canJoin = contest.status === 'ACTIVE' && !hasJoined && !isFull;
-  const canEnter = contest.status === 'ACTIVE' && hasJoined;
-  const isFullWithoutJoin = contest.status === 'ACTIVE' && isFull && !hasJoined;
+  // 참가 가능 여부는 백엔드 판단(joinable)을 따른다.
+  // 단, 시작 전(SCHEDULED) 대회는 참가 불가 — "개최 예정" 버튼이 join을 호출하지 않도록 명시적으로 차단.
+  const canJoin = contest.joinable && !hasJoined && contest.status !== 'SCHEDULED';
+  // 참가했고 진행 중인 대회는 입장 가능
+  const canEnter = hasJoined && contest.status === 'ACTIVE';
 
   const actionLabel =
     contest.status === 'ENDED'
       ? '결과 보기'
       : contest.status === 'SCHEDULED'
         ? '개최 예정'
-        : hasJoined
+        : canEnter
           ? '입장하기'
-          : isFull
-            ? '마감'
-            : isJoining
-              ? '참가 처리 중'
-              : '참가하기';
+          : hasJoined
+            ? '참가 완료'
+            : canJoin
+              ? (isJoining ? '참가 처리 중' : '참가하기')
+              : '참가 불가';
 
   const buttonStyle =
     contest.status === 'ENDED'
       ? 'border border-[#1565C0] bg-[#1565C0] text-white hover:bg-[#0f55a5]'
-      : contest.status === 'SCHEDULED'
-        ? 'border border-slate-600 bg-slate-400 text-white hover:bg-slate-400'
-        : isFullWithoutJoin
-          ? 'border border-blue-100 bg-[#F0F6FF] text-[#3F5872] hover:bg-[#F0F6FF]'
-          : 'bg-[#1565C0] text-white hover:bg-[#0f55a5]';
+      : canEnter || canJoin
+        ? 'bg-[#1565C0] text-white hover:bg-[#0f55a5]'
+        : 'cursor-default border border-blue-100 bg-[#E8F0FA] text-[#6C88A4] hover:bg-[#E8F0FA]';
+
+  // 참가 처리 중에만 실제 disabled(중복 클릭 방지). 그 외 비활성 상태(개최 예정 등)는
+  // disabled로 흐리게 하지 않고, 핸들러에서 무반응 처리한다.
+  const isDisabled = isJoining;
 
   const handleActionClick = () => {
     if (contest.status === 'ENDED') {
@@ -136,8 +135,11 @@ export function ContestCard({ contest, isJoining, onJoin }: ContestCardProps) {
       </div>
 
       <Button
-        className={cn('mt-4 h-11 w-full rounded-xl text-sm font-extrabold', buttonStyle)}
-        disabled={isJoining || (contest.status !== 'ENDED' && !canJoin && !canEnter)}
+        className={cn(
+          'mt-4 h-11 w-full rounded-xl text-sm font-extrabold disabled:opacity-100',
+          buttonStyle,
+        )}
+        disabled={isDisabled}
         onClick={handleActionClick}
         variant="brand"
       >

@@ -5,16 +5,19 @@ interface OrderBookRowProps {
   order: OrderBookItem;
   side: 'ask' | 'bid';
   maxQuantity: number;
+  currentPrice: number;
 }
 
 function formatPrice(value: number) {
   return value.toLocaleString('ko-KR');
 }
 
-export function OrderBookRow({ order, side, maxQuantity }: OrderBookRowProps) {
+export function OrderBookRow({ order, side, maxQuantity, currentPrice }: OrderBookRowProps) {
   const barWidth = `${Math.max((order.quantity / maxQuantity) * 100, 8)}%`;
   const isAsk = side === 'ask';
-  const changePrefix = order.changeRate > 0 ? '+' : '';
+  // 현재가 대비 등락률 = (호가가격 - 현재가) / 현재가 × 100 (현재가가 실시간 변하면 같이 갱신)
+  const rate = currentPrice > 0 ? ((order.price - currentPrice) / currentPrice) * 100 : 0;
+  const changePrefix = rate > 0 ? '+' : '';
 
   return (
     <div className="relative grid min-h-12 grid-cols-3 items-center overflow-hidden border-b border-slate-100 bg-white px-2">
@@ -34,7 +37,7 @@ export function OrderBookRow({ order, side, maxQuantity }: OrderBookRowProps) {
         </p>
         <p className={cn('text-[10px] font-bold', isAsk ? 'text-blue-500' : 'text-red-400')}>
           {changePrefix}
-          {order.changeRate.toFixed(2)}%
+          {rate.toFixed(2)}%
         </p>
       </div>
       <div className="relative z-[1] pr-[5px] text-right text-xs font-bold text-[#6C88A4]">

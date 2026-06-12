@@ -1,19 +1,27 @@
 import { X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { OrderAmountForm } from './OrderAmountForm';
 import { OrderSideTabs } from './OrderSideTabs';
 import { OrderStockCard } from './OrderStockCard';
 import { OrderSummaryCard } from './OrderSummaryCard';
 import { OrderTypeToggle } from './OrderTypeToggle';
-import { orderAccountMock } from '../../mocks/orderMock';
+import { useContestMode } from '../../contexts/ContestModeContext';
+import { useMaintenanceStatus } from '../../hooks/useMaintenanceStatus';
+import { portfolioApi } from '../../api/user/portfolio';
+import { orderApi } from '../../api/user/order';
+import { contestsApi } from '../../api/user/contests';
+import { parseApiError } from '../../api/parseApiError';
 import type { OrderFormState, OrderSide, OrderStockInfo, OrderType } from '../../types/order';
 import { cn } from '../../utils/cn';
+
+const FEE_RATE = 0.0015;
 
 interface OrderBottomSheetProps {
   initialSide: OrderSide;
   isOpen: boolean;
   onClose: () => void;
   stock: OrderStockInfo;
+  stockId: number;
 }
 
 function parseNumber(value: string) {
@@ -21,13 +29,17 @@ function parseNumber(value: string) {
 }
 
 function getOrderError({
+  availableBalance,
   estimatedTotal,
   formState,
+  holdingQuantity,
   price,
   quantity,
 }: {
+  availableBalance: number;
   estimatedTotal: number;
   formState: OrderFormState;
+  holdingQuantity: number;
   price: number;
   quantity: number;
 }) {
@@ -47,11 +59,11 @@ function getOrderError({
     return '주문 가격은 1원 이상 입력해주세요';
   }
 
-  if (formState.side === 'BUY' && estimatedTotal > orderAccountMock.availableBalance) {
+  if (formState.side === 'BUY' && estimatedTotal > availableBalance) {
     return '주문 가능 금액을 초과했습니다';
   }
 
-  if (formState.side === 'SELL' && quantity > orderAccountMock.holdingQuantity) {
+  if (formState.side === 'SELL' && quantity > holdingQuantity) {
     return '보유 수량을 초과하여 매도할 수 없습니다';
   }
 
@@ -63,21 +75,78 @@ export function OrderBottomSheet({
   isOpen,
   onClose,
   stock,
+  stockId,
 }: OrderBottomSheetProps) {
+  const { contestId, isContestMode } = useContestMode();
+  const contestIdNum = isContestMode && contestId ? Number(contestId) : undefined;
+  const maintenance = useMaintenanceStatus();
+
   const getInitialFormState = (side: OrderSide = initialSide): OrderFormState => ({
     side,
     orderType: 'LIMIT',
     quantity: '',
     price: String(stock.currentPrice),
   });
-  const [formState, setFormState] = useState<OrderFormState>({
-    side: initialSide,
-    orderType: 'LIMIT',
-    quantity: '',
-    price: String(stock.currentPrice),
-  });
+  const [formState, setFormState] = useState<OrderFormState>(() => getInitialFormState());
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [holdingQuantity, setHoldingQuantity] = useState(0);
+  // 대회 모드: 이 종목이 대회에서 거래 가능한지(전체 대회면 항상 true, 제한 대회면 지정 종목만)
+  const [tradableInContest, setTradableInContest] = useState(true);
+
+  useEffect(() => {
+    if (!isOpen || contestIdNum == null) {
+      setTradableInContest(true);
+      return;
+    }
+    let cancelled = false;
+    contestsApi
+      .getContestStocks(contestIdNum, { keyword: stock.stockCode, size: 50 })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((res: any) => {
+        if (cancelled) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const items: any[] = res?.content ?? res?.items ?? [];
+        setTradableInContest(items.some((it) => (it.code ?? it.stockCode) === stock.stockCode));
+      })
+      .catch(() => {
+        // 조회 실패 시 막지 않음(서버가 STOCK_NOT_TRADABLE로 최종 검증)
+        if (!cancelled) setTradableInContest(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, contestIdNum, stock.stockCode]);
+
+  // 주문창 열릴 때 주문가능금액(대회/일반) + 보유(매도가능)수량 조회
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+
+    (contestIdNum != null
+      ? portfolioApi.getContestAccount(contestIdNum)
+      : portfolioApi.getAvailableCash()
+    )
+      .then((d) => {
+        if (active && d) setAvailableBalance(Number(d.availableBalance ?? 0));
+      })
+      .catch(() => {});
+
+    portfolioApi
+      .getHolding(stock.stockCode, contestIdNum)
+      .then((d) => {
+        if (active && d) setHoldingQuantity(Number(d.availableQuantity ?? d.quantity ?? 0));
+      })
+      .catch(() => {
+        if (active) setHoldingQuantity(0);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, stock.stockCode, contestIdNum]);
 
   if (!isOpen) {
     return null;
@@ -86,7 +155,7 @@ export function OrderBottomSheet({
   const quantity = parseNumber(formState.quantity);
   const orderPrice = formState.orderType === 'MARKET' ? stock.currentPrice : parseNumber(formState.price);
   const estimatedAmount = quantity * orderPrice;
-  const fee = Math.round(estimatedAmount * orderAccountMock.feeRate);
+  const fee = Math.round(estimatedAmount * FEE_RATE);
   const estimatedTotal = estimatedAmount + fee;
   const isBuy = formState.side === 'BUY';
 
@@ -106,10 +175,22 @@ export function OrderBottomSheet({
     }));
   };
 
-  const handleSubmitOrder = () => {
+  const handleSubmitOrder = async () => {
+    if (maintenance) {
+      setErrorMessage('점검 중에는 주문할 수 없습니다.');
+      setSuccessMessage('');
+      return;
+    }
+    if (!tradableInContest) {
+      setErrorMessage('이 대회에서는 거래할 수 없는 종목입니다.');
+      setSuccessMessage('');
+      return;
+    }
     const nextErrorMessage = getOrderError({
+      availableBalance,
       estimatedTotal,
       formState,
+      holdingQuantity,
       price: orderPrice,
       quantity,
     });
@@ -120,18 +201,26 @@ export function OrderBottomSheet({
       return;
     }
 
-    console.log('mock order submit', {
-      stockCode: stock.stockCode,
-      side: formState.side,
-      orderType: formState.orderType,
-      quantity,
-      price: orderPrice,
-      estimatedAmount,
-      fee,
-    });
-    setErrorMessage('');
-    setSuccessMessage('주문이 접수되었습니다');
-    setFormState(getInitialFormState(formState.side));
+    setSubmitting(true);
+    try {
+      await orderApi.createOrder({
+        contestId: contestIdNum,
+        stockId,
+        stockCode: stock.stockCode,
+        side: formState.side,
+        orderType: formState.orderType,
+        price: formState.orderType === 'LIMIT' ? orderPrice : undefined,
+        quantity,
+      });
+      setErrorMessage('');
+      setSuccessMessage('주문이 접수되었습니다');
+      setFormState(getInitialFormState(formState.side));
+    } catch (e) {
+      setErrorMessage(parseApiError(e));
+      setSuccessMessage('');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleCloseSuccessModal = () => {
@@ -178,21 +267,40 @@ export function OrderBottomSheet({
             }}
           />
           <OrderSummaryCard
-            availableBalance={orderAccountMock.availableBalance}
+            availableBalance={availableBalance}
             estimatedAmount={estimatedAmount}
             fee={fee}
-            holdingQuantity={orderAccountMock.holdingQuantity}
+            holdingQuantity={holdingQuantity}
           />
+
+          {maintenance ? (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-700">
+              점검 중에는 주문할 수 없습니다.
+            </p>
+          ) : !tradableInContest ? (
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-center text-xs font-bold text-amber-700">
+              이 대회에서는 거래할 수 없는 종목입니다.
+            </p>
+          ) : null}
 
           <button
             className={cn(
-              'h-12 w-full rounded-xl text-sm font-extrabold text-white shadow-sm transition',
+              'h-12 w-full rounded-xl text-sm font-extrabold text-white shadow-sm transition disabled:opacity-60',
               isBuy ? 'bg-red-500 hover:bg-red-600' : 'bg-[#1565C0] hover:bg-blue-700',
             )}
+            disabled={submitting || maintenance || !tradableInContest}
             onClick={handleSubmitOrder}
             type="button"
           >
-            {isBuy ? '매수 주문' : '매도 주문'}
+            {maintenance
+              ? '점검 중 (주문 불가)'
+              : !tradableInContest
+                ? '대회 거래 불가 종목'
+                : submitting
+                  ? '처리 중...'
+                  : isBuy
+                    ? '매수 주문'
+                    : '매도 주문'}
           </button>
         </div>
       </section>

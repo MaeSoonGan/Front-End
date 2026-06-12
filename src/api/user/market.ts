@@ -13,6 +13,14 @@ export const marketApi = {
   getRanking: (type?: string) =>
     client.get('/api/market/ranking', { params: type ? { type } : undefined }).then(r => r.data.data),
 
+  // 실시간 조회상위 랭킹 (market-service, RDS 스냅샷 — 종목명 조인 + 마지막 실제값) — success/data 래퍼
+  getHtsTopViewRanking: () =>
+    client.get('/api/market/ranking/hts-top-view').then(r => r.data.data),
+
+  // 코스피/코스닥 지수 (market-service, RDS 스냅샷 — 마지막 실제값 유지) — success/data 래퍼
+  getRealtimeIndices: () =>
+    client.get('/api/market/indices').then(r => r.data.data),
+
   // 종목 현재가
   getStockPrice: (code: string) =>
     client.get(`/api/stocks/${code}/price`).then(r => r.data.data),
@@ -20,6 +28,10 @@ export const marketApi = {
   // 종목 일별 정보 (시/고/저/전일종가)
   getStockDailyInfo: (code: string) =>
     client.get(`/api/stocks/${code}/daily-info`).then(r => r.data.data),
+
+  // 종목 차트 캔들 (period D/W/M, range/from/to)
+  getStockChart: (code: string, params?: { period?: string; range?: string; from?: string; to?: string }) =>
+    client.get(`/api/stocks/${code}/chart`, { params }).then(r => r.data.data),
 
   // 종목 호가
   getStockOrderbook: (code: string) =>

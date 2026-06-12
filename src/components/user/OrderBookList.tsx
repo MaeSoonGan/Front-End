@@ -27,9 +27,10 @@ export function OrderBookList({ orderBook, summary }: OrderBookListProps) {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-blue-100">
-        {orderBook.askOrders.map((order) => (
+        {[...orderBook.askOrders].reverse().map((order) => (
           <OrderBookRow
             key={`ask-${order.price}`}
+            currentPrice={summary.currentPrice}
             maxQuantity={maxQuantity}
             order={order}
             side="ask"
@@ -47,6 +48,7 @@ export function OrderBookList({ orderBook, summary }: OrderBookListProps) {
         {orderBook.bidOrders.map((order) => (
           <OrderBookRow
             key={`bid-${order.price}`}
+            currentPrice={summary.currentPrice}
             maxQuantity={maxQuantity}
             order={order}
             side="bid"

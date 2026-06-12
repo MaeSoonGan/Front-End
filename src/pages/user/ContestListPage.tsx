@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search } from 'lucide-react';
-import { PageContainer } from '../../components/common/PageContainer';
 import { ContestCard } from '../../components/user/ContestCard';
-import { useInfiniteScroll } from '../../hooks/useInfiniteScroll';
-import { contestMocks, loadContestPage } from '../../mocks/contestMock';
-import type { ContestStatus } from '../../types/contest';
+import { contestsApi } from '../../api/user/contests';
+import { parseApiError } from '../../api/parseApiError';
+import type { ContestListItem, ContestStatus, ContestStockType } from '../../types/contest';
 import { cn } from '../../utils/cn';
 
+// 프론트 필터(예정 포함) → 백엔드 status 파라미터. SCHEDULED는 ACTIVE 계열로 함께 조회 후 클라이언트에서 구분 표시.
 type ContestFilter = 'ALL' | ContestStatus;
 
 const CONTEST_FILTER_OPTIONS: Array<{ label: string; value: ContestFilter }> = [
@@ -16,95 +16,133 @@ const CONTEST_FILTER_OPTIONS: Array<{ label: string; value: ContestFilter }> = [
   { label: '마감', value: 'ENDED' },
 ];
 
-const CONTEST_PAGE_SIZE = 4;
+const CONTEST_PAGE_SIZE = 10;
+
+// 백엔드 status → 프론트 ContestStatus 매핑 (CLOSING_SOON은 진행중으로 표시)
+function toContestStatus(status: string): ContestStatus {
+  if (status === 'ENDED') return 'ENDED';
+  if (status === 'SCHEDULED') return 'SCHEDULED';
+  return 'ACTIVE'; // ACTIVE, CLOSING_SOON
+}
+
+// 백엔드 stockType → 표시용. 'ALL'/빈값은 '전체 종목', 그 외는 값 그대로 표시
+function toStockType(stockType: string | null | undefined): ContestStockType {
+  if (!stockType || stockType === 'ALL') return '전체 종목';
+  return stockType as ContestStockType;
+}
 
 export function ContestListPage() {
-  const [contests, setContests] = useState(contestMocks);
+  const [contests, setContests] = useState<ContestListItem[]>([]);
   const [joiningContestId, setJoiningContestId] = useState<string | null>(null);
   const [searchKeyword, setSearchKeyword] = useState('');
+  const [appliedKeyword, setAppliedKeyword] = useState('');
   const [activeFilter, setActiveFilter] = useState<ContestFilter>('ALL');
-  const [currentPage, setCurrentPage] = useState(0);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [loadMoreElement, setLoadMoreElement] = useState<HTMLDivElement | null>(null);
+  const [loading, setLoading] = useState(true); // 초기/필터 변경 로딩
+  const [loadingMore, setLoadingMore] = useState(false); // 다음 페이지 로딩
+  const [error, setError] = useState('');
+  const [hasMore, setHasMore] = useState(false);
 
-  const filteredContests = useMemo(() => contests.filter((contest) => {
-    const keyword = searchKeyword.trim().toLowerCase();
-    const isMatchedFilter = activeFilter === 'ALL' || contest.status === activeFilter;
+  const pageRef = useRef(0); // 마지막으로 불러온 페이지(0-based)
+  const loadingRef = useRef(false); // 중복 요청 방지
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-    if (!isMatchedFilter) {
-      return false;
-    }
-
-    if (!keyword) {
-      return true;
-    }
-
-    const contestYear = contest.startAt.slice(0, 4);
-
-    return (
-      contest.title.toLowerCase().includes(keyword) ||
-      contest.stockType.toLowerCase().includes(keyword) ||
-      contestYear.includes(keyword)
-    );
-  }), [activeFilter, contests, searchKeyword]);
-  const visibleContests = useMemo(
-    () =>
-      Array.from({ length: currentPage + 1 }).flatMap((_, page) =>
-        loadContestPage(page, CONTEST_PAGE_SIZE, filteredContests),
-      ),
-    [currentPage, filteredContests],
+  const loadContests = useCallback(
+    async (reset: boolean) => {
+      if (loadingRef.current) return;
+      loadingRef.current = true;
+      const nextPage = reset ? 0 : pageRef.current + 1;
+      if (reset) setLoading(true);
+      else setLoadingMore(true);
+      try {
+        const data = await contestsApi.getContests({
+          keyword: appliedKeyword || undefined,
+          status: activeFilter,
+          page: nextPage,
+          size: CONTEST_PAGE_SIZE,
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const items: ContestListItem[] = (data.content ?? []).map((c: any) => ({
+          id: String(c.contestId),
+          title: c.title ?? '',
+          stockType: toStockType(c.stockType),
+          status: toContestStatus(c.status),
+          startAt: (c.startAt ?? '').split('T')[0],
+          endAt: (c.endAt ?? '').split('T')[0],
+          currentParticipants: c.participantCount ?? 0,
+          maxParticipants: c.maxParticipants ?? null,
+          seedMoney: Number(c.seedMoney ?? 0),
+          isJoined: Boolean(c.joined),
+          joinable: Boolean(c.joinable),
+          joinDisabledReason: c.joinDisabledReason ?? null,
+        }));
+        pageRef.current = nextPage;
+        setContests((prev) => (reset ? items : [...prev, ...items]));
+        const totalPages = data.totalPages && data.totalPages > 0 ? data.totalPages : 1;
+        setHasMore(nextPage + 1 < totalPages);
+        setError('');
+      } catch (e) {
+        setError(parseApiError(e));
+      } finally {
+        if (reset) setLoading(false);
+        else setLoadingMore(false);
+        loadingRef.current = false;
+      }
+    },
+    [appliedKeyword, activeFilter],
   );
-  const hasMore = visibleContests.length < filteredContests.length;
 
-  const handleLoadMore = useCallback(() => {
-    if (!hasMore || isLoadingMore) {
-      return;
-    }
-
-    setIsLoadingMore(true);
-    window.setTimeout(() => {
-      setCurrentPage((page) => page + 1);
-      setIsLoadingMore(false);
-    }, 350);
-  }, [hasMore, isLoadingMore]);
-
-  useInfiniteScroll({
-    hasMore,
-    isLoading: isLoadingMore,
-    onLoadMore: handleLoadMore,
-    target: loadMoreElement,
-  });
-
+  // 필터/검색어 변경 시 처음부터 다시 로드
   useEffect(() => {
-    setCurrentPage(0);
-    setIsLoadingMore(false);
-  }, [activeFilter, searchKeyword]);
+    // 의도된 초기/리셋 로드(내부에서 로딩 상태 set) — 룰 예외
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadContests(true);
+  }, [loadContests]);
 
-  const handleJoinContest = (contestId: string) => {
+  // 검색어 디바운스 (입력 후 300ms)
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setAppliedKeyword(searchKeyword.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchKeyword]);
+
+  // 무한 스크롤: 하단 sentinel이 보이면 다음 페이지 로드
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+          loadContests(false);
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadContests]);
+
+  const handleJoinContest = async (contestId: string) => {
     setJoiningContestId(contestId);
-    console.log('mock contest join:', contestId);
-
-    window.setTimeout(() => {
-      // TODO: 실제 참가 API 연동 후 서버 응답 기준으로 참가 상태와 참가자 수를 갱신합니다.
-      setContests((currentContests) =>
-        currentContests.map((contest) =>
-          contest.id === contestId
-            ? {
-                ...contest,
-                currentParticipants: contest.currentParticipants + 1,
-                isJoined: true,
-              }
-            : contest,
+    try {
+      await contestsApi.joinContest(Number(contestId));
+      // 참가 성공 시 해당 카드만 즉시 갱신(스크롤 위치 유지)
+      setContests((prev) =>
+        prev.map((c) =>
+          c.id === contestId
+            ? { ...c, isJoined: true, joinable: false, currentParticipants: c.currentParticipants + 1 }
+            : c,
         ),
       );
+    } catch (e) {
+      setError(parseApiError(e));
+    } finally {
       setJoiningContestId(null);
-    }, 500);
+    }
   };
 
   return (
-    <PageContainer className="min-h-full bg-[#F3F7FC] pt-3">
-      {/* TODO: 상태 판단은 startAt/endAt 기준 서버 처리 값으로 내려받아 사용합니다. */}
-      {/* TODO: 실제 참가자 수 API 연동 후 mock data를 제거합니다. */}
+    <div className="flex min-h-full flex-col bg-[#F3F7FC] px-4 pb-6 pt-3">
       <section className="mb-4 space-y-3">
         <div className="flex h-11 items-center gap-2 rounded-2xl border border-blue-100 bg-white px-3 shadow-sm">
           <Search className="shrink-0 text-[#6C88A4]" size={17} strokeWidth={2.5} />
@@ -135,16 +173,27 @@ export function ContestListPage() {
         </div>
       </section>
 
-      <section className="space-y-3">
-        {filteredContests.length > 0 ? (
-          visibleContests.map((contest) => (
-            <ContestCard
-              contest={contest}
-              isJoining={joiningContestId === contest.id}
-              key={contest.id}
-              onJoin={handleJoinContest}
-            />
-          ))
+      <section className="flex-1 space-y-3">
+        {loading ? (
+          <p className="py-10 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
+        ) : error ? (
+          <p className="py-10 text-center text-xs font-bold text-red-500">{error}</p>
+        ) : contests.length > 0 ? (
+          <>
+            {contests.map((contest) => (
+              <ContestCard
+                contest={contest}
+                isJoining={joiningContestId === contest.id}
+                key={contest.id}
+                onJoin={handleJoinContest}
+              />
+            ))}
+            {/* 무한 스크롤 감지용 sentinel */}
+            <div ref={sentinelRef} aria-hidden className="h-1" />
+            {loadingMore && (
+              <p className="py-3 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
+            )}
+          </>
         ) : (
           <div className="rounded-2xl border border-blue-100 bg-white px-4 py-10 text-center shadow-sm">
             <p className="text-sm font-extrabold text-slate-950">검색 결과가 없습니다.</p>
@@ -154,20 +203,6 @@ export function ContestListPage() {
           </div>
         )}
       </section>
-
-      {filteredContests.length > 0 ? (
-        <div ref={setLoadMoreElement} className="py-5 text-center">
-          {isLoadingMore ? (
-            <p className="text-xs font-bold text-[#6C88A4]">대회를 불러오는 중...</p>
-          ) : hasMore ? (
-            <p className="text-xs font-bold text-[#6C88A4]">아래로 스크롤하면 더 불러와요</p>
-          ) : (
-            <p className="text-xs font-bold text-[#A3B4C6]">
-              더 이상 불러올 대회가 없어요
-            </p>
-          )}
-        </div>
-      ) : null}
-    </PageContainer>
+    </div>
   );
 }

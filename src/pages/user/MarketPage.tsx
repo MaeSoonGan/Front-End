@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MarketTabs } from '../../components/user/MarketTabs';
 import { OrderBottomSheet } from '../../components/user/OrderBottomSheet';
+import { useMarketSocket } from '../../hooks/useMarketSocket';
 import { OrderBookList } from '../../components/user/OrderBookList';
 import { StockChartSection } from '../../components/user/StockChartSection';
 import { StockInfoGrid } from '../../components/user/StockInfoGrid';
@@ -16,9 +17,42 @@ import type {
   ChartType,
   MarketTab,
   OrderBookData,
+  StockChartPoint,
   StockSummary,
 } from '../../types/stock';
 import { cn } from '../../utils/cn';
+
+// 차트 주기 → 차트 API period (분봉은 이 API가 미지원이라 매핑 없음 → mock 폴백)
+const CHART_PERIOD_TO_API: Partial<Record<ChartPeriod, string>> = {
+  day: 'D',
+  week: 'W',
+  month: 'M',
+};
+
+// 차트 API 응답(OHLCV) → StockChartPoint[]. MA5/20/60은 종가로 계산(부족 구간은 가용분 평균).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toChartPoints(items: any[]): StockChartPoint[] {
+  const closes = items.map((it) => Number(it.close ?? 0));
+  const movingAverage = (endIdx: number, window: number) => {
+    const start = Math.max(0, endIdx - window + 1);
+    const slice = closes.slice(start, endIdx + 1);
+    return slice.length === 0 ? 0 : Math.round(slice.reduce((sum, v) => sum + v, 0) / slice.length);
+  };
+  return items.map((it, i) => {
+    const close = Number(it.close ?? 0);
+    const open = Number(it.open ?? 0);
+    const prevClose = i > 0 ? Number(items[i - 1].close ?? 0) : open;
+    return {
+      date: String(it.date ?? ''),
+      price: close,
+      ma5: movingAverage(i, 5),
+      ma20: movingAverage(i, 20),
+      ma60: movingAverage(i, 60),
+      volume: Number(it.volume ?? 0),
+      direction: close >= prevClose ? 'rise' : 'fall',
+    };
+  });
+}
 
 function getInitialTab(tab: string | null): MarketTab {
   if (tab === 'chart' || tab === 'trades') {
@@ -82,7 +116,9 @@ export function MarketPage() {
   const { chart, tradeTrend, tradeHistory } = selectedStock;
 
   const [apiSummary, setApiSummary] = useState<StockSummary | null>(null);
+  const [stockId, setStockId] = useState(0);
   const [apiOrderBook, setApiOrderBook] = useState<OrderBookData | null>(null);
+  const [apiChart, setApiChart] = useState<StockChartPoint[] | null>(null);
   const [loading, setLoading] = useState(true);
 
   // 현재가 + 일별정보 + 호가 조회
@@ -97,6 +133,7 @@ export function MarketPage() {
     ])
       .then(([price, daily, orderbook]) => {
         if (!active) return;
+        setStockId(Number(price.stockId ?? 0));
         setApiSummary({
           stockName: price.name ?? '',
           stockCode: price.code,
@@ -123,6 +160,29 @@ export function MarketPage() {
     return () => { active = false; };
   }, [stockCode]);
 
+  // 차트 캔들 조회 (period D/W/M만 API 지원, 분봉은 mock 폴백)
+  useEffect(() => {
+    const apiPeriod = CHART_PERIOD_TO_API[activePeriod];
+    if (!stockCode || !apiPeriod) {
+      setApiChart(null);
+      return;
+    }
+    let active = true;
+    marketApi
+      .getStockChart(stockCode, { period: apiPeriod })
+      .then((data) => {
+        if (!active) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setApiChart(toChartPoints((data?.items ?? []) as any[]));
+      })
+      .catch(() => {
+        if (active) setApiChart(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [stockCode, activePeriod]);
+
   // 관심종목 여부 조회
   useEffect(() => {
     if (!stockCode) return;
@@ -132,8 +192,36 @@ export function MarketPage() {
       .catch(() => {});
   }, [stockCode]);
 
-  const summary = apiSummary;
-  const orderBook = apiOrderBook ?? { askOrders: [], bidOrders: [] };
+  // 실시간 시세 + 호가 구독 (현재 보는 종목)
+  const { prices: livePrices, orderbooks: liveOrderbooks } = useMarketSocket(
+    stockCode ? [stockCode] : [],
+    { orderbookCodes: stockCode ? [stockCode] : [] },
+  );
+  const live = stockCode ? livePrices[stockCode] : undefined;
+  const liveOrderbook = stockCode ? liveOrderbooks[stockCode] : undefined;
+
+  const summary: StockSummary | null = apiSummary
+    ? live
+      ? {
+          ...apiSummary,
+          currentPrice: live.currentPrice,
+          changeAmount: live.changePrice,
+          changeRate: live.changeRate,
+          volume: live.volume ? live.volume.toLocaleString('ko-KR') : apiSummary.volume,
+          highPrice: live.high || apiSummary.highPrice,
+          lowPrice: live.low || apiSummary.lowPrice,
+          openPrice: live.open || apiSummary.openPrice,
+          // 전일종가 = 현재가 - 전일대비변동액 (ws에 전일종가 필드가 없어 역산)
+          previousClose: live.currentPrice - live.changePrice,
+        }
+      : apiSummary
+    : null;
+  const orderBook = liveOrderbook
+    ? {
+        askOrders: liveOrderbook.asks.map((l) => ({ price: l.price, quantity: l.quantity, changeRate: 0 })),
+        bidOrders: liveOrderbook.bids.map((l) => ({ price: l.price, quantity: l.quantity, changeRate: 0 })),
+      }
+    : apiOrderBook ?? { askOrders: [], bidOrders: [] };
 
   const orderStock: OrderStockInfo | null = summary
     ? {
@@ -249,7 +337,7 @@ export function MarketPage() {
         <StockChartSection
           activeChartType={activeChartType}
           activePeriod={activePeriod}
-          chartData={chart[activePeriod]}
+          chartData={apiChart ?? chart[activePeriod]}
           onChangeChartType={setActiveChartType}
           onChangePeriod={setActivePeriod}
         />
@@ -265,6 +353,7 @@ export function MarketPage() {
           key={`${summary.stockCode}-${orderSheetSide}`}
           onClose={handleCloseOrderSheet}
           stock={orderStock}
+          stockId={stockId}
         />
       ) : null}
     </div>
