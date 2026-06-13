@@ -432,12 +432,13 @@ export function HomePage() {
 
       const myContestTask = contestsApi
         .getMyContests({ status: 'ACTIVE', page: 0, size: 50 })
-        .then((data) => {
+        .then(async (data) => {
           if (cancelled) return;
           // 홈 "참여 중" 목록에는 실제 진행 중 대회만 표시.
           // 대회 상태(c.status)를 신뢰: SCHEDULED(시작 예정)·ENDED(종료) 제외.
           // status가 갱신 안 된 채 종료일만 지난 경우도 대비해 endAt도 함께 확인.
-          const list = (data?.content ?? []).filter((c) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const list = ((data?.content ?? []) as any[]).filter((c: any) => {
             if (c.status === 'ENDED' || isContestEnded(c.endAt)) {
               return false;
             }
@@ -446,15 +447,40 @@ export function HomePage() {
             }
             return true;
           });
-          setMyContests(
-            list.map((c) => {
+
+          const enrichedList = await Promise.all(
+            list.map(async (c: any) => {
+              const contestId = Number(c.contestId ?? c.id);
+              const [detail, account, myRanking] = await Promise.all([
+                contestsApi.getContest(contestId).catch(() => null),
+                portfolioApi.getContestAccount(contestId).catch(() => null),
+                contestsApi.getMyRanking(contestId).catch(() => null),
+              ]);
               const { badge, statusLabel, notStarted } = toContestBadge(c.status, c.startAt, c.endAt);
+              const rank = Number(myRanking?.rank ?? detail?.myRank ?? c.myRank ?? 0);
+              const participants = Number(
+                detail?.participantCount ??
+                  detail?.totalParticipants ??
+                  c.participantCount ??
+                  c.totalParticipants ??
+                  0,
+              );
+              const currentAsset = Number(
+                account?.currentAsset ??
+                  account?.totalAsset ??
+                  account?.totalEvaluation ??
+                  c.currentAsset ??
+                  c.totalAsset ??
+                  0,
+              );
+
               return {
-                id: String(c.contestId),
-                title: c.title ?? '',
-                rank: Number(c.myRank ?? 0),
-                participants: Number(c.totalParticipants ?? 0),
-                myAsset: formatWon(Number(c.currentAsset ?? 0)),
+                id: String(c.contestId ?? c.id),
+                title: detail?.title ?? c.title ?? '',
+                rank,
+                participants,
+                // getMyContests.currentAsset은 랭킹 스냅샷 기준일 수 있어 대회 홈과 동일하게 계좌 API를 우선 사용합니다.
+                myAsset: formatWon(currentAsset),
                 period: formatPeriod(c.startAt, c.endAt),
                 badge,
                 statusLabel,
@@ -462,6 +488,10 @@ export function HomePage() {
               };
             }),
           );
+
+          if (!cancelled) {
+            setMyContests(enrichedList);
+          }
         })
         .catch(() => {
           if (!cancelled) setMyContests([]);

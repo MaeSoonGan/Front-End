@@ -6,12 +6,16 @@ import {
   clearTokens,
 } from '../utils/tokenStorage';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
 const client = axios.create({
-  baseURL: '',
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
+  timeout: 10000,
 });
 
 client.interceptors.request.use(config => {
+  // TODO: 인증 저장소가 확정되면 localStorage 직접 조회를 tokenStorage 기반으로 통일합니다.
   // 사용자 로그인 토큰 우선, 없으면 admin 토큰. 둘 다 없으면 헤더 미부착
   // (더미 'admin-token' 폴백 제거 — 실제 인증 서버(EKS)는 더미 토큰을 거부해 403 발생)
   const token = getAccessToken() ?? localStorage.getItem('adminToken');
@@ -33,7 +37,7 @@ async function refreshAccessToken(): Promise<string> {
     throw new Error('No refresh token');
   }
   // raw axios 사용 — client 인스턴스를 쓰면 인터셉터가 재귀 호출됨
-  const response = await axios.post('/api/auth/reissue', { refreshToken });
+  const response = await axios.post('/api/auth/reissue', { refreshToken }, { baseURL: API_BASE_URL });
   const accessToken = response.data.data.accessToken;
   setAccessToken(accessToken);
   return accessToken;
@@ -63,6 +67,15 @@ client.interceptors.response.use(
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
+    }
+
+    if (status === 401) {
+      // TODO: 인증 UX 확정 후 로그인 이동/토스트 노출 정책을 정리합니다.
+      console.error('[API] 인증이 필요합니다.', error.response?.data ?? error.message);
+    } else if (status === 403) {
+      console.error('[API] 접근 권한이 없습니다.', error.response?.data ?? error.message);
+    } else if (status && status >= 500) {
+      console.error('[API] 서버 오류가 발생했습니다.', error.response?.data ?? error.message);
     }
 
     return Promise.reject(error);

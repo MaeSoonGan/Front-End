@@ -10,6 +10,7 @@ import { useContestMode } from '../../contexts/ContestModeContext';
 import { useMarketSocket } from '../../hooks/useMarketSocket';
 import { portfolioApi } from '../../api/user/portfolio';
 import { orderApi } from '../../api/user/order';
+import { tradeApi } from '../../api/user/trade';
 import type {
   BalanceSummary,
   BalanceTab,
@@ -169,6 +170,10 @@ export function BalancePage() {
   const [trades, setTrades] = useState<BalanceTradeHistoryItem[]>([]);
   const [executions, setExecutions] = useState<ExecutionHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tradeLoading, setTradeLoading] = useState(false);
+  const [executionLoading, setExecutionLoading] = useState(false);
+  const [tradeErrorMessage, setTradeErrorMessage] = useState('');
+  const [executionErrorMessage, setExecutionErrorMessage] = useState('');
 
   // 보유 종목 실시간 현재가 구독 (현재가만, 호가 X)
   const { prices: livePrices } = useMarketSocket(holdings.map((h) => h.stockCode));
@@ -270,7 +275,9 @@ export function BalancePage() {
   useEffect(() => {
     let cancelled = false;
     const cid = isContestMode && contestId ? Number(contestId) : undefined;
-    orderApi
+    setTradeLoading(true);
+    setTradeErrorMessage('');
+    tradeApi
       .getTrades({
         contestId: cid,
         from: tradeFrom,
@@ -281,7 +288,13 @@ export function BalancePage() {
         if (!cancelled) setTrades((data?.content ?? []).map(toTradeItem));
       })
       .catch(() => {
-        if (!cancelled) setTrades([]);
+        if (!cancelled) {
+          setTrades([]);
+          setTradeErrorMessage('매매내역을 불러오지 못했습니다.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setTradeLoading(false);
       });
     return () => {
       cancelled = true;
@@ -292,18 +305,40 @@ export function BalancePage() {
   useEffect(() => {
     let cancelled = false;
     const cid = isContestMode && contestId ? Number(contestId) : undefined;
+    setExecutionLoading(true);
+    setExecutionErrorMessage('');
     orderApi
       .getOrders({ contestId: cid, date: executionDate })
       .then((data) => {
         if (!cancelled) setExecutions((data?.content ?? []).map(toExecutionItem));
       })
       .catch(() => {
-        if (!cancelled) setExecutions([]);
+        if (!cancelled) {
+          setExecutions([]);
+          setExecutionErrorMessage('체결내역을 불러오지 못했습니다.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setExecutionLoading(false);
       });
     return () => {
       cancelled = true;
     };
   }, [isContestMode, contestId, executionDate]);
+
+  const handleCancelExecution = async (orderId: string) => {
+    await orderApi.cancelOrder(orderId);
+    setExecutions((current) =>
+      current.map((execution) =>
+        execution.id === orderId
+          ? {
+              ...execution,
+              status: 'CANCELLED',
+            }
+          : execution,
+      ),
+    );
+  };
 
   const handleChangeTab = (tab: BalanceTab) => {
     setActiveTab(tab);
@@ -353,6 +388,8 @@ export function BalancePage() {
       ) : activeTab === 'trades' ? (
         <BalanceTradeHistoryTab
           endDate={tradeTo}
+          errorMessage={tradeErrorMessage}
+          isLoading={tradeLoading}
           onChangeEndDate={setTradeTo}
           onChangeSide={setTradeSide}
           onChangeStartDate={setTradeFrom}
@@ -363,8 +400,11 @@ export function BalancePage() {
       ) : (
         <BalanceExecutionHistoryTab
           date={executionDate}
+          errorMessage={executionErrorMessage}
           executions={executions}
           filter={executionFilter}
+          isLoading={executionLoading}
+          onCancelExecution={handleCancelExecution}
           onChangeDate={setExecutionDate}
           onChangeFilter={setExecutionFilter}
         />

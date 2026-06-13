@@ -17,6 +17,7 @@ import type { StatusTone } from '../../../types/common';
 import { dashboardApi } from '../../../api/admin/dashboard';
 import { systemApi } from '../../../api/admin/system';
 import { membersApi } from '../../../api/admin/members';
+import { contestsApi } from '../../../api/admin/contests';
 
 // ---- Types ----
 
@@ -113,6 +114,25 @@ function formatDateTime(iso: string): string {
   return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getContent(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.content)) return data.content;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getNumber(data: any, keys: string[], fallback = 0): number {
+  const value = keys.map((key) => data?.[key]).find((item) => item !== undefined && item !== null);
+  return Number(value ?? fallback);
+}
+
+function formatContestPeriod(startAt: string | null | undefined, endAt: string | null | undefined): string {
+  if (!startAt && !endAt) return '';
+  return `${startAt ? formatDate(startAt) : ''} ~ ${endAt ? formatDate(endAt) : ''}`;
+}
+
 // ---- Page ----
 
 export function AdminDashboardPage() {
@@ -139,53 +159,97 @@ export function AdminDashboardPage() {
   const [activityPage, setActivityPage] = useState(1);
 
   useEffect(() => {
-    dashboardApi.getDashboard()
-      .then(data => {
+    let cancelled = false;
+
+    async function fetchDashboard() {
+      setLoading(true);
+      try {
+        const [dashboard, memberSummary, contestSummary, activeContestData, monitoring, auditLogs] =
+          await Promise.all([
+            dashboardApi.getDashboard().catch(() => null),
+            membersApi.getMemberSummary().catch(() => null),
+            contestsApi.getContestSummary().catch(() => null),
+            contestsApi.getContests({ status: 'ACTIVE', page: 0, size: 3 }).catch(() => null),
+            systemApi.getMonitoring().catch(() => null),
+            systemApi.getAuditLogs({ page: 0, size: 4 }).catch(() => null),
+          ]);
+
+        if (cancelled) return;
+
+        const data = dashboard ?? {};
+        const activeContests = getContent(data.activeContests).length > 0
+          ? getContent(data.activeContests)
+          : getContent(activeContestData);
+        const alerts = getContent(data.alerts).length > 0
+          ? getContent(data.alerts)
+          : getContent(monitoring?.alerts);
+        const recentActivities = getContent(data.recentActivities).length > 0
+          ? getContent(data.recentActivities)
+          : getContent(auditLogs);
+
         setStats({
-          totalMembers:        data.totalUsers ?? 0,
-          todayNewMembers:     data.todayNewUsers ?? 0,
-          todayOrders:         data.todayOrders ?? 0,
-          todayCompletedOrders: data.todayCompletedOrders ?? 0,
-          activeContestCount:  data.activeContestCount ?? 0,
-          totalParticipants:   data.activeContestParticipants ?? 0,
-          anomalyCount:        data.abnormalAlertCount ?? 0,
+          totalMembers: getNumber(data, ['totalUsers', 'totalMembers'], memberSummary?.totalCount ?? 0),
+          todayNewMembers: getNumber(data, ['todayNewUsers', 'todayNewMembers'], memberSummary?.todayJoinCount ?? 0),
+          todayOrders: getNumber(data, ['todayOrders'], monitoring?.todayOrders ?? 0),
+          todayCompletedOrders: getNumber(
+            data,
+            ['todayCompletedOrders', 'settledOrders'],
+            monitoring?.todayCompletedOrders ?? monitoring?.settledOrders ?? 0,
+          ),
+          activeContestCount: getNumber(data, ['activeContestCount'], contestSummary?.activeContestCount ?? activeContests.length),
+          totalParticipants: getNumber(
+            data,
+            ['activeContestParticipants', 'totalParticipants'],
+            contestSummary?.totalParticipantCount ?? 0,
+          ),
+          anomalyCount: getNumber(data, ['abnormalAlertCount', 'anomalyCount'], alerts.length),
         });
 
-        setAlerts((data.alerts ?? []).map((a: any) => ({
-          id:         String(a.alertId),
-          memberId:   String(a.userId),
-          userId:     String(a.userId),
+        setAlerts(alerts.map((a: any) => ({
+          id:         String(a.alertId ?? a.id),
+          memberId:   String(a.memberId ?? a.userId ?? ''),
+          userId:     String(a.userId ?? a.memberId ?? ''),
           orderId:    a.orderId ? String(a.orderId) : undefined,
           alertType:  (a.type as AlertType) ?? 'ABNORMAL_ORDER',
-          memberName: a.userName ?? '',
-          description: a.content ?? '',
+          memberName: a.userName ?? a.memberName ?? '',
+          description: a.content ?? a.description ?? '',
         })));
 
-        setDailyOrders((data.dailyOrders ?? []).map((d: any) => ({
+        setDailyOrders(getContent(data.dailyOrders).map((d: any) => ({
           date:    d.isToday ? '오늘' : formatDate(d.date),
           count:   d.orderCount ?? 0,
           isToday: d.isToday ?? false,
           fill:    d.isToday ? '#ef4444' : '#3b82f6',
         })));
 
-        setContests((data.activeContests ?? []).map((c: any) => ({
-          id:            String(c.contestId),
-          name:          c.contestName ?? '',
-          period:        c.period ?? '',
-          participants:  `${c.participantCount ?? 0}명`,
+        setContests(activeContests.map((c: any) => ({
+          id:            String(c.contestId ?? c.id),
+          name:          c.contestName ?? c.title ?? c.name ?? '',
+          period:        c.period ?? formatContestPeriod(c.startAt, c.endAt),
+          participants:  `${c.participantCount ?? c.currentParticipants ?? 0}명`,
           contestStatus: 'ACTIVE' as ContestStatus,
         })));
 
-        setActivities((data.recentActivities ?? []).map((a: any) => ({
-          id:           String(a.activityId),
+        setActivities(recentActivities.map((a: any) => ({
+          id:           String(a.activityId ?? a.logId ?? a.id),
           content:      a.content ?? '',
-          adminId:      a.adminName ?? String(a.adminId),
+          adminId:      a.adminName ?? a.adminId ?? '',
           createdAt:    a.createdAt ? formatDateTime(a.createdAt) : '',
           activityType: toActivityType(a.type ?? ''),
         })));
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+
+      } catch (error) {
+        console.error(error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    fetchDashboard();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const isSystemNormal = alerts.length === 0;

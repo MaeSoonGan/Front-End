@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import type { ExecutionHistoryItem } from '../../types/balance';
+import { parseApiError } from '../../api/parseApiError';
 
 interface ExecutionItemCardProps {
   execution: ExecutionHistoryItem;
-  onCancelExecution: (id: string) => void;
+  onCancelExecution: (id: string) => Promise<void>;
 }
 
 const statusLabel = {
@@ -19,6 +21,20 @@ function formatWon(value: number) {
 export function ExecutionItemCard({ execution, onCancelExecution }: ExecutionItemCardProps) {
   const isBuy = execution.side === 'BUY';
   const canCancel = execution.status !== 'CANCELLED' && execution.remainingQuantity > 0;
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleCancel = async () => {
+    setIsCancelling(true);
+    setErrorMessage('');
+    try {
+      await onCancelExecution(execution.id);
+    } catch (error) {
+      setErrorMessage(parseApiError(error));
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   return (
     <article className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
@@ -51,14 +67,15 @@ export function ExecutionItemCard({ execution, onCancelExecution }: ExecutionIte
       {canCancel ? (
         <button
           className="mt-3 h-9 w-full rounded-xl bg-red-50 text-xs font-extrabold text-red-500 transition hover:bg-red-100"
-          onClick={() => {
-            // TODO: 주문 취소 API 연동 후 서버 상태와 동기화합니다.
-            onCancelExecution(execution.id);
-          }}
+          disabled={isCancelling}
+          onClick={handleCancel}
           type="button"
         >
-          주문 취소
+          {isCancelling ? '취소 중...' : '주문 취소'}
         </button>
+      ) : null}
+      {errorMessage ? (
+        <p className="mt-2 text-center text-xs font-bold text-red-500">{errorMessage}</p>
       ) : null}
     </article>
   );

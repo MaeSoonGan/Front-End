@@ -8,6 +8,8 @@ interface BalanceTradeHistoryTabProps {
   startDate: string;
   endDate: string;
   side: TradeFilter;
+  isLoading?: boolean;
+  errorMessage?: string;
   onChangeStartDate: (value: string) => void;
   onChangeEndDate: (value: string) => void;
   onChangeSide: (value: TradeFilter) => void;
@@ -22,6 +24,8 @@ export function BalanceTradeHistoryTab({
   startDate,
   endDate,
   side,
+  isLoading = false,
+  errorMessage = '',
   onChangeStartDate,
   onChangeEndDate,
   onChangeSide,
@@ -81,7 +85,11 @@ export function BalanceTradeHistoryTab({
       </section>
 
       <div className="mt-4 space-y-2">
-        {filteredTrades.length > 0 ? (
+        {isLoading ? (
+          <StatusState message="불러오는 중..." />
+        ) : errorMessage ? (
+          <StatusState message={errorMessage} />
+        ) : filteredTrades.length > 0 ? (
           filteredTrades.map((trade) => {
             const isBuy = trade.side === 'BUY';
 
@@ -113,10 +121,14 @@ export function BalanceTradeHistoryTab({
 }
 
 function EmptyState() {
+  return <StatusState message="조회내역이 없어요." />;
+}
+
+function StatusState({ message }: { message: string }) {
   return (
     <div className="rounded-xl border border-blue-100 bg-white px-4 py-16 text-center shadow-sm">
       <p className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-xl text-[#A3B4C6]">!</p>
-      <p className="mt-4 text-sm font-extrabold text-[#A3B4C6]">조회내역이 없어요.</p>
+      <p className="mt-4 text-sm font-extrabold text-[#A3B4C6]">{message}</p>
     </div>
   );
 }

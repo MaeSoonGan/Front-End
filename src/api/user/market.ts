@@ -1,6 +1,11 @@
 import client from '../client';
 
 export const marketApi = {
+  // 종목 목록
+  // TODO: 목록 API 응답 필드/페이지네이션 명세 확정 후 타입을 구체화합니다.
+  getStocks: (params?: { keyword?: string; market?: string; page?: number; size?: number }) =>
+    client.get('/api/stocks', { params }).then(r => r.data.data),
+
   // 시장 지수 (KOSPI/KOSDAQ)
   getIndex: (market: string) =>
     client.get('/api/market/index', { params: { market } }).then(r => r.data.data),
@@ -36,6 +41,11 @@ export const marketApi = {
   // 종목 호가
   getStockOrderbook: (code: string) =>
     client.get(`/api/stocks/${code}/orderbook`).then(r => r.data.data),
+
+  // 종목 체결 데이터
+  // TODO: 체결 데이터 endpoint가 확정되면 /api/market/trades 후보 경로를 실제 명세로 교체합니다.
+  getStockTrades: (code: string, params?: { size?: number }) =>
+    client.get(`/api/stocks/${code}/trades`, { params }).then(r => r.data.data),
 
   // 종목 검색
   searchStocks: (keyword: string, market: string) =>
