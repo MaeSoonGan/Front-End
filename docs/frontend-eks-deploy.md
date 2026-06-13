@@ -28,7 +28,8 @@ Replace `<ECR_USER_IMAGE_URI>:<TAG>` and `<ECR_ADMIN_IMAGE_URI>:<TAG>` in `k8s/f
 ```text
 kubectl apply -f k8s/frontend-deployment.yaml
 kubectl apply -f k8s/frontend-service.yaml
-kubectl apply -f k8s/frontend-ingress.yaml
+
+Ingress/ALB 라우팅은 기존 인프라에서 관리합니다. 이 프론트 레포의 k8s manifest는 기존 ALB target으로 연결될 Deployment와 Service만 제공합니다.
 kubectl rollout status deployment/frontend
 ```
 
