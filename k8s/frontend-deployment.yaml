@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend-user
+  namespace: app
   labels:
     app: frontend-user
 spec:
@@ -18,8 +19,7 @@ spec:
         eks.amazonaws.com/nodegroup: maesoongan-nodegroup-frontend
       containers:
         - name: frontend-user
-          # TODO: GitHub Actions가 실제 ECR 이미지 URI와 태그로 교체합니다.
-          image: <ECR_USER_IMAGE_URI>:<TAG>
+          image: 295234319852.dkr.ecr.ap-northeast-2.amazonaws.com/maesoongan/frontend-user:aadc1c4aa8f7a688f244431c27d1accbb9278fcb
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -40,6 +40,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: frontend-admin
+  namespace: app
   labels:
     app: frontend-admin
 spec:
@@ -56,8 +57,7 @@ spec:
         eks.amazonaws.com/nodegroup: maesoongan-nodegroup-frontend
       containers:
         - name: frontend-admin
-          # TODO: GitHub Actions가 실제 ECR 이미지 URI와 태그로 교체합니다.
-          image: <ECR_ADMIN_IMAGE_URI>:<TAG>
+          image: 295234319852.dkr.ecr.ap-northeast-2.amazonaws.com/maesoongan/frontend-admin:aadc1c4aa8f7a688f244431c27d1accbb9278fcb
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
