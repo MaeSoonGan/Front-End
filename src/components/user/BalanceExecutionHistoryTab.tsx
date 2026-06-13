@@ -7,6 +7,9 @@ interface BalanceExecutionHistoryTabProps {
   executions: ExecutionHistoryItem[];
   date: string;
   filter: ExecutionFilterType;
+  isLoading?: boolean;
+  errorMessage?: string;
+  onCancelExecution: (id: string) => Promise<void>;
   onChangeDate: (value: string) => void;
   onChangeFilter: (value: ExecutionFilterType) => void;
 }
@@ -15,6 +18,9 @@ export function BalanceExecutionHistoryTab({
   executions,
   date,
   filter,
+  isLoading = false,
+  errorMessage = '',
+  onCancelExecution,
   onChangeDate,
   onChangeFilter,
 }: BalanceExecutionHistoryTabProps) {
@@ -42,17 +48,8 @@ export function BalanceExecutionHistoryTab({
     [executionItems, filter],
   );
 
-  const handleCancelExecution = (id: string) => {
-    setExecutionItems((current) =>
-      current.map((execution) =>
-        execution.id === id
-          ? {
-              ...execution,
-              status: 'CANCELLED',
-            }
-          : execution,
-      ),
-    );
+  const handleCancelExecution = async (id: string) => {
+    await onCancelExecution(id);
   };
 
   return (
@@ -68,7 +65,11 @@ export function BalanceExecutionHistoryTab({
       </div>
 
       <div className="mt-4 space-y-2">
-        {filteredExecutions.length > 0 ? (
+        {isLoading ? (
+          <StatusState message="불러오는 중..." />
+        ) : errorMessage ? (
+          <StatusState message={errorMessage} />
+        ) : filteredExecutions.length > 0 ? (
           filteredExecutions.map((execution) => (
             <ExecutionItemCard
               execution={execution}
@@ -77,12 +78,18 @@ export function BalanceExecutionHistoryTab({
             />
           ))
         ) : (
-          <div className="rounded-xl border border-blue-100 bg-white px-4 py-16 text-center shadow-sm">
-            <p className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-xl text-[#A3B4C6]">!</p>
-            <p className="mt-4 text-sm font-extrabold text-[#A3B4C6]">조회내역이 없어요.</p>
-          </div>
+          <StatusState message="조회내역이 없어요." />
         )}
       </div>
     </section>
+  );
+}
+
+function StatusState({ message }: { message: string }) {
+  return (
+    <div className="rounded-xl border border-blue-100 bg-white px-4 py-16 text-center shadow-sm">
+      <p className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-xl text-[#A3B4C6]">!</p>
+      <p className="mt-4 text-sm font-extrabold text-[#A3B4C6]">{message}</p>
+    </div>
   );
 }

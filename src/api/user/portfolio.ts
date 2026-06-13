@@ -5,6 +5,11 @@ export const portfolioApi = {
   getSummary: () =>
     client.get('/api/portfolio/summary').then(r => r.data.data),
 
+  // 포트폴리오 전체 조회
+  // TODO: /api/portfolio 단일 응답 명세가 확정되면 BalancePage 매핑을 이 함수로 통합합니다.
+  getPortfolio: () =>
+    client.get('/api/portfolio').then(r => r.data.data),
+
   // 대회 계좌 요약 (총자산/예수금/순위 등) — order-service
   getContestAccount: (contestId: number) =>
     client.get(`/api/contests/${contestId}/account`).then(r => r.data.data),
@@ -26,6 +31,10 @@ export const portfolioApi = {
   // 수익률 추이
   getProfitHistory: (period: string = '1M') =>
     client.get('/api/portfolio/profit-history', { params: { period } }).then(r => r.data.data),
+
+  // TODO: 백엔드가 /api/portfolio/profit-trend로 제공할 경우 getProfitHistory 대체 여부를 확인합니다.
+  getProfitTrend: (period: string = '1M') =>
+    client.get('/api/portfolio/profit-trend', { params: { period } }).then(r => r.data.data),
 
   resetSeedMoney: (data: { contestId?: number; holdingsAndCashResetAgreed: boolean; irreversibleAgreed: boolean }) =>
     client.post('/api/portfolio/seed-money/reset', data).then(r => r.data.data),
