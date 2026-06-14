@@ -156,7 +156,8 @@ export function MarketPage() {
       marketApi.getRealtimePrice(stockCode),
       // stockId(주문용)만 기존 RDS 경로에서 확보
       marketApi.getStockPrice(stockCode).catch(() => null),
-      marketApi.getStockOrderbook(stockCode).catch(() => null),
+      // 호가도 한투 실시간 경로(Redis→한투→마지막호가)로 조회
+      marketApi.getRealtimeOrderbook(stockCode).catch(() => null),
     ])
       .then(([price, idRow, orderbook]) => {
         if (!active) return;
