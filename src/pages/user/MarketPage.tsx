@@ -152,26 +152,24 @@ export function MarketPage() {
     let active = true;
     setLoading(true);
     Promise.all([
-      // 현재가/일별: RDS 스냅샷(/api/stocks) 대신 realtime 경로(Redis→한투 폴백)로 조회
-      marketApi.getRealtimePrice(stockCode),
-      // stockId(주문용)만 기존 경로에서 확보
-      marketApi.getStockPrice(stockCode).catch(() => null),
+      marketApi.getStockPrice(stockCode),
+      marketApi.getStockDailyInfo(stockCode).catch(() => null),
       marketApi.getStockOrderbook(stockCode).catch(() => null),
     ])
-      .then(([price, idRow, orderbook]) => {
+      .then(([price, daily, orderbook]) => {
         if (!active) return;
-        setStockId(Number(idRow?.stockId ?? 0));
+        setStockId(Number(price.stockId ?? 0));
         setApiSummary({
-          stockName: price.stockName ?? '',
-          stockCode: price.stockCode ?? stockCode,
-          currentPrice: Number(price.currentPrice ?? 0),
-          changeAmount: Number(price.changePrice ?? 0),
+          stockName: price.name ?? '',
+          stockCode: price.code,
+          currentPrice: Number(price.price ?? 0),
+          changeAmount: Number(price.change ?? 0),
           changeRate: Number(price.changeRate ?? 0),
           volume: Number(price.volume ?? 0).toLocaleString('ko-KR'),
-          openPrice: Number(price.open ?? 0),
-          highPrice: Number(price.high ?? 0),
-          lowPrice: Number(price.low ?? 0),
-          previousClose: Number(price.currentPrice ?? 0) - Number(price.changePrice ?? 0),
+          openPrice: Number(daily?.open ?? 0),
+          highPrice: Number(daily?.high ?? 0),
+          lowPrice: Number(daily?.low ?? 0),
+          previousClose: Number(daily?.prevClose ?? 0),
         });
         if (orderbook) {
           setApiOrderBook({
