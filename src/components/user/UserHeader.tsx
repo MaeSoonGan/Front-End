@@ -310,7 +310,13 @@ export function UserHeader() {
                   }
 
                   if (titlePathname.startsWith('/notices/')) {
-                    navigate(isContestMode ? getContestPath('/notices') : '/notices');
+                    // 들어온 출처(알림/공지목록 등)로 복귀 — 히스토리 pop으로 처리해야
+                    // 중복 엔트리가 안 쌓인다. 히스토리 없으면 공지 목록으로 fallback.
+                    if (window.history.length > 1) {
+                      navigate(-1);
+                    } else {
+                      navigate(isContestMode ? getContestPath('/notices') : '/notices');
+                    }
                     return;
                   }
 

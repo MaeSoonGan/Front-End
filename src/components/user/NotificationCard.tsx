@@ -13,6 +13,8 @@ const typeIcons: Record<NotificationItem['type'], string> = {
   CONTEST: '🏆',
   NOTICE: '📣',
   MARKET_OPEN: '📈',
+  SEED: '💰',
+  MAINTENANCE: '🔧',
 };
 
 const directionText = {

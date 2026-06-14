@@ -226,6 +226,12 @@ export function HomePage() {
         }
       : summaryAsset ?? EMPTY_ASSET;
 
+  // 일반 모드 총자산 증감(부호) — 수익률 화살표 방향 결정용
+  const normalChange =
+    summaryRaw && assetHoldingsLoaded
+      ? summaryRaw.cash + liveEvaluation - summaryRaw.seed
+      : 0;
+
   // 대회 모드: 내 live 수익률로 실시간 순위 계산 (다른 참여자는 mock 고정)
   const liveContestProfitRate =
     isContestMode && summaryRaw && assetHoldingsLoaded && summaryRaw.seed > 0
@@ -538,7 +544,9 @@ export function HomePage() {
               {normalAsset.total}
             </p>
             <p className="mt-1 text-xs text-blue-100">
-              {isContestMode ? contestTitle : `${normalAsset.change} (${normalAsset.rate})`}
+              {isContestMode
+                ? contestTitle
+                : `${normalChange >= 0 ? '▲' : '▼'} ${normalAsset.change} (${normalAsset.rate})`}
             </p>
           </div>
           {isContestMode ? (
