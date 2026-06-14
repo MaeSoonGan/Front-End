@@ -157,7 +157,8 @@ export function AdminContestDetailPage() {
     if (!contestId) return;
     try {
       // 전체 참가자를 받아 클라이언트에서 검색/정렬/페이지네이션 (전체 데이터 기준 정렬)
-      const data = await contestsApi.getRankings(Number(contestId), { page: 0, size: 1000 });
+      // 백엔드 size 상한이 100 → 1000으로 호출하면 400. 최대 100건 조회(클라이언트 검색/정렬/페이지네이션).
+      const data = await contestsApi.getRankings(Number(contestId), { page: 0, size: 100 });
       setParticipants(
         (data.content ?? []).map((r: any) => ({
           id:           String(r.memberId),

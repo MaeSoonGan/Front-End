@@ -8,6 +8,7 @@ import { UserHeader } from '../components/user/UserHeader';
 import { ContestModeProvider } from '../contexts/ContestModeContext';
 import { resetMarketSocket } from '../hooks/useMarketSocket';
 import { isAuthenticated } from '../utils/tokenStorage';
+import { portfolioApi } from '../api/user/portfolio';
 
 export function UserLayout() {
   const navigate = useNavigate();
@@ -21,6 +22,17 @@ export function UserLayout() {
 
     navigate('/login', { replace: true });
   }, [navigate]);
+
+  // 현재 접속자 집계용 하트비트: 로그인 상태에서 진입 즉시 1회 + 30초마다 핑
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      return;
+    }
+    const ping = () => portfolioApi.heartbeat().catch(() => {});
+    ping();
+    const timer = window.setInterval(ping, 30000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // 페이지 이동 시 스크롤을 맨 위로 (SPA 네비게이션은 스크롤이 유지되므로).
   // 뷰포트에 따라 실제 스크롤러가 main일 수도, window일 수도 있어 둘 다 리셋.

@@ -130,7 +130,7 @@ export function MarketRankingPage() {
               <div
                 className="flex w-full cursor-pointer items-center justify-between rounded-xl border border-blue-100 bg-white px-4 py-3 text-left shadow-sm transition hover:border-blue-200 hover:bg-[#F8FBFF]"
                 key={stock.code}
-                onClick={() => navigate(`${marketPath}?stockCode=${stock.code}`)}
+                onClick={() => navigate(`${marketPath}?stockCode=${stock.code}&from=market-ranking`)}
               >
                 <div className="flex items-center gap-3">
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E5F4FF] text-sm font-extrabold text-[#1565C0]">

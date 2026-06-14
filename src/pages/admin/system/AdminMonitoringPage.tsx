@@ -24,7 +24,7 @@ export function AdminMonitoringPage() {
   const [stats, setStats]                 = useState({ todayOrders: 0, settledOrders: 0, activeUsers: 0 });
   const [maintenanceOn, setMaintenanceOn] = useState(false);
   const [confirmModal, setConfirmModal]   = useState<'on' | 'off' | null>(null);
-  const [alertConfirm, setAlertConfirm]   = useState<{ id: string; action: 'cancel' | 'suspend' | 'dismiss'; memberId: string } | null>(null);
+  const [alertConfirm, setAlertConfirm]   = useState<{ id: string; action: 'cancel' | 'suspend' | 'release' | 'dismiss'; memberId: string } | null>(null);
   const [alertPage, setAlertPage]         = useState(1);
 
   const ALERT_PAGE_SIZE = 5;
@@ -91,6 +91,16 @@ export function AdminMonitoringPage() {
       await membersApi.suspendMembers({ memberIds: [Number(memberId)], reason: '비정상 탐지 — 즉시 정지' });
       setAlerts(prev => prev.filter(a => a.id !== id));
     } catch (e) { console.error(e); }
+  }
+
+  // 로그인 다수 실패로 자동 정지된 회원 알림 → 정지 해제 (대시보드와 동일)
+  async function handleRelease(id: string) {
+    try {
+      await systemApi.releaseAlert(Number(id));
+    } catch (e) {
+      console.error(e);
+    }
+    setAlerts(prev => prev.filter(a => a.id !== id));
   }
 
   useAdminPageActions(
@@ -171,8 +181,13 @@ export function AdminMonitoringPage() {
                       <p className="mt-0.5 text-xs text-slate-500">{alert.detail}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1.5">
-                      <button onClick={() => setAlertConfirm({ id: alert.id, action: 'cancel', memberId: alert.memberId })} className="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">주문취소</button>
-                      <button onClick={() => setAlertConfirm({ id: alert.id, action: 'suspend', memberId: alert.memberId })} className="cursor-pointer rounded border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50">계정정지</button>
+                      {alert.orderId ? (
+                        // 거래 관련 비정상 탐지: 주문 강제 취소
+                        <button onClick={() => setAlertConfirm({ id: alert.id, action: 'cancel', memberId: alert.memberId })} className="cursor-pointer rounded border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50">주문취소</button>
+                      ) : (
+                        // 로그인 다수 실패 등 회원 비정상 탐지(자동 정지): 정지 해제
+                        <button onClick={() => setAlertConfirm({ id: alert.id, action: 'release', memberId: alert.memberId })} className="cursor-pointer rounded border border-rose-300 bg-white px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50">정지 해제</button>
+                      )}
                       <button onClick={() => setAlertConfirm({ id: alert.id, action: 'dismiss', memberId: alert.memberId })} className="cursor-pointer rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-slate-50">무시</button>
                     </div>
                   </div>
@@ -241,7 +256,7 @@ export function AdminMonitoringPage() {
                 onClick={() => setConfirmModal('off')}
                 disabled={!maintenanceOn}
               >
-                정상 모드 유지
+                점검 모드 OFF
               </Button>
             </div>
           </Card>
@@ -255,6 +270,7 @@ export function AdminMonitoringPage() {
         const ACTION_META = {
           cancel:  { label: '주문취소',  desc: `"${target.memberName}(${target.memberId})"의 해당 주문을 강제 취소합니다.`, btnVariant: 'secondary' as const },
           suspend: { label: '계정정지',  desc: `"${target.memberName}(${target.memberId})" 계정을 즉시 정지합니다.`,     btnVariant: 'danger'    as const },
+          release: { label: '정지 해제', desc: `"${target.memberName}(${target.memberId})"의 자동 정지를 해제하고 로그인 실패를 초기화합니다.`, btnVariant: 'danger' as const },
           dismiss: { label: '무시',      desc: '해당 탐지 알림을 목록에서 제거합니다.',                                     btnVariant: 'secondary' as const },
         };
         const meta = ACTION_META[alertConfirm.action];
@@ -262,6 +278,7 @@ export function AdminMonitoringPage() {
         async function handleConfirm() {
           if (alertConfirm!.action === 'cancel')  await handleCancelOrder(alertConfirm!.id);
           if (alertConfirm!.action === 'suspend') await handleSuspend(alertConfirm!.id, alertConfirm!.memberId);
+          if (alertConfirm!.action === 'release') await handleRelease(alertConfirm!.id);
           if (alertConfirm!.action === 'dismiss') await handleDismiss(alertConfirm!.id);
           setAlertConfirm(null);
         }
@@ -321,7 +338,7 @@ export function AdminMonitoringPage() {
                   setConfirmModal(null);
                 }}
               >
-                {confirmModal === 'on' ? '점검 모드 ON' : '정상 모드 유지'}
+                {confirmModal === 'on' ? '점검 모드 ON' : '점검 모드 OFF'}
               </Button>
             </div>
           </div>

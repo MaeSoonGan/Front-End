@@ -153,7 +153,7 @@ export function AdminAuditLogDetailPage() {
         </div>
 
         {/* 메타 정보 그리드 */}
-        <div className="mb-5 grid grid-cols-2 gap-x-8 gap-y-3 rounded-lg bg-slate-50 px-5 py-4 text-sm lg:grid-cols-4">
+        <div className="mb-5 grid grid-cols-2 gap-x-8 gap-y-3 rounded-lg bg-slate-50 px-5 py-4 text-sm lg:grid-cols-5">
           <div>
             <p className="mb-1 text-xs font-medium text-slate-400">대상</p>
             <p className="font-medium text-slate-800">{log.target || '-'}</p>
@@ -161,10 +161,6 @@ export function AdminAuditLogDetailPage() {
           <div>
             <p className="mb-1 text-xs font-medium text-slate-400">처리 관리자</p>
             <p className="font-medium text-slate-800">{log.adminName}{log.adminLoginId ? ` (${log.adminLoginId})` : ''}</p>
-          </div>
-          <div>
-            <p className="mb-1 text-xs font-medium text-slate-400">IP 주소</p>
-            <p className="font-medium text-slate-800">{log.ip}</p>
           </div>
           <div>
             <p className="mb-1 text-xs font-medium text-slate-400">처리 일시</p>

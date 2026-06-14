@@ -7,7 +7,6 @@ import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { membersApi } from '../../../api/admin/members';
 import { downloadCsv } from '../../../utils/download';
 
-type PaymentType = '이벤트 당첨' | '보상' | '상금' | '기타';
 type SortField = 'amount' | 'paidAt' | null;
 type SortDir = 'asc' | 'desc' | null;
 
@@ -24,7 +23,6 @@ interface PaymentRecord {
   id: string;
   recipientNickname: string;
   amount: number;
-  type: PaymentType;
   reason: string;
   adminName: string;
   paidAt: string;
@@ -38,21 +36,6 @@ function isoToPaidAt(iso: string): string {
 }
 
 const PAGE_SIZE = 8;
-
-const TYPE_BADGE_CLASS: Record<PaymentType, string> = {
-  '이벤트 당첨': 'bg-amber-100 text-amber-600',
-  '보상': 'bg-[#E8F0FE] text-[#1565C0]',
-  '상금': 'bg-rose-100 text-rose-600',
-  '기타': 'bg-slate-100 text-slate-600',
-};
-
-function TypeBadge({ type }: { type: PaymentType }) {
-  return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${TYPE_BADGE_CLASS[type]}`}>
-      {type}
-    </span>
-  );
-}
 
 function formatAmountMan(amount: number) {
   return (amount / 10000).toLocaleString('ko-KR') + '만원';
@@ -68,14 +51,13 @@ function SortIcon({ field, currentField, dir }: { field: SortField; currentField
 export function AdminSeedMoneyPage() {
   const [payments, setPayments]   = useState<PaymentRecord[]>([]);
   const [totalPages, setTotalPages] = useState(1);
-  const [summary, setSummary]     = useState({ thisMonthCount: 0, thisMonthTotal: 0, todayCount: 0, todayTotal: 0, autoResetToday: 0 });
+  const [summary, setSummary]     = useState({ thisMonthCount: 0, thisMonthTotal: 0, todayCount: 0, todayTotal: 0, monthCount: 0, monthTotal: 0 });
   const [memberQuery, setMemberQuery] = useState('');
   const [searchResults, setSearchResults] = useState<MemberSearchResult[]>([]);
   const [foundMember, setFoundMember] = useState<MemberSearchResult | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const [amount, setAmount]         = useState('');
-  const [paymentType, setPaymentType] = useState<PaymentType>('이벤트 당첨');
   const [reason, setReason]         = useState('');
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -94,7 +76,6 @@ export function AdminSeedMoneyPage() {
           id:                String(p.seedHistoryId),
           recipientNickname: p.nickname ?? '',
           amount:            p.amount ?? 0,
-          type:              '기타' as PaymentType,
           reason:            p.reason ?? '',
           adminName:         p.adminName ?? '',
           paidAt:            isoToPaidAt(p.createdAt),
@@ -113,7 +94,8 @@ export function AdminSeedMoneyPage() {
         thisMonthTotal: data.totalPaymentAmount ?? 0,
         todayCount:     data.todayPaymentCount ?? 0,
         todayTotal:     data.todayPaymentAmount ?? 0,
-        autoResetToday: 0,
+        monthCount:     data.monthPaymentCount ?? 0,
+        monthTotal:     data.monthPaymentAmount ?? 0,
       }))
       .catch(console.error);
   }, []);
@@ -200,7 +182,6 @@ export function AdminSeedMoneyPage() {
     setSearchResults([]);
     setDropdownOpen(false);
     setAmount('');
-    setPaymentType('이벤트 당첨');
     setReason('');
   }
 
@@ -227,10 +208,6 @@ export function AdminSeedMoneyPage() {
                 <span className="font-semibold text-[#1565C0]">
                   +{Number(amount).toLocaleString('ko-KR')}만원 ({actualAmount.toLocaleString('ko-KR')}원)
                 </span>
-              </div>
-              <div className="flex gap-2">
-                <span className="w-24 shrink-0 text-slate-500">지급 유형</span>
-                <TypeBadge type={paymentType} />
               </div>
               <div className="flex gap-2">
                 <span className="w-24 shrink-0 text-slate-500">사유</span>
@@ -266,9 +243,9 @@ export function AdminSeedMoneyPage() {
           <p className="mt-0.5 text-xs text-slate-400">총 {(summary.todayTotal / 10000).toLocaleString('ko-KR')}만원</p>
         </Card>
         <Card>
-          <p className="text-sm text-slate-500">자동 초기화 건수 (오늘)</p>
-          <p className="mt-1 text-2xl font-bold text-slate-900">{summary.autoResetToday}건</p>
-          <p className="mt-0.5 text-xs text-slate-400">회원 자동 초기화</p>
+          <p className="text-sm text-slate-500">이번 달 지급</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900">{summary.monthCount}건</p>
+          <p className="mt-0.5 text-xs text-slate-400">총 {(summary.monthTotal / 10000).toLocaleString('ko-KR')}만원</p>
         </Card>
       </div>
 
@@ -292,7 +269,6 @@ export function AdminSeedMoneyPage() {
                     >
                       금액<SortIcon field="amount" currentField={sortField} dir={sortDir} />
                     </th>
-                    <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">유형</th>
                     <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">사유</th>
                     <th className="whitespace-nowrap pb-2 pr-4 text-center font-medium">지급 관리자</th>
                     <th
@@ -306,7 +282,7 @@ export function AdminSeedMoneyPage() {
                 <tbody className="divide-y divide-slate-100">
                   {paginated.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-3 text-center text-slate-400">
+                      <td colSpan={5} className="py-3 text-center text-slate-400">
                         지급 이력이 없습니다.
                       </td>
                     </tr>
@@ -319,9 +295,6 @@ export function AdminSeedMoneyPage() {
                       <td className="whitespace-nowrap py-3 pr-4 text-center font-medium text-[#1565C0]">
                         +{formatAmountMan(record.amount)}
                       </td>
-                      <td className="py-3 pr-4 text-center">
-                        <TypeBadge type={record.type} />
-                      </td>
                       <td className="py-3 pr-4 text-center text-slate-700">
                         {record.reason}
                       </td>
@@ -331,7 +304,7 @@ export function AdminSeedMoneyPage() {
                   ))}
                   {Array.from({ length: Math.max(0, PAGE_SIZE - (paginated.length === 0 ? 1 : paginated.length)) }).map((_, i) => (
                     <tr key={`ghost-${i}`}>
-                      <td colSpan={6} className="py-3 pr-4">
+                      <td colSpan={5} className="py-3 pr-4">
                         <span className="invisible select-none text-sm leading-5">x</span>
                       </td>
                     </tr>
@@ -406,40 +379,23 @@ export function AdminSeedMoneyPage() {
                 </div>
               </div>
 
-              {/* 지급 금액 + 지급 유형 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    지급 금액 (만원)
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="예) 100"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value)}
-                    min="1"
-                    required
-                    className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
-                  />
-                  <p className={`mt-1 text-xs text-slate-400 ${amount ? 'visible' : 'invisible'}`}>
-                    실제 지급액: {actualAmount.toLocaleString('ko-KR')}원
-                  </p>
-                </div>
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                    지급 유형
-                  </label>
-                  <select
-                    value={paymentType}
-                    onChange={e => setPaymentType(e.target.value as PaymentType)}
-                    className="w-full cursor-pointer rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
-                  >
-                    <option value="이벤트 당첨">이벤트 당첨</option>
-                    <option value="보상">보상</option>
-                    <option value="상금">상금</option>
-                    <option value="기타">기타</option>
-                  </select>
-                </div>
+              {/* 지급 금액 */}
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                  지급 금액 (만원)
+                </label>
+                <input
+                  type="number"
+                  placeholder="예) 100"
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
+                  min="1"
+                  required
+                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
+                />
+                <p className={`mt-1 text-xs text-slate-400 ${amount ? 'visible' : 'invisible'}`}>
+                  실제 지급액: {actualAmount.toLocaleString('ko-KR')}원
+                </p>
               </div>
 
               {/* 지급 사유 */}

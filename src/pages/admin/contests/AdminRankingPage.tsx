@@ -58,6 +58,11 @@ export function AdminRankingPage() {
   const [totalPages, setTotalPages]         = useState(1);
   const [currentPage, setCurrentPage]       = useState(1);
   const [loading, setLoading]               = useState(false);
+  // 현황 통계는 현재 페이지가 아니라 대회 전체 기준(getRankingStats)으로 표시
+  const [statsData, setStatsData] = useState<{
+    averageProfitRate?: number; highestProfitRate?: number;
+    profitCount?: number; lossCount?: number; excludedCount?: number;
+  } | null>(null);
 
   const [selectedEntry, setSelectedEntry]   = useState<RankingEntry | null>(null);
   const [excludeNickname, setExcludeNickname] = useState('');
@@ -102,6 +107,13 @@ export function AdminRankingPage() {
         }))
       );
       setTotalPages(data.totalPages ?? 1);
+      // 대회 전체 통계(평균/수익자·손실자/최고/제외) — 페이지와 무관
+      try {
+        const s = await contestsApi.getRankingStats(Number(contestId));
+        setStatsData(s);
+      } catch {
+        // 통계 조회 실패는 목록 표시에 영향 없음
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -143,6 +155,20 @@ export function AdminRankingPage() {
   useEffect(() => { handleCsvExportRef.current = handleCsvExport; });
 
   const stats = useMemo(() => {
+    // 최고 수익률 닉네임: 전체 1위(랭킹 정렬상 rank 1, 보통 1페이지에 존재)
+    const topNickname = entries.find(e => e.rank === 1)?.nickname ?? '-';
+    if (statsData) {
+      // 대회 전체 기준 통계 (백엔드 getRankingStats)
+      return {
+        avgProfitRate: Number(statsData.averageProfitRate ?? 0) / 100,
+        profitCount:   statsData.profitCount ?? 0,
+        lossCount:     statsData.lossCount ?? 0,
+        topNickname,
+        topProfitRate: Number(statsData.highestProfitRate ?? 0) / 100,
+        excludedCount: statsData.excludedCount ?? 0,
+      };
+    }
+    // 통계 로딩 전 폴백(현재 페이지 기준)
     const normal   = entries.filter(e => e.status === 'NORMAL');
     const excluded = entries.filter(e => e.status === 'EXCLUDED');
     const sorted   = [...normal].sort((a, b) => b.profitRate - a.profitRate);
@@ -151,11 +177,11 @@ export function AdminRankingPage() {
       avgProfitRate: avg,
       profitCount:   normal.filter(e => e.profitRate > 0).length,
       lossCount:     normal.filter(e => e.profitRate < 0).length,
-      topNickname:   sorted[0]?.nickname ?? '-',
+      topNickname,
       topProfitRate: sorted[0]?.profitRate ?? 0,
       excludedCount: excluded.length,
     };
-  }, [entries]);
+  }, [statsData, entries]);
 
   const ghostCount = PAGE_SIZE - Math.max(entries.length, entries.length === 0 ? 1 : 0);
 

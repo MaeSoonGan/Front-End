@@ -1,6 +1,10 @@
 import client from '../client';
 
 export const portfolioApi = {
+  // 접속 하트비트 (현재 접속자 집계용) — 로그인 상태에서 주기 호출
+  heartbeat: () =>
+    client.post('/api/portfolio/heartbeat').then(r => r.data),
+
   // 잔고 요약 (총자산/예수금/주문가능금액/수익) — Redis 의존(주문가능금액)
   getSummary: () =>
     client.get('/api/portfolio/summary').then(r => r.data.data),

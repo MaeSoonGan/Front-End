@@ -317,7 +317,6 @@ useAdminPageActions(
               <col className="w-32" />
               <col className="w-48" />
               <col className="w-20" />
-              <col className="w-28" />
               <col className="w-32" />
             </colgroup>
             <thead>
@@ -328,15 +327,14 @@ useAdminPageActions(
                 <th className="whitespace-nowrap px-3 py-3 text-center font-medium">대상</th>
                 <th className="whitespace-nowrap px-3 py-3 text-center font-medium">상세 내용</th>
                 <th className="whitespace-nowrap px-3 py-3 text-center font-medium">처리 관리자</th>
-                <th className="whitespace-nowrap px-3 py-3 text-center font-medium">IP</th>
                 <th className="whitespace-nowrap px-3 py-3 text-center font-medium">처리 일시</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
-                <tr className="h-11"><td colSpan={8} className="px-3 text-center text-sm text-slate-400">불러오는 중...</td></tr>
+                <tr className="h-11"><td colSpan={7} className="px-3 text-center text-sm text-slate-400">불러오는 중...</td></tr>
               ) : logs.length === 0 ? (
-                <tr className="h-11"><td colSpan={8} className="px-3 text-center text-sm text-slate-400">검색 결과가 없습니다.</td></tr>
+                <tr className="h-11"><td colSpan={7} className="px-3 text-center text-sm text-slate-400">검색 결과가 없습니다.</td></tr>
               ) : (
                 logs.map(log => (
                   <tr key={log.id} className="h-11 cursor-pointer hover:bg-slate-50" onClick={() => navigate(`/admin/audit-log/${log.id}`)}>
@@ -350,14 +348,13 @@ useAdminPageActions(
                     <td className="truncate px-3 text-center text-slate-700">{log.target}</td>
                     <td className="truncate px-3 text-center text-slate-500">{log.detail}</td>
                     <td className="px-3 text-center text-slate-700">{log.adminId}</td>
-                    <td className="px-3 text-center text-slate-400">{log.ip}</td>
                     <td className="px-3 text-center text-slate-400">{log.createdAt}</td>
                   </tr>
                 ))
               )}
               {!loading && Array.from({ length: ghostCount }).map((_, i) => (
                 <tr key={`ghost-${i}`} className="h-11">
-                  <td /><td /><td /><td /><td /><td /><td /><td />
+                  <td /><td /><td /><td /><td /><td /><td />
                 </tr>
               ))}
             </tbody>
