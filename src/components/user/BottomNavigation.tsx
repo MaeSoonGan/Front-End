@@ -14,7 +14,7 @@ export function BottomNavigation() {
   const { getContestPath, isContestMode, leaveContest } = useContestMode();
 
   return (
-    <nav className="z-20 shrink-0 border-t border-blue-100 bg-white/95 backdrop-blur">
+    <nav className="z-20 shrink-0 border-t border-blue-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
       <div className="grid h-16 grid-cols-5 px-1">
         {items.map((item) => {
           const isContestItem = item.to === '/contests';

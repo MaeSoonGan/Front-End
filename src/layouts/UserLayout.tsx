@@ -33,8 +33,8 @@ export function UserLayout() {
 
   return (
     <ContestModeProvider>
-      <div className="app-cursor min-h-screen bg-slate-100 sm:flex sm:items-center sm:justify-center sm:px-4 sm:py-10">
-        <div className="relative flex min-h-screen w-full flex-col overflow-hidden bg-[#F3F7FC] sm:min-h-[720px] sm:max-w-md sm:rounded-3xl sm:shadow-xl">
+      <div className="app-cursor h-[100dvh] overflow-hidden bg-slate-100 sm:flex sm:items-center sm:justify-center sm:px-4 sm:py-10">
+        <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#F3F7FC] sm:h-[720px] sm:max-w-md sm:rounded-3xl sm:shadow-xl">
           <UserHeader />
           <MaintenanceBanner />
           <ContestModeBanner />
