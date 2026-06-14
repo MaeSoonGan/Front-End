@@ -35,6 +35,10 @@ export const marketApi = {
   getRealtimePrice: (code: string) =>
     client.get(`/api/market/price/${code}`).then(r => r.data),
 
+  // 실시간 호가 (market-realtime-service): Redis 캐시 → 없으면 한투 fetch → 마지막 호가 백업. raw 응답.
+  getRealtimeOrderbook: (code: string) =>
+    client.get(`/api/market/orderbook/${code}`).then(r => r.data),
+
   // 종목 일별 정보 (시/고/저/전일종가)
   getStockDailyInfo: (code: string) =>
     client.get(`/api/stocks/${code}/daily-info`).then(r => r.data.data),
