@@ -19,7 +19,7 @@ spec:
         eks.amazonaws.com/nodegroup: maesoongan-nodegroup-frontend
       containers:
         - name: frontend-user
-          image: 295234319852.dkr.ecr.ap-northeast-2.amazonaws.com/maesoongan/frontend-user:c65359f9131cf709ce0b1300e9907dba57542cd4
+          image: 295234319852.dkr.ecr.ap-northeast-2.amazonaws.com/maesoongan/frontend-user:b359efe5e3e18629a3d85270fe33c93792f64385
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
@@ -57,7 +57,7 @@ spec:
         eks.amazonaws.com/nodegroup: maesoongan-nodegroup-frontend
       containers:
         - name: frontend-admin
-          image: 295234319852.dkr.ecr.ap-northeast-2.amazonaws.com/maesoongan/frontend-admin:c65359f9131cf709ce0b1300e9907dba57542cd4
+          image: 295234319852.dkr.ecr.ap-northeast-2.amazonaws.com/maesoongan/frontend-admin:b359efe5e3e18629a3d85270fe33c93792f64385
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
