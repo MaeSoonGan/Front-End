@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-user
+  namespace: app
+  labels:
+    app: frontend-user
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend-user
+  template:
+    metadata:
+      labels:
+        app: frontend-user
+    spec:
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: maesoongan-nodegroup-frontend
+      containers:
+        - name: frontend-user
+          image: 295234319852.dkr.ecr.ap-northeast-2.amazonaws.com/maesoongan/frontend-user:8bb8f8d80b6beab6882f5ffc93dc728d5dc5f20c
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-admin
+  namespace: app
+  labels:
+    app: frontend-admin
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend-admin
+  template:
+    metadata:
+      labels:
+        app: frontend-admin
+    spec:
+      nodeSelector:
+        eks.amazonaws.com/nodegroup: maesoongan-nodegroup-frontend
+      containers:
+        - name: frontend-admin
+          image: 295234319852.dkr.ecr.ap-northeast-2.amazonaws.com/maesoongan/frontend-admin:8bb8f8d80b6beab6882f5ffc93dc728d5dc5f20c
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20

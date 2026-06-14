@@ -19,6 +19,7 @@ import type {
   OrderBookData,
   StockChartPoint,
   StockSummary,
+  TradeHistoryItem,
 } from '../../types/stock';
 import { cn } from '../../utils/cn';
 
@@ -50,6 +51,27 @@ function toChartPoints(items: any[]): StockChartPoint[] {
       ma60: movingAverage(i, 60),
       volume: Number(it.volume ?? 0),
       direction: close >= prevClose ? 'rise' : 'fall',
+    };
+  });
+}
+
+// TODO: 체결 데이터 API 응답 필드가 확정되면 DTO 타입과 매핑 규칙을 고정합니다.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toTradeHistoryItems(items: any[]): TradeHistoryItem[] {
+  return items.map((item) => {
+    const price = Number(item.price ?? item.tradePrice ?? item.executionPrice ?? 0);
+    const changeAmount = Number(item.changeAmount ?? item.change ?? 0);
+    const quantity = Number(item.quantity ?? item.tradeVolume ?? item.executionQuantity ?? 0);
+    const direction = changeAmount >= 0 ? 'UP' : 'DOWN';
+
+    return {
+      tradeTime: String(item.tradeTime ?? item.executedAt ?? item.createdAt ?? ''),
+      price,
+      changeAmount,
+      quantity,
+      strength: Number(item.strength ?? item.executionStrength ?? 0),
+      direction,
+      quantityDirection: direction,
     };
   });
 }
@@ -119,6 +141,9 @@ export function MarketPage() {
   const [stockId, setStockId] = useState(0);
   const [apiOrderBook, setApiOrderBook] = useState<OrderBookData | null>(null);
   const [apiChart, setApiChart] = useState<StockChartPoint[] | null>(null);
+  const [apiTradeHistory, setApiTradeHistory] = useState<TradeHistoryItem[] | null>(null);
+  const [tradeLoading, setTradeLoading] = useState(false);
+  const [tradeErrorMessage, setTradeErrorMessage] = useState('');
   const [loading, setLoading] = useState(true);
 
   // 현재가 + 일별정보 + 호가 조회
@@ -182,6 +207,37 @@ export function MarketPage() {
       active = false;
     };
   }, [stockCode, activePeriod]);
+
+  // 종목 체결 데이터 조회. 추세 차트 API는 미정이라 기존 mock trendData를 유지합니다.
+  useEffect(() => {
+    if (!stockCode) {
+      setApiTradeHistory(null);
+      return;
+    }
+
+    let active = true;
+    setTradeLoading(true);
+    setTradeErrorMessage('');
+    marketApi
+      .getStockTrades(stockCode, { size: 30 })
+      .then((data) => {
+        if (!active) return;
+        const items = Array.isArray(data) ? data : data?.content ?? data?.items ?? data?.trades ?? [];
+        setApiTradeHistory(toTradeHistoryItems(items));
+      })
+      .catch(() => {
+        if (!active) return;
+        setApiTradeHistory(null);
+        setTradeErrorMessage('체결 데이터를 불러오지 못해 예시 데이터를 표시합니다.');
+      })
+      .finally(() => {
+        if (active) setTradeLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [stockCode]);
 
   // 관심종목 여부 조회
   useEffect(() => {
@@ -342,11 +398,16 @@ export function MarketPage() {
           onChangePeriod={setActivePeriod}
         />
       ) : (
-        <TradeHistoryTab trades={tradeHistory} trendData={tradeTrend} />
+        <TradeHistoryTab
+          errorMessage={tradeErrorMessage}
+          isLoading={tradeLoading}
+          trades={apiTradeHistory ?? tradeHistory}
+          trendData={tradeTrend}
+        />
       )}
 
       <TradeActionButtons onSelectSide={setOrderSheetSide} />
-      {orderSheetSide ? (
+      {orderSheetSide && orderStock ? (
         <OrderBottomSheet
           initialSide={orderSheetSide}
           isOpen={Boolean(orderSheetSide)}

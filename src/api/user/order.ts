@@ -46,4 +46,9 @@ export const orderApi = {
   // 주문 생성
   createOrder: (body: CreateOrderBody) =>
     client.post('/api/orders', body).then(r => r.data.data),
+
+  // 미체결 주문 취소
+  // TODO: 백엔드 취소 endpoint가 DELETE인지 PATCH cancel인지 확정되면 한쪽으로 고정합니다.
+  cancelOrder: (orderId: string | number) =>
+    client.patch(`/api/orders/${orderId}/cancel`).then(r => r.data.data),
 };

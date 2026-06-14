@@ -12,37 +12,42 @@ const stripOrigin: ProxyOptions['configure'] = (proxy) => {
   });
 };
 
+const DEPLOYED_API_TARGET = 'https://www.maesoongan.xyz';
+const DEPLOYED_WS_TARGET = 'wss://www.maesoongan.xyz';
+
 // /api/* 프록시 공통 옵션 (Origin 제거 포함)
 const api = (target: string): ProxyOptions => ({
   target,
   changeOrigin: true,
+  secure: true,
   configure: stripOrigin,
 });
 
 export default defineConfig({
   server: {
     proxy: {
-      '/api/auth': api('http://localhost:8081'),
-      '/api/members': api('http://localhost:8081'),
-      '/api/notices': api('http://localhost:8086'),
-      '/api/notifications': api('http://localhost:8086'),
+      '/api/auth': api(DEPLOYED_API_TARGET),
+      '/api/admin': api(DEPLOYED_API_TARGET),
+      '/api/members': api(DEPLOYED_API_TARGET),
+      '/api/notices': api(DEPLOYED_API_TARGET),
+      '/api/notifications': api(DEPLOYED_API_TARGET),
       // 실시간 시세 websocket (market-realtime-service). ws 핸드셰이크 Origin은 유지.
       '/ws/market': {
-        target: 'http://localhost:8090',
+        target: DEPLOYED_WS_TARGET,
         ws: true,
         changeOrigin: true,
       },
       // 대회 계좌는 order-service(8084)에 있으므로 contest-service보다 먼저 매칭
-      '^/api/contests/[^/]+/account': api('http://localhost:8084'),
-      '/api/contests': api('http://localhost:8082'),
-      '/api/portfolio': api('http://localhost:8084'),
-      '/api/orders': api('http://localhost:8084'),
-      '/api/trades': api('http://localhost:8084'),
+      '^/api/contests/[^/]+/account': api(DEPLOYED_API_TARGET),
+      '/api/contests': api(DEPLOYED_API_TARGET),
+      '/api/portfolio': api(DEPLOYED_API_TARGET),
+      '/api/orders': api(DEPLOYED_API_TARGET),
+      '/api/trades': api(DEPLOYED_API_TARGET),
       // 순위(hts-top-view)·지수(indices)는 market-service(8085, RDS 스냅샷)로
-      '/api/market': api('http://localhost:8085'),
-      '/api/stocks': api('http://localhost:8085'),
-      '/api/watchlist': api('http://localhost:8085'),
-      '/api': api('http://localhost:8080'),
+      '/api/market': api(DEPLOYED_API_TARGET),
+      '/api/stocks': api(DEPLOYED_API_TARGET),
+      '/api/watchlist': api(DEPLOYED_API_TARGET),
+      '/api': api(DEPLOYED_API_TARGET),
     },
   },
   plugins: [
@@ -51,29 +56,45 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'FISA 모의투자 서비스',
-        short_name: 'FISA Invest',
-        description: '모의투자 대회 및 클라우드 관제 서비스',
-        theme_color: '#0f172a',
+        name: '매순간',
+        short_name: '매순간',
+        description: '매순간 모의투자 서비스',
+        theme_color: '#1565C0',
         background_color: '#ffffff',
         display: 'standalone',
+        orientation: 'portrait',
         start_url: '/',
         scope: '/',
         icons: [
           {
-            src: '/pwa-192x192.png',
+            // TODO: 실제 브랜드 아이콘 확정 후 public/icons 파일을 교체합니다.
+            src: '/icons/icon-192x192.png',
             sizes: '192x192',
             type: 'image/png',
           },
           {
-            src: '/pwa-512x512.png',
+            src: '/icons/icon-512x512.png',
             sizes: '512x512',
             type: 'image/png',
+          },
+          {
+            src: '/icons/maskable-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
           },
         ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
+            handler: 'NetworkOnly',
+            method: 'GET',
+          },
+        ],
       },
       devOptions: {
         enabled: true,
