@@ -30,6 +30,11 @@ export const marketApi = {
   getStockPrice: (code: string) =>
     client.get(`/api/stocks/${code}/price`).then(r => r.data.data),
 
+  // 실시간 현재가 (market-realtime-service): Redis 캐시 → 없으면 한투 fetch.
+  // 이 엔드포인트는 ApiResponse 래퍼 없이 raw 객체를 반환하므로 r.data 그대로 사용.
+  getRealtimePrice: (code: string) =>
+    client.get(`/api/market/price/${code}`).then(r => r.data),
+
   // 종목 일별 정보 (시/고/저/전일종가)
   getStockDailyInfo: (code: string) =>
     client.get(`/api/stocks/${code}/daily-info`).then(r => r.data.data),
