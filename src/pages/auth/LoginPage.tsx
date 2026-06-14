@@ -6,7 +6,6 @@ import { PasswordInput } from '../../components/common/PasswordInput';
 import { TextInput } from '../../components/common/TextInput';
 import { authApi } from '../../api/auth/auth';
 import { adminAuthApi } from '../../api/admin/auth';
-import { parseApiError } from '../../api/parseApiError';
 import { saveTokens, clearTokens } from '../../utils/tokenStorage';
 import { saveAdminAuth, clearAdminAuth } from '../../utils/adminAuth';
 import loginLogo from '../../assets/login-logo-transparent.png';
@@ -63,8 +62,14 @@ export function LoginPage() {
         });
         navigate('/admin', { replace: true });
       } catch {
-        // 둘 다 실패 → 회원 로그인 에러 메시지 노출
-        setErrors({ server: parseApiError(userError) });
+        // 둘 다 실패 → 사용자 친화 메시지로 표시 (서버 원시 응답 노출 방지)
+        const status = (userError as { response?: { status?: number } })?.response?.status;
+        setErrors({
+          server:
+            status === 403
+              ? '비밀번호를 여러 번 틀려 계정이 잠겼습니다. 비밀번호 재설정 후 다시 시도해주세요.'
+              : '아이디 또는 비밀번호가 일치하지 않습니다.',
+        });
       }
     } finally {
       setIsLoading(false);

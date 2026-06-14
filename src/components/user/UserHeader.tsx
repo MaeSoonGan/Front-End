@@ -261,6 +261,10 @@ export function UserHeader() {
 
                     if (pathname === '/market') {
                       const from = searchParams.get('from');
+                      if (from === 'market-ranking') {
+                        navigate(-1); // 순위에서 들어온 경우: 히스토리 pop → 순위로 복귀(루프 방지)
+                        return;
+                      }
                       navigate(from === 'balance' ? '/balance' : from === 'watchlist' ? '/watchlist' : '/home');
                       return;
                     }
@@ -271,6 +275,10 @@ export function UserHeader() {
 
                   if (isContestMode && titlePathname === '/market') {
                     const from = new URLSearchParams(search).get('from');
+                    if (from === 'market-ranking') {
+                      navigate(-1); // 순위에서 들어온 경우: 히스토리 pop → 순위로 복귀(루프 방지)
+                      return;
+                    }
                     navigate(
                       from === 'balance'
                         ? getContestPath('/balance')

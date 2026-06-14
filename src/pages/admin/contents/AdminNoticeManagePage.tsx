@@ -7,7 +7,7 @@ import { useAdminPageActions } from '../../../contexts/AdminPageActionsContext';
 import { Button } from '../../../components/common/Button';
 import { noticesApi } from '../../../api/admin/notices';
 
-type NoticeStatus = 'PUBLISHED' | 'SCHEDULED' | 'HIDDEN' | 'DRAFT';
+type NoticeStatus = 'PUBLISHED' | 'SCHEDULED' | 'HIDDEN' | 'DRAFT' | 'DELETED';
 type TabFilter = 'ALL' | NoticeStatus;
 type SortDir = 'asc' | 'desc' | null;
 
@@ -33,10 +33,11 @@ interface FormState {
 }
 
 const STATUS_LABEL: Record<NoticeStatus, string> = {
-  PUBLISHED: '게시중',
+  PUBLISHED: '게시',
   SCHEDULED: '예약',
   HIDDEN:    '숨김',
   DRAFT:     '임시저장',
+  DELETED:   '삭제',
 };
 
 const STATUS_BADGE_CLASS: Record<NoticeStatus, string> = {
@@ -44,14 +45,14 @@ const STATUS_BADGE_CLASS: Record<NoticeStatus, string> = {
   SCHEDULED: 'bg-sky-100 text-sky-600',
   HIDDEN:    'bg-slate-100 text-slate-500',
   DRAFT:     'bg-purple-100 text-purple-600',
+  DELETED:   'bg-slate-100 text-slate-400',
 };
 
 const TAB_LIST: { label: string; value: TabFilter }[] = [
   { label: '전체',     value: 'ALL'       },
-  { label: '게시중',   value: 'PUBLISHED' },
+  { label: '게시',     value: 'PUBLISHED' },
   { label: '예약',     value: 'SCHEDULED' },
   { label: '숨김',     value: 'HIDDEN'    },
-  { label: '임시저장', value: 'DRAFT'     },
 ];
 
 const EMPTY_FORM: FormState = {
@@ -233,30 +234,6 @@ export function AdminNoticeManagePage() {
     }
   }
 
-  async function handleTempSave() {
-    const payload = {
-      title:   form.title || '(제목 없음)',
-      content: form.content,
-      isPinned: form.isPinned,
-      status:  'DRAFT' as NoticeStatus,
-      startAt: dateToIso(form.startDate),
-      endAt:   dateToIso(form.endDate),
-    };
-    try {
-      if (editingId) {
-        await noticesApi.updateNotice(Number(editingId), payload);
-      } else {
-        await noticesApi.createNotice(payload);
-      }
-      setEditingId(null);
-      setForm({ ...EMPTY_FORM });
-      setIsFormOpen(false);
-      fetchNotices();
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
   function handleCancel() {
     setEditingId(null);
     setForm({ ...EMPTY_FORM });
@@ -387,7 +364,7 @@ export function AdminNoticeManagePage() {
                   {!loading && filtered.map(notice => (
                     <tr key={notice.id} className="h-10.25 cursor-pointer border-t border-slate-100 hover:bg-slate-50">
                       <td className="px-3 py-3 text-center">
-                        {notice.isPinned && <Pin size={14} className="mx-auto text-rose-500" />}
+                        {notice.isPinned && notice.status !== 'DELETED' && <Pin size={14} className="mx-auto text-rose-500" />}
                       </td>
                       <td className="truncate px-3 py-3 text-center font-medium text-slate-900" title={notice.title}>
                         <button onClick={() => navigate(`/admin/notices/${notice.id}`)} className="cursor-pointer hover:text-[#1565C0] hover:underline">
@@ -481,7 +458,6 @@ export function AdminNoticeManagePage() {
                 </div>
                 <div className="flex gap-2">
                   <Button variant="brand" type="submit" className="flex-1 cursor-pointer" disabled={!form.title.trim()}>{editingId ? '수정' : '등록'}</Button>
-                  <Button variant="secondary" type="button" className="cursor-pointer" onClick={handleTempSave}>임시 저장</Button>
                   <Button variant="ghost" type="button" className="cursor-pointer" onClick={handleCancel}>취소</Button>
                 </div>
               </form>
