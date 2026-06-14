@@ -33,7 +33,9 @@ export type NotificationType =
   | 'ORDER_CANCEL'
   | 'CONTEST'
   | 'NOTICE'
-  | 'MARKET_OPEN';
+  | 'MARKET_OPEN'
+  | 'SEED'
+  | 'MAINTENANCE';
 
 export type NotificationDirection = 'BUY' | 'SELL';
 

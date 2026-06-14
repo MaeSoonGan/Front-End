@@ -1,9 +1,10 @@
 import { useState, useCallback, type ReactNode } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 import { AdminHeader } from '../components/admin/AdminHeader';
 import { AdminSidebar } from '../components/admin/AdminSidebar';
 import { AlertCountProvider } from '../contexts/AlertCountContext';
 import { AdminPageActionsContext } from '../contexts/AdminPageActionsContext';
+import { isAdminAuthenticated } from '../utils/adminAuth';
 
 export function AdminLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -11,6 +12,11 @@ export function AdminLayout() {
 
   const handleToggleSidebar = useCallback(() => setIsSidebarOpen(prev => !prev), []);
   const setActions = useCallback((actions: ReactNode) => setHeaderActions(actions), []);
+
+  // 비로그인(어드민 토큰 없음) 접근 차단 — 렌더 전 동기 리다이렉트
+  if (!isAdminAuthenticated()) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <AlertCountProvider>

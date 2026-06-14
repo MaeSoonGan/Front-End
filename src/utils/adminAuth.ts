@@ -25,6 +25,14 @@ export function getAdminInfo(): AdminInfo | null {
   }
 }
 
+export function getAdminToken(): string | null {
+  return window.localStorage.getItem(ADMIN_TOKEN_KEY);
+}
+
+export function isAdminAuthenticated(): boolean {
+  return getAdminToken() !== null;
+}
+
 export function clearAdminAuth() {
   window.localStorage.removeItem(ADMIN_TOKEN_KEY);
   window.localStorage.removeItem(ADMIN_INFO_KEY);

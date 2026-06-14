@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { ContestModeBanner } from '../components/user/ContestModeBanner';
 import { MaintenanceBanner } from '../components/user/MaintenanceBanner';
 import { BottomNavigation } from '../components/user/BottomNavigation';
@@ -11,17 +11,8 @@ import { isAuthenticated } from '../utils/tokenStorage';
 import { portfolioApi } from '../api/user/portfolio';
 
 export function UserLayout() {
-  const navigate = useNavigate();
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    if (isAuthenticated()) {
-      return;
-    }
-
-    navigate('/login', { replace: true });
-  }, [navigate]);
 
   // 현재 접속자 집계용 하트비트: 로그인 상태에서 진입 즉시 1회 + 30초마다 핑
   useEffect(() => {
@@ -42,6 +33,11 @@ export function UserLayout() {
     // 페이지 이동 시 실시간 소스 초기화(누적 구독 비우기 → 한도 초과 예방)
     resetMarketSocket();
   }, [location.pathname]);
+
+  // 비로그인 접근 차단 — 렌더 전 동기 리다이렉트(플래시 방지)
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" replace />;
+  }
 
   return (
     <ContestModeProvider>

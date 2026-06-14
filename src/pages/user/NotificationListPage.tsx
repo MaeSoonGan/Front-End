@@ -19,6 +19,8 @@ function resolveType(rawType: string): { type: NotificationType; direction?: Not
       ? 'SELL'
       : undefined;
   if (t.includes('CANCEL')) return { type: 'ORDER_CANCEL', direction };
+  if (t.includes('SEED')) return { type: 'SEED' };
+  if (t.includes('MAINTENANCE')) return { type: 'MAINTENANCE' };
   if (t.includes('CONTEST') || t.includes('RANK')) return { type: 'CONTEST' };
   if (t.includes('MARKET')) return { type: 'MARKET_OPEN' };
   if (t.includes('NOTICE')) return { type: 'NOTICE' };
@@ -70,6 +72,8 @@ function resolvePath(n: NotificationItem): string | null {
       return n.targetId ? `/contests/${n.targetId}` : '/my-contests';
     case 'NOTICE':
       return n.targetId ? `/notices/${n.targetId}` : '/notices';
+    case 'SEED':
+      return '/balance';
     default:
       return null;
   }
