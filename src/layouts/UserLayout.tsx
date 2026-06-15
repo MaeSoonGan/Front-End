@@ -6,7 +6,6 @@ import { BottomNavigation } from '../components/user/BottomNavigation';
 import { RealtimeRecoveryModal } from '../components/common/RealtimeRecoveryModal';
 import { UserHeader } from '../components/user/UserHeader';
 import { ContestModeProvider } from '../contexts/ContestModeContext';
-import { resetMarketSocket } from '../hooks/useMarketSocket';
 import { isAuthenticated } from '../utils/tokenStorage';
 import { portfolioApi } from '../api/user/portfolio';
 
@@ -30,8 +29,9 @@ export function UserLayout() {
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
     window.scrollTo({ top: 0 });
-    // 페이지 이동 시 실시간 소스 초기화(누적 구독 비우기 → 한도 초과 예방)
-    resetMarketSocket();
+    // 페이지 이동 시 전역 KIS 재연결(resetMarketSocket)을 더 이상 하지 않는다.
+    // 구독 정리는 useMarketSocket의 ref-count 구독/해제가 처리하고,
+    // 한도 초과는 realtime-service가 idle 구독을 즉시 회수해 대응(전역 끊김 방지).
   }, [location.pathname]);
 
   // 비로그인 접근 차단 — 렌더 전 동기 리다이렉트(플래시 방지)
