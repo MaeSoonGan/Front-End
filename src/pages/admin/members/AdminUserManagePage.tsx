@@ -195,7 +195,9 @@ const [isSeedModalOpen, setIsSeedModalOpen] = useState(false);
         reason,
       });
       setSelectedIds([]);
+      // 정지는 온프렘 처리 후 결과 이벤트로 반영되는 비동기 작업 → 즉시 + 잠시 뒤 재조회로 확정 상태 반영
       fetchMembers();
+      window.setTimeout(fetchMembers, 1500);
     } catch (e) {
       console.error(e);
     }
