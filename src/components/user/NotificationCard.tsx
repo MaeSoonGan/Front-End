@@ -27,16 +27,13 @@ const directionClasses = {
   SELL: 'bg-blue-50 text-blue-600',
 } as const;
 
+// 클릭(이동) 불가 알림 종류: 체결/주문취소(체결 관련), 시드머니 지급
+const NON_CLICKABLE_TYPES: NotificationItem['type'][] = ['EXECUTION', 'ORDER_CANCEL', 'SEED'];
+
 export function NotificationCard({ notification, onRead }: NotificationCardProps) {
-  return (
-    <button
-      className="block w-full text-left"
-      onClick={() => {
-        // TODO: 알림 상세 이동 및 읽음 처리 API 연동 후 서버 상태와 동기화합니다.
-        onRead(notification.id);
-      }}
-      type="button"
-    >
+  const clickable = !NON_CLICKABLE_TYPES.includes(notification.type);
+
+  const content = (
       <Card
         className={cn(
           'rounded-2xl border-blue-100 px-4 py-4',
@@ -87,6 +84,20 @@ export function NotificationCard({ notification, onRead }: NotificationCardProps
           </div>
         </div>
       </Card>
+  );
+
+  // 체결/시드머니 알림은 이동할 곳이 없어 클릭 불가(읽음은 '모두 읽음'으로 처리)
+  if (!clickable) {
+    return <div className="block w-full text-left">{content}</div>;
+  }
+
+  return (
+    <button
+      className="block w-full cursor-pointer text-left"
+      onClick={() => onRead(notification.id)}
+      type="button"
+    >
+      {content}
     </button>
   );
 }
