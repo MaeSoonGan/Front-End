@@ -33,6 +33,9 @@ export const membersApi = {
   releaseSuspension: (suspensionId: number, data: { reason: string }) =>
     client.patch(`${ADMIN_MEMBERS_PATH}/suspensions/${suspensionId}/release`, data).then(r => r.data.data),
 
+  releaseSuspensionByMember: (memberId: number, data: { reason: string }) =>
+    client.patch(`${ADMIN_MEMBERS_PATH}/${memberId}/suspensions/release`, data).then(r => r.data.data),
+
   exportSuspensions: (params?: { keyword?: string; status?: string; startDate?: string; endDate?: string }) =>
     client.get(`${ADMIN_MEMBERS_PATH}/suspensions/export`, { params, responseType: 'blob' }).then(r => r.data),
 
