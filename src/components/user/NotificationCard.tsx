@@ -70,7 +70,7 @@ export function NotificationCard({ notification, onRead }: NotificationCardProps
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-1 text-sm font-bold text-slate-800">{notification.message}</p>
+                <p className="mt-1 whitespace-pre-line text-sm font-bold text-slate-800">{notification.message}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <span className="text-[11px] font-bold text-[#6C88A4]">
