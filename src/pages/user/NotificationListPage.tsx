@@ -30,6 +30,18 @@ function resolveType(rawType: string): { type: NotificationType; direction?: Not
   return { type: 'NOTICE' };
 }
 
+// createdAt이 오늘(브라우저 로컬 날짜)인지 판단 — 읽은 알림은 오늘 것만 표시(날짜 지나면 초기화)
+function isToday(iso: string): boolean {
+  if (!iso) return false;
+  const d = new Date(iso);
+  const now = new Date();
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  );
+}
+
 // createdAt → 상대시간 표시
 function toDisplayTime(iso: string): string {
   if (!iso) return '';
@@ -101,8 +113,9 @@ export function NotificationListPage() {
     () => visibleNotifications.filter((notification) => !notification.isRead),
     [visibleNotifications],
   );
+  // 읽은 알림은 오늘 생성된 것만 표시 → 날짜가 지나면 읽은 목록이 자동 초기화됨
   const readNotifications = useMemo(
-    () => visibleNotifications.filter((notification) => notification.isRead),
+    () => visibleNotifications.filter((notification) => notification.isRead && isToday(notification.createdAt)),
     [visibleNotifications],
   );
   const totalUnreadCount = notifications.filter((notification) => !notification.isRead).length;

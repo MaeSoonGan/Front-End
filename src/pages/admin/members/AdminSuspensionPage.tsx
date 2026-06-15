@@ -15,6 +15,7 @@ type SortDir = 'asc' | 'desc' | null;
 
 interface SuspensionRecord {
   id: string;
+  memberId: number;
   targetNickname: string;
   targetAccountId: string;
   type: SuspensionType;
@@ -87,7 +88,11 @@ export function AdminSuspensionPage() {
   const [sortDir, setSortDir]   = useState<SortDir>(null);
 
   const [selectedSuspensionId, setSelectedSuspensionId] = useState<string | null>(null);
+  const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [targetMember, setTargetMember] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [formError, setFormError] = useState('');
   const [processType, setProcessType]   = useState<ProcessType>('계정 정지');
   const [reason, setReason]     = useState('');
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -105,6 +110,7 @@ export function AdminSuspensionPage() {
       setRecords(
         (data.content ?? []).map((r: any) => ({
           id:               String(r.suspensionId),
+          memberId:         Number(r.memberId),
           targetNickname:   r.nickname ?? '',
           targetAccountId:  r.accountId ?? '',
           type:             'MANUAL' as SuspensionType,
@@ -134,6 +140,30 @@ export function AdminSuspensionPage() {
       .catch(console.error);
   }, []);
 
+  // 대상 회원 검색(자동완성): 직접 타이핑 시에만 검색. 이미 선택(행 클릭/드롭다운)된 상태면 검색 안 함.
+  useEffect(() => {
+    if (selectedMemberId !== null) { setSearchResults([]); setShowDropdown(false); return; }
+    const kw = targetMember.trim();
+    if (kw === '') { setSearchResults([]); setShowDropdown(false); return; }
+    const t = window.setTimeout(async () => {
+      try {
+        const data = await membersApi.searchMembers({ keyword: kw, limit: 8 });
+        setSearchResults(data ?? []);
+        setShowDropdown(true);
+      } catch (e) { console.error(e); setSearchResults([]); }
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, [targetMember, selectedMemberId]);
+
+  function handleSelectMember(m: any) {
+    setTargetMember(m.nickname ?? m.email ?? String(m.memberId));
+    setSelectedMemberId(m.memberId);
+    setSelectedSuspensionId(null);
+    setShowDropdown(false);
+    setSearchResults([]);
+    setFormError('');
+  }
+
   const filtered = useMemo(() => {
     let result = [...records];
     if (typeFilter !== 'ALL') result = result.filter(r => r.type === typeFilter);
@@ -144,7 +174,8 @@ export function AdminSuspensionPage() {
   const safePage = Math.min(currentPage, totalPages);
   const paginated = filtered;
 
-  const isFormComplete = targetMember.trim() !== '' && reason.trim() !== '';
+  // 회원이 확정 선택(행 클릭/검색 선택)되고 사유가 있어야 처리 가능 → 존재하지 않는 이름 입력 차단
+  const isFormComplete = selectedMemberId !== null && reason.trim() !== '';
 
   function handleDateSort() {
     setSortDir(prev => (prev === null ? 'asc' : prev === 'asc' ? 'desc' : null));
@@ -153,34 +184,56 @@ export function AdminSuspensionPage() {
 
   function handleRowClick(record: SuspensionRecord) {
     setSelectedSuspensionId(record.id);
+    setSelectedMemberId(record.memberId);
     setTargetMember(record.targetNickname);
     setProcessType(record.status === 'SUSPENDED' ? '계정 해제' : '계정 정지');
     setReason('');
+    setShowDropdown(false);
+    setSearchResults([]);
+    setFormError('');
   }
 
   function handleProcessSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (selectedMemberId === null) {
+      setFormError('검색 후 목록에서 회원을 선택하세요.');
+      return;
+    }
+    setFormError('');
     setIsConfirmOpen(true);
   }
 
   async function handleConfirm() {
+    if (selectedMemberId === null) return;
     try {
-      if (processType === '계정 해제' && selectedSuspensionId) {
+      if (processType === '계정 정지') {
+        await membersApi.suspendMembers({ memberIds: [selectedMemberId], reason });
+      } else if (selectedSuspensionId) {
+        // 정지 이력에서 행 클릭으로 선택한 경우: suspensionId 기반 해제
         await membersApi.releaseSuspension(Number(selectedSuspensionId), { reason });
+      } else {
+        // 이름 검색으로 선택한 경우: memberId 기반 해제
+        await membersApi.releaseSuspensionByMember(selectedMemberId, { reason });
       }
       setIsConfirmOpen(false);
       handleReset();
-      // 해제는 온프렘 처리 후 결과 이벤트로 반영되는 비동기 작업 → 즉시 + 잠시 뒤 재조회로 확정 상태 반영
+      // 정지/해제는 온프렘 처리 후 결과 이벤트로 반영되는 비동기 작업 → 즉시 + 잠시 뒤 재조회로 확정 상태 반영
       fetchRecords();
       window.setTimeout(fetchRecords, 1500);
-    } catch (e) {
+    } catch (e: any) {
+      setIsConfirmOpen(false);
+      setFormError(e?.response?.data?.message ?? '처리 중 오류가 발생했습니다.');
       console.error(e);
     }
   }
 
   function handleReset() {
     setSelectedSuspensionId(null);
+    setSelectedMemberId(null);
     setTargetMember('');
+    setSearchResults([]);
+    setShowDropdown(false);
+    setFormError('');
     setProcessType('계정 정지');
     setReason('');
   }
@@ -392,13 +445,37 @@ export function AdminSuspensionPage() {
             </div>
 
             <form onSubmit={handleProcessSubmit} className="flex flex-1 flex-col gap-6">
-              <TextInput
-                label="대상 회원 (닉네임 또는 이메일)"
-                placeholder="예) 홍길동 또는 hong@..."
-                value={targetMember}
-                onChange={e => setTargetMember(e.target.value)}
-                required
-              />
+              <div className="relative">
+                <TextInput
+                  label="대상 회원 (닉네임 또는 이메일)"
+                  placeholder="예) 홍길동 또는 hong@..."
+                  value={targetMember}
+                  onChange={e => { setTargetMember(e.target.value); setSelectedMemberId(null); setSelectedSuspensionId(null); setFormError(''); }}
+                  required
+                />
+                {showDropdown && searchResults.length > 0 && (
+                  <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
+                    {searchResults.map(m => (
+                      <li key={m.memberId}>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectMember(m)}
+                          className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                        >
+                          <span className="font-medium text-slate-900">{m.nickname}</span>
+                          <span className="truncate text-xs text-slate-400">{m.email ?? m.loginId}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {selectedMemberId !== null && (
+                  <p className="mt-1 text-xs text-emerald-600">✓ 회원 선택됨 (ID: {selectedMemberId})</p>
+                )}
+                {formError && (
+                  <p className="mt-1 text-xs text-rose-600">{formError}</p>
+                )}
+              </div>
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">처리 유형</label>
