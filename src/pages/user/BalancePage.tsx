@@ -327,7 +327,8 @@ export function BalancePage() {
   }, [isContestMode, contestId, executionDate]);
 
   const handleCancelExecution = async (orderId: string) => {
-    await orderApi.cancelOrder(orderId);
+    const cid = isContestMode && contestId ? Number(contestId) : undefined;
+    await orderApi.cancelOrder(orderId, cid);
     setExecutions((current) =>
       current.map((execution) =>
         execution.id === orderId

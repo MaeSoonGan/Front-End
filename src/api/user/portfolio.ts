@@ -1,5 +1,7 @@
 import client from '../client';
 
+const contestOrdersPath = (contestId: number) => `/api/contest-orders/contests/${contestId}`;
+
 export const portfolioApi = {
   // 접속 하트비트 (현재 접속자 집계용) — 로그인 상태에서 주기 호출
   heartbeat: () =>
@@ -14,13 +16,17 @@ export const portfolioApi = {
   getPortfolio: () =>
     client.get('/api/portfolio').then(r => r.data.data),
 
-  // 대회 계좌 요약 (총자산/예수금/순위 등) — order-service
+  // 대회 계좌 요약 (총자산/예수금/순위 등) — contest-order-service
   getContestAccount: (contestId: number) =>
-    client.get(`/api/contests/${contestId}/account`).then(r => r.data.data),
+    client.get(`${contestOrdersPath(contestId)}/account`).then(r => r.data.data),
+
+  // 대회 포트폴리오 요약. 현재 백엔드는 account와 같은 응답 구조를 반환합니다.
+  getContestPortfolio: (contestId: number) =>
+    client.get(`${contestOrdersPath(contestId)}/portfolio`).then(r => r.data.data),
 
   // 보유종목 (contestId 지정 시 대회 계좌 기준)
   getHoldings: (contestId?: number) =>
-    client.get('/api/portfolio/holdings', { params: contestId != null ? { contestId } : undefined })
+    client.get(contestId != null ? `${contestOrdersPath(contestId)}/holdings` : '/api/portfolio/holdings')
       .then(r => r.data.data),
 
   // 주문가능금액 (예수금/주문가능/예약)
@@ -29,7 +35,11 @@ export const portfolioApi = {
 
   // 단일 종목 보유 상세 (보유수량/매도가능수량/현재가)
   getHolding: (stockCode: string, contestId?: number) =>
-    client.get(`/api/portfolio/holdings/${stockCode}`, { params: contestId != null ? { contestId } : undefined })
+    client.get(
+      contestId != null
+        ? `${contestOrdersPath(contestId)}/holdings/${stockCode}`
+        : `/api/portfolio/holdings/${stockCode}`,
+    )
       .then(r => r.data.data),
 
   // 수익률 추이

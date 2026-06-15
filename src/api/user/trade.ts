@@ -16,10 +16,21 @@ function clean<T extends object>(params: T): Partial<T> {
   ) as Partial<T>;
 }
 
+const contestOrdersPath = (contestId: number) => `/api/contest-orders/contests/${contestId}`;
+
+function withoutContestId<T extends { contestId?: number }>(params: T) {
+  const { contestId: _contestId, ...rest } = params;
+  return rest;
+}
+
 export const tradeApi = {
   // 매매내역 조회
-  getTrades: (params: TradeHistoryParams = {}) =>
-    client.get('/api/trades', { params: clean(params) }).then(response => response.data.data),
+  getTrades: (params: TradeHistoryParams = {}) => {
+    const query = clean(withoutContestId(params));
+    return params.contestId != null
+      ? client.get(`${contestOrdersPath(params.contestId)}/trades`, { params: query }).then(response => response.data.data)
+      : client.get('/api/trades', { params: query }).then(response => response.data.data);
+  },
 
   // 체결내역 조회
   getExecutions: (params: TradeHistoryParams = {}) =>

@@ -34,21 +34,43 @@ function clean<T extends object>(params: T): Partial<T> {
   ) as Partial<T>;
 }
 
+const contestOrdersPath = (contestId: number) => `/api/contest-orders/contests/${contestId}`;
+
+function withoutContestId<T extends { contestId?: number }>(params: T) {
+  const { contestId: _contestId, ...rest } = params;
+  return rest;
+}
+
 export const orderApi = {
   // 체결내역(주문 현황)
-  getOrders: (params: OrderListParams = {}) =>
-    client.get('/api/orders', { params: clean(params) }).then(r => r.data.data),
+  getOrders: (params: OrderListParams = {}) => {
+    const query = clean(withoutContestId(params));
+    return params.contestId != null
+      ? client.get(`${contestOrdersPath(params.contestId)}/orders`, { params: query }).then(r => r.data.data)
+      : client.get('/api/orders', { params: query }).then(r => r.data.data);
+  },
 
   // 매매내역(체결된 거래)
-  getTrades: (params: TradeListParams = {}) =>
-    client.get('/api/trades', { params: clean(params) }).then(r => r.data.data),
+  getTrades: (params: TradeListParams = {}) => {
+    const query = clean(withoutContestId(params));
+    return params.contestId != null
+      ? client.get(`${contestOrdersPath(params.contestId)}/trades`, { params: query }).then(r => r.data.data)
+      : client.get('/api/trades', { params: query }).then(r => r.data.data);
+  },
 
   // 주문 생성
-  createOrder: (body: CreateOrderBody) =>
-    client.post('/api/orders', body).then(r => r.data.data),
+  createOrder: (body: CreateOrderBody) => {
+    if (body.contestId != null) {
+      const { contestId, ...requestBody } = body;
+      return client.post(`${contestOrdersPath(contestId)}/orders`, requestBody).then(r => r.data.data);
+    }
+
+    return client.post('/api/orders', body).then(r => r.data.data);
+  },
 
   // 미체결 주문 취소
-  // TODO: 백엔드 취소 endpoint가 DELETE인지 PATCH cancel인지 확정되면 한쪽으로 고정합니다.
-  cancelOrder: (orderId: string | number) =>
-    client.patch(`/api/orders/${orderId}/cancel`).then(r => r.data.data),
+  cancelOrder: (orderId: string | number, contestId?: number) =>
+    contestId != null
+      ? client.delete(`${contestOrdersPath(contestId)}/orders/${orderId}`).then(r => r.data.data)
+      : client.patch(`/api/orders/${orderId}/cancel`).then(r => r.data.data),
 };
