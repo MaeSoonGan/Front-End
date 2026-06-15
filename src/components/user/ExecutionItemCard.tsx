@@ -11,6 +11,7 @@ const statusLabel = {
   FILLED: '체결완료',
   PARTIAL: '부분체결',
   OPEN: '미체결',
+  CANCEL_REQUESTED: '취소 요청 중',
   CANCELLED: '취소',
 };
 
@@ -20,7 +21,11 @@ function formatWon(value: number) {
 
 export function ExecutionItemCard({ execution, onCancelExecution }: ExecutionItemCardProps) {
   const isBuy = execution.side === 'BUY';
-  const canCancel = execution.status !== 'CANCELLED' && execution.remainingQuantity > 0;
+  // 이미 취소됐거나 취소 요청 중인 주문은 다시 취소할 수 없다.
+  const canCancel =
+    execution.status !== 'CANCELLED' &&
+    execution.status !== 'CANCEL_REQUESTED' &&
+    execution.remainingQuantity > 0;
   const [isCancelling, setIsCancelling] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
@@ -51,7 +56,9 @@ export function ExecutionItemCard({ execution, onCancelExecution }: ExecutionIte
           className={`rounded-full px-2 py-1 text-[10px] font-extrabold ${
             execution.status === 'CANCELLED'
               ? 'bg-red-100 text-red-500'
-              : 'bg-[#E8F0FA] text-[#1565C0]'
+              : execution.status === 'CANCEL_REQUESTED'
+                ? 'bg-amber-100 text-amber-600'
+                : 'bg-[#E8F0FA] text-[#1565C0]'
           }`}
         >
           {statusLabel[execution.status]}
