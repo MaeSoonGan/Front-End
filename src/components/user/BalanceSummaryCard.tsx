@@ -29,14 +29,18 @@ export function BalanceSummaryCard({ summary }: BalanceSummaryCardProps) {
       <p className="mt-1 text-xs font-extrabold text-blue-100">
         {isUp ? '▲' : '▼'} {formatSignedWon(summary.profitAmount)} ({formatSignedRate(summary.profitRate)})
       </p>
-      <div className="mt-5 grid grid-cols-2 gap-3">
+      <div className="mt-5 grid grid-cols-3 gap-2">
         <div className="rounded-xl bg-white/15 p-3">
           <p className="text-xs text-blue-100">예수금</p>
-          <p className="mt-1 text-sm font-extrabold">{formatWon(summary.deposit)}</p>
+          <p className="mt-1 text-xs font-extrabold">{formatWon(summary.deposit)}</p>
         </div>
         <div className="rounded-xl bg-white/15 p-3">
           <p className="text-xs text-blue-100">주식평가</p>
-          <p className="mt-1 text-sm font-extrabold">{formatWon(stockEvaluation)}</p>
+          <p className="mt-1 text-xs font-extrabold">{formatWon(stockEvaluation)}</p>
+        </div>
+        <div className="rounded-xl bg-white/15 p-3">
+          <p className="text-xs text-blue-100">주문 가능</p>
+          <p className="mt-1 text-xs font-extrabold">{formatWon(summary.availableOrderAmount)}</p>
         </div>
       </div>
     </section>

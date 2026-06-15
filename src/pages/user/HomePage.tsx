@@ -18,6 +18,7 @@ interface AssetView {
   rate: string;
   cash: string;
   evaluation: string;
+  available: string;
 }
 
 interface MarketStatusCard {
@@ -62,6 +63,7 @@ const EMPTY_ASSET: AssetView = {
   rate: '-',
   cash: '-',
   evaluation: '-',
+  available: '-',
 };
 
 function getChangeClass(changeRate: string) {
@@ -191,7 +193,7 @@ export function HomePage() {
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const [summaryAsset, setSummaryAsset] = useState<AssetView | null>(null);
-  const [summaryRaw, setSummaryRaw] = useState<{ cash: number; seed: number } | null>(null);
+  const [summaryRaw, setSummaryRaw] = useState<{ cash: number; seed: number; available: number } | null>(null);
   const [assetHoldings, setAssetHoldings] = useState<{ code: string; quantity: number; price: number }[]>([]);
   const [assetHoldingsLoaded, setAssetHoldingsLoaded] = useState(false);
   const [marketStatus, setMarketStatus] = useState<MarketStatusCard[]>([]);
@@ -223,6 +225,7 @@ export function HomePage() {
           ),
           cash: formatWon(summaryRaw.cash),
           evaluation: formatWon(liveEvaluation),
+          available: formatWon(summaryRaw.available),
         }
       : summaryAsset ?? EMPTY_ASSET;
 
@@ -303,16 +306,17 @@ export function HomePage() {
 
   // 관심종목 상태 (하트 토글)
   const [watchset, setWatchset] = useState<Set<string>>(new Set());
+  const watchContestId = isContestMode && contestId ? Number(contestId) : 0;
   useEffect(() => {
     marketApi
-      .getWatchlist('domestic')
+      .getWatchlist('domestic', watchContestId)
       .then((data) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const codes = (data?.items ?? data?.stocks ?? []).map((i: any) => i.code ?? i.stockCode);
         setWatchset(new Set(codes.filter(Boolean)));
       })
       .catch(() => {});
-  }, []);
+  }, [watchContestId]);
 
   const toggleWatch = async (code: string) => {
     const has = watchset.has(code);
@@ -323,8 +327,8 @@ export function HomePage() {
       return next;
     });
     try {
-      if (has) await marketApi.deleteWatchlist(code);
-      else await marketApi.addWatchlist(code);
+      if (has) await marketApi.deleteWatchlist(code, watchContestId);
+      else await marketApi.addWatchlist(code, watchContestId);
     } catch {
       setWatchset((prev) => {
         const next = new Set(prev);
@@ -369,7 +373,7 @@ export function HomePage() {
           if (cancelled || !s) return;
           const total = Number(s.currentAsset ?? 0);
           const profit = Number(s.profitAmount ?? 0);
-          setSummaryRaw({ cash: Number(s.cashBalance ?? 0), seed: total - profit });
+          setSummaryRaw({ cash: Number(s.cashBalance ?? 0), seed: total - profit, available: Number(s.availableBalance ?? 0) });
         })
         .catch(() => {});
 
@@ -406,11 +410,13 @@ export function HomePage() {
             rate: formatSignedRate(Number(s.profitRate ?? 0)),
             cash: formatWon(Number(s.cashBalance ?? 0)),
             evaluation: formatWon(Number(s.stockValuation ?? 0)),
+            available: formatWon(Number(s.availableBalance ?? 0)),
           });
           // 총자산 live 계산용 원시값 (시드 = 총자산 - 수익)
           setSummaryRaw({
             cash: Number(s.cashBalance ?? 0),
             seed: Number(s.totalAsset ?? 0) - Number(s.profitAmount ?? 0),
+            available: Number(s.availableBalance ?? 0),
           });
         })
         .catch(() => {});
@@ -564,14 +570,18 @@ export function HomePage() {
           ) : null}
         </div>
         {!isContestMode ? (
-          <div className="mt-5 grid grid-cols-2 gap-3">
+          <div className="mt-5 grid grid-cols-3 gap-2">
             <div className="rounded-xl bg-white/15 p-3">
               <p className="text-xs text-blue-100">예수금</p>
-              <p className="mt-1 text-sm font-bold">{normalAsset.cash}</p>
+              <p className="mt-1 text-xs font-bold">{normalAsset.cash}</p>
             </div>
             <div className="rounded-xl bg-white/15 p-3">
               <p className="text-xs text-blue-100">주식평가</p>
-              <p className="mt-1 text-sm font-bold">{normalAsset.evaluation}</p>
+              <p className="mt-1 text-xs font-bold">{normalAsset.evaluation}</p>
+            </div>
+            <div className="rounded-xl bg-white/15 p-3">
+              <p className="text-xs text-blue-100">주문 가능</p>
+              <p className="mt-1 text-xs font-bold">{normalAsset.available}</p>
             </div>
           </div>
         ) : null}

@@ -4,9 +4,12 @@ import { WatchlistStockCard } from '../../components/user/WatchlistStockCard';
 import { WatchlistTabs } from '../../components/user/WatchlistTabs';
 import { marketApi } from '../../api/user/market';
 import { parseApiError } from '../../api/parseApiError';
+import { useContestMode } from '../../contexts/ContestModeContext';
 import type { WatchlistMarketType, WatchlistStockItem } from '../../types/watchlist';
 
 export function WatchlistPage() {
+  const { contestId } = useContestMode();
+  const cid = Number(contestId) || 0; // 일반 모드 = 0, 대회 모드 = 대회 ID
   const [activeMarket, setActiveMarket] = useState<WatchlistMarketType>('DOMESTIC');
   const [watchlistItems, setWatchlistItems] = useState<WatchlistStockItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,7 +27,7 @@ export function WatchlistPage() {
       setLoading(true);
     }
     try {
-      const data = await marketApi.getWatchlist('domestic');
+      const data = await marketApi.getWatchlist('domestic', cid);
       setWatchlistItems(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (data.items ?? []).map((item: any) => ({
@@ -47,7 +50,7 @@ export function WatchlistPage() {
         setLoading(false);
       }
     }
-  }, [activeMarket]);
+  }, [activeMarket, cid]);
 
   useEffect(() => {
     fetchWatchlist();
@@ -61,7 +64,7 @@ export function WatchlistPage() {
 
   const handleRemoveWatchlist = async (id: string) => {
     try {
-      await marketApi.deleteWatchlist(id);
+      await marketApi.deleteWatchlist(id, cid);
       setWatchlistItems((current) => current.filter((item) => item.id !== id));
     } catch (e) {
       setError(parseApiError(e));

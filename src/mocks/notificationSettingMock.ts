@@ -37,13 +37,13 @@ export const contestNotificationItems: NotificationSettingItem[] = [
     key: 'contestStartAlert',
     icon: '🏆',
     title: '대회 시작 알림',
-    description: '참여 중인 대회가 시작되면 알려드려요',
+    description: '참여 중인 대회 시작 30분 전 알려드려요',
   },
   {
     key: 'contestEndAlert',
     icon: '🏁',
     title: '대회 종료 알림',
-    description: '대회가 종료되면 결과를 알려드려요',
+    description: '대회 종료 30분 전 알려드려요',
   },
   {
     key: 'rankingChangeAlert',
@@ -58,12 +58,12 @@ export const marketNotificationItems: NotificationSettingItem[] = [
     key: 'marketOpenAlert',
     icon: '🔔',
     title: '장 시작 알림',
-    description: '오전 9시 장이 열릴 때 알려드려요',
+    description: '장 시작 30분 전(오전 8시 30분) 알려드려요',
   },
   {
     key: 'marketCloseAlert',
     icon: '📣',
     title: '장 마감 알림',
-    description: '오후 3시 30분 장 마감 시 알려드려요',
+    description: '장 마감 30분 전(오후 3시) 알려드려요',
   },
 ];
