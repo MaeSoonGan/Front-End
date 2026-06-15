@@ -1,6 +1,6 @@
 export type BalanceTab = 'holdings' | 'trades' | 'executions';
 export type TradeSide = 'BUY' | 'SELL';
-export type ExecutionStatus = 'FILLED' | 'PARTIAL' | 'OPEN' | 'CANCELLED';
+export type ExecutionStatus = 'FILLED' | 'PARTIAL' | 'OPEN' | 'CANCEL_REQUESTED' | 'CANCELLED';
 export type ExecutionFilterType = 'ALL' | 'FILLED' | 'OPEN';
 
 export interface BalanceSummary {

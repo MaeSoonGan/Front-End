@@ -97,8 +97,11 @@ function toExecutionStatus(status: string): ExecutionStatus {
     case 'OPEN':
     case 'PENDING':
       return 'OPEN';
+    case 'CANCEL_REQUESTED':
+      // 취소 요청 후 온프렘 확정 대기 상태(아직 취소 완료 아님)
+      return 'CANCEL_REQUESTED';
     default:
-      // CANCELED, CANCELLED, CANCEL_REQUESTED, CANCEL_FAILED, REJECTED 등
+      // CANCELED, CANCELLED, CANCEL_FAILED, REJECTED 등
       return 'CANCELLED';
   }
 }
@@ -164,6 +167,8 @@ export function BalancePage() {
   const { contestId, isContestMode } = useContestMode();
   const [activeTab, setActiveTab] = useState<BalanceTab>(() => getInitialTab(searchParams.get('tab')));
 
+  // 주문 취소 등으로 서버 상태가 바뀌면 증가시켜 잔고/체결을 재조회한다.
+  const [refreshKey, setRefreshKey] = useState(0);
   const [summary, setSummary] = useState<BalanceSummary>(EMPTY_SUMMARY);
   const [holdings, setHoldings] = useState<HoldingItem[]>([]);
   const [profitTrend, setProfitTrend] = useState<ProfitTrendPoint[]>([]);
@@ -269,7 +274,7 @@ export function BalancePage() {
     return () => {
       cancelled = true;
     };
-  }, [isContestMode, contestId]);
+  }, [isContestMode, contestId, refreshKey]);
 
   // 매매내역 — 날짜/구분 필터로 백엔드 조회 (필터 변경 시 재조회)
   useEffect(() => {
@@ -324,21 +329,24 @@ export function BalancePage() {
     return () => {
       cancelled = true;
     };
-  }, [isContestMode, contestId, executionDate]);
+  }, [isContestMode, contestId, executionDate, refreshKey]);
 
   const handleCancelExecution = async (orderId: string) => {
     const cid = isContestMode && contestId ? Number(contestId) : undefined;
     await orderApi.cancelOrder(orderId, cid);
+    // 취소 "요청"만 보낸 상태 → 즉시 완료가 아니라 '취소 요청 중'으로 표시.
+    // 실제 취소 확정/주문가능·예수금 복원은 온프렘 확정 후 서버 상태에 반영되므로 재조회로 갱신한다.
     setExecutions((current) =>
       current.map((execution) =>
         execution.id === orderId
           ? {
               ...execution,
-              status: 'CANCELLED',
+              status: 'CANCEL_REQUESTED',
             }
           : execution,
       ),
     );
+    setRefreshKey((key) => key + 1);
   };
 
   const handleChangeTab = (tab: BalanceTab) => {
