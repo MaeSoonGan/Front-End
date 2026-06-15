@@ -60,15 +60,15 @@ export const marketApi = {
   searchStocks: (keyword: string, market: string) =>
     client.get('/api/stocks/search', { params: { keyword, market } }).then(r => r.data.data),
 
-  // 관심종목 조회
-  getWatchlist: (market: string = 'domestic') =>
-    client.get('/api/watchlist', { params: { market } }).then(r => r.data.data),
+  // 관심종목 조회 (contestId=0이면 일반 모드, 그 외 대회별)
+  getWatchlist: (market: string = 'domestic', contestId: number = 0) =>
+    client.get('/api/watchlist', { params: { market, contestId } }).then(r => r.data.data),
 
   // 관심종목 추가
-  addWatchlist: (stockCode: string) =>
-    client.post(`/api/watchlist/${stockCode}`).then(r => r.data.data),
+  addWatchlist: (stockCode: string, contestId: number = 0) =>
+    client.post(`/api/watchlist/${stockCode}`, null, { params: { contestId } }).then(r => r.data.data),
 
   // 관심종목 삭제
-  deleteWatchlist: (stockCode: string) =>
-    client.delete(`/api/watchlist/${stockCode}`).then(r => r.data.data),
+  deleteWatchlist: (stockCode: string, contestId: number = 0) =>
+    client.delete(`/api/watchlist/${stockCode}`, { params: { contestId } }).then(r => r.data.data),
 };

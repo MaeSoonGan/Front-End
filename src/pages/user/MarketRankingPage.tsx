@@ -29,7 +29,8 @@ function formatSignedRate(value: number) {
 
 export function MarketRankingPage() {
   const navigate = useNavigate();
-  const { getContestPath, isContestMode } = useContestMode();
+  const { getContestPath, isContestMode, contestId } = useContestMode();
+  const watchContestId = isContestMode && contestId ? Number(contestId) : 0;
   const marketPath = isContestMode ? getContestPath('/market') : '/market';
 
   const [items, setItems] = useState<RankingItem[]>([]);
@@ -74,14 +75,14 @@ export function MarketRankingPage() {
   // 관심종목 상태
   useEffect(() => {
     marketApi
-      .getWatchlist('domestic')
+      .getWatchlist('domestic', watchContestId)
       .then((data) => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const codes = (data?.items ?? data?.stocks ?? []).map((i: any) => i.code ?? i.stockCode);
         setWatchset(new Set(codes.filter(Boolean)));
       })
       .catch(() => {});
-  }, []);
+  }, [watchContestId]);
 
   const toggleWatch = useCallback(async (code: string) => {
     const has = watchset.has(code);
@@ -92,8 +93,8 @@ export function MarketRankingPage() {
       return next;
     });
     try {
-      if (has) await marketApi.deleteWatchlist(code);
-      else await marketApi.addWatchlist(code);
+      if (has) await marketApi.deleteWatchlist(code, watchContestId);
+      else await marketApi.addWatchlist(code, watchContestId);
     } catch {
       setWatchset((prev) => {
         const next = new Set(prev);
@@ -102,7 +103,7 @@ export function MarketRankingPage() {
         return next;
       });
     }
-  }, [watchset]);
+  }, [watchset, watchContestId]);
 
   return (
     <div className="min-h-full bg-[#F3F7FC] px-4 pb-24 pt-4">

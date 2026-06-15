@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MarketTabs } from '../../components/user/MarketTabs';
 import { OrderBottomSheet } from '../../components/user/OrderBottomSheet';
 import { useMarketSocket } from '../../hooks/useMarketSocket';
+import { useContestMode } from '../../contexts/ContestModeContext';
 import { OrderBookList } from '../../components/user/OrderBookList';
 import { StockChartSection } from '../../components/user/StockChartSection';
 import { StockInfoGrid } from '../../components/user/StockInfoGrid';
@@ -94,6 +95,8 @@ function getInitialOrderSide(orderSide: string | null): OrderSide | null {
 
 export function MarketPage() {
   const navigate = useNavigate();
+  const { contestId } = useContestMode();
+  const cid = Number(contestId) || 0; // 일반 모드 = 0, 대회 모드 = 대회 ID
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<MarketTab>(() => getInitialTab(searchParams.get('tab')));
   const [activePeriod, setActivePeriod] = useState<ChartPeriod>('day');
@@ -245,11 +248,11 @@ export function MarketPage() {
   // 관심종목 여부 조회
   useEffect(() => {
     if (!stockCode) return;
-    marketApi.getWatchlist('domestic')
+    marketApi.getWatchlist('domestic', cid)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .then((data) => setIsFavorite((data.items ?? []).some((i: any) => i.code === stockCode)))
       .catch(() => {});
-  }, [stockCode]);
+  }, [stockCode, cid]);
 
   // 실시간 시세 + 호가 구독 (현재 보는 종목)
   const { prices: livePrices, orderbooks: liveOrderbooks } = useMarketSocket(
@@ -298,9 +301,9 @@ export function MarketPage() {
     setIsFavorite(next); // 낙관적 업데이트
     try {
       if (next) {
-        await marketApi.addWatchlist(stockCode);
+        await marketApi.addWatchlist(stockCode, cid);
       } else {
-        await marketApi.deleteWatchlist(stockCode);
+        await marketApi.deleteWatchlist(stockCode, cid);
       }
     } catch {
       setIsFavorite(!next); // 실패 시 롤백
