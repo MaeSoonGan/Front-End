@@ -222,8 +222,10 @@ export function ContestRankingPage() {
         : p,
     );
     merged.sort((a, b) => b.profitRate - a.profitRate);
-    return merged.map((p, i) => ({
-      rank: i + 1,
+    // 공동순위(올림픽식): 나보다 수익률이 높은 사람 수 + 1 → 동점은 같은 등수, 다음은 인원수만큼 건너뜀
+    // (상단 내 순위 카드의 liveRank 계산과 동일한 기준으로 일치시킴)
+    return merged.map((p) => ({
+      rank: merged.filter((q) => q.profitRate > p.profitRate).length + 1,
       nickname: p.nickname,
       profitAmount: p.profitAmount,
       profitRate: p.profitRate,
