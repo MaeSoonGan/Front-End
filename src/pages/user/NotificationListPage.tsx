@@ -30,7 +30,7 @@ function resolveType(rawType: string): { type: NotificationType; direction?: Not
   return { type: 'NOTICE' };
 }
 
-// createdAt이 오늘(브라우저 로컬 날짜)인지 판단 — 읽은 알림은 오늘 것만 표시(날짜 지나면 초기화)
+// createdAt이 오늘(브라우저 로컬 날짜)인지 — 오늘 생성된 알림만 표시(날짜 지나면 목록 초기화)
 function isToday(iso: string): boolean {
   if (!iso) return false;
   const d = new Date(iso);
@@ -108,18 +108,22 @@ export function NotificationListPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const visibleNotifications = notifications.slice(0, visibleCount);
+  // 오늘 생성된 알림만 표시 → 날짜가 지나면 목록이 자동 초기화됨
+  const todayNotifications = useMemo(
+    () => notifications.filter((notification) => isToday(notification.createdAt)),
+    [notifications],
+  );
+  const visibleNotifications = todayNotifications.slice(0, visibleCount);
   const unreadNotifications = useMemo(
     () => visibleNotifications.filter((notification) => !notification.isRead),
     [visibleNotifications],
   );
-  // 읽은 알림은 오늘 생성된 것만 표시 → 날짜가 지나면 읽은 목록이 자동 초기화됨
   const readNotifications = useMemo(
-    () => visibleNotifications.filter((notification) => notification.isRead && isToday(notification.createdAt)),
+    () => visibleNotifications.filter((notification) => notification.isRead),
     [visibleNotifications],
   );
-  const totalUnreadCount = notifications.filter((notification) => !notification.isRead).length;
-  const hasMore = visibleCount < notifications.length;
+  const totalUnreadCount = todayNotifications.filter((notification) => !notification.isRead).length;
+  const hasMore = visibleCount < todayNotifications.length;
 
   const handleReadNotification = (id: string) => {
     const target = notifications.find((notification) => notification.id === id);
@@ -143,7 +147,7 @@ export function NotificationListPage() {
 
   const handleLoadMore = () => {
     setVisibleCount((currentCount) =>
-      Math.min(currentCount + LOAD_MORE_COUNT, notifications.length),
+      Math.min(currentCount + LOAD_MORE_COUNT, todayNotifications.length),
     );
   };
 
@@ -161,9 +165,9 @@ export function NotificationListPage() {
         </button>
       </div>
 
-      {loading && notifications.length === 0 ? (
+      {loading && todayNotifications.length === 0 ? (
         <p className="py-16 text-center text-xs font-bold text-[#6C88A4]">불러오는 중...</p>
-      ) : notifications.length === 0 ? (
+      ) : todayNotifications.length === 0 ? (
         <p className="py-16 text-center text-xs font-bold text-[#A3B4C6]">알림이 없습니다.</p>
       ) : (
         <div className="space-y-5">
@@ -187,7 +191,7 @@ export function NotificationListPage() {
           ) : null}
 
           <p className="pb-4 pt-2 text-center text-xs font-bold text-[#6C88A4]">
-            최근 30일 알림만 표시됩니다
+            오늘 받은 알림만 표시됩니다
           </p>
         </div>
       )}

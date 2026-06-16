@@ -113,7 +113,8 @@ export function AdminSuspensionPage() {
           memberId:         Number(r.memberId),
           targetNickname:   r.nickname ?? '',
           targetAccountId:  r.accountId ?? '',
-          type:             'MANUAL' as SuspensionType,
+          // 자동정지(로그인 실패 누적)는 BE가 reason을 고정 문구로 기록 → reason으로 자동/수동 판별
+          type:             (r.reason === '로그인 실패 누적 자동 정지' ? 'AUTO' : 'MANUAL') as SuspensionType,
           reason:           r.reason ?? '',
           adminName:        r.adminName ?? '',
           processedAt:      isoToProcessedAt(r.createdAt),
