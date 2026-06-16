@@ -67,7 +67,7 @@ export function LoginPage() {
         setErrors({
           server:
             status === 403
-              ? '비밀번호를 여러 번 틀려 계정이 잠겼습니다. 비밀번호 재설정 후 다시 시도해주세요.'
+              ? '비밀번호를 여러 번 틀려 계정이 잠겼습니다.\n비밀번호 재설정 후 다시 시도해주세요.'
               : '아이디 또는 비밀번호가 일치하지 않습니다.',
         });
       }
@@ -137,7 +137,7 @@ export function LoginPage() {
         </div>
 
         {errors.server ? (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">
+          <p className="whitespace-pre-line break-keep rounded-lg bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-600">
             {errors.server}
           </p>
         ) : null}
